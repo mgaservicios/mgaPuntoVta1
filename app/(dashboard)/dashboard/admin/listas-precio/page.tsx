@@ -21,11 +21,11 @@ type FormState = {
   nombre: string
   tipo: 'manual' | 'calculada'
   categoria: 'costo' | 'venta'
-  lista_base_id: string
+  lista_base_id: string | null
   porcentaje: string
 }
 
-const FORM_INITIAL: FormState = { nombre: '', tipo: 'manual', categoria: 'venta', lista_base_id: '', porcentaje: '' }
+const FORM_INITIAL: FormState = { nombre: '', tipo: 'manual', categoria: 'venta', lista_base_id: null, porcentaje: '' }
 
 export default function ListasPrecioPage() {
   const [listas, setListas] = useState<ListaPrecio[]>([])
@@ -91,7 +91,7 @@ export default function ListasPrecioPage() {
       nombre: lista.nombre,
       tipo: lista.tipo,
       categoria: lista.categoria,
-      lista_base_id: lista.lista_base_id ? String(lista.lista_base_id) : '',
+      lista_base_id: lista.lista_base_id ? String(lista.lista_base_id) : null,
       porcentaje: lista.porcentaje != null ? String(lista.porcentaje) : '',
     })
   }
@@ -171,7 +171,7 @@ export default function ListasPrecioPage() {
 
           <div className="flex flex-col gap-1">
             <label className="text-xs text-gray-500">Tipo</label>
-            <Select value={form.tipo} onValueChange={(v) => setForm((f) => ({ ...f, tipo: v as 'manual' | 'calculada', lista_base_id: '', porcentaje: '' }))}>
+            <Select value={form.tipo} onValueChange={(v) => setForm((f) => ({ ...f, tipo: v as 'manual' | 'calculada', lista_base_id: null, porcentaje: '' }))}>
               <SelectTrigger className="w-36">
                 <SelectValue />
               </SelectTrigger>
@@ -282,7 +282,7 @@ export default function ListasPrecioPage() {
                 {/* Tipo */}
                 <TableCell>
                   {editId === lista.id ? (
-                    <Select value={editForm.tipo} onValueChange={(v) => setEditForm((f) => ({ ...f, tipo: v as 'manual' | 'calculada', lista_base_id: '', porcentaje: '' }))}>
+                    <Select value={editForm.tipo} onValueChange={(v) => setEditForm((f) => ({ ...f, tipo: v as 'manual' | 'calculada', lista_base_id: null, porcentaje: '' }))}>
                       <SelectTrigger className="h-8 w-32">
                         <SelectValue />
                       </SelectTrigger>
