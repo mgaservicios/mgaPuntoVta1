@@ -95,8 +95,8 @@ export async function GET(req: NextRequest) {
       ...a,
       stock_sucursales: withActive(byArticulo[a.id] ?? []),
       articulo_variantes: (a.articulo_variantes ?? []).map((v) => ({
-        ...(v as object),
-        stock_sucursales: withActive(byVariante[(v as { id: number }).id] ?? []),
+        ...v,
+        stock_sucursales: withActive(byVariante[v.id] ?? []),
       })),
     }))
   }
