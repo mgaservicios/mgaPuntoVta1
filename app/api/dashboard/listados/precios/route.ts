@@ -81,12 +81,14 @@ export async function GET(req: NextRequest) {
 
   const targetMap = byList.get(parseInt(listaId, 10))!
   const baseMap = lista.lista_base_id ? byList.get(lista.lista_base_id) : null
+  const listaTipo = lista.tipo
+  const listaPorcentaje = lista.porcentaje
 
   function getPrecio(articuloId: number, varianteId: number | null): number | null {
     const key = `${articuloId}-${varianteId ?? 'null'}`
     const artKey = `${articuloId}-null` // fallback al nivel artículo
 
-    if (lista.tipo === 'manual') {
+    if (listaTipo === 'manual') {
       // Precio específico de variante → precio nivel artículo
       return targetMap.get(key) ?? (varianteId !== null ? (targetMap.get(artKey) ?? null) : null)
     }
@@ -96,10 +98,10 @@ export async function GET(req: NextRequest) {
     if (override != null) return override
 
     // Derivar de la lista base × porcentaje
-    if (!baseMap || lista.porcentaje == null) return null
+    if (!baseMap || listaPorcentaje == null) return null
     const base = baseMap.get(key) ?? (varianteId !== null ? (baseMap.get(artKey) ?? null) : null)
     if (base == null) return null
-    return Math.round(base * (1 + Number(lista.porcentaje) / 100) * 100) / 100
+    return Math.round(base * (1 + Number(listaPorcentaje) / 100) * 100) / 100
   }
 
   // 4. Armar filas
