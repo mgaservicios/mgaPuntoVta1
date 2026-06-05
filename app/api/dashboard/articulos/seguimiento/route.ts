@@ -227,7 +227,7 @@ export async function GET(req: NextRequest) {
     ventas: { numero: string } | null
     articulo_variantes: { sku: string | null; variante_atributos?: { valor: string; atributo_tipos: { nombre: string } | null }[] }[] | null
   }
-  const movimientos = ((movsResult.data ?? []) as MovRaw[]).map(m => ({
+  const movimientos = ((movsResult.data ?? []) as unknown as MovRaw[]).map(m => ({
     id: `mov-${m.id}`,
     tipo: m.tipo,
     cantidad: m.cantidad,
@@ -237,7 +237,7 @@ export async function GET(req: NextRequest) {
     observaciones: m.observaciones,
     fecha: m.created_at,
     variante_id: m.variante_id,
-    sucursal: m.sucursales?.nombre ?? null,
+    sucursal: (() => { const s = m.sucursales as unknown; return (Array.isArray(s) ? (s as {nombre:string}[])[0]?.nombre : (s as {nombre:string}|null)?.nombre) ?? null })(),
     variante: m.articulo_variantes?.[0] ?? null,
   }))
 
