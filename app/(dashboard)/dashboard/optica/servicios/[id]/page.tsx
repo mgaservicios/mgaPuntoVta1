@@ -167,7 +167,8 @@ export default function OpticaServicioPage({ params }: { params: Promise<{ id: s
     }
   }
 
-  function updateTipoField(key: string, field: 'detalle' | 'precio' | 'estadoItem', value: string) {
+  function updateTipoField(key: string, field: 'detalle' | 'precio' | 'estadoItem', value: string | null) {
+    if (value === null) return
     setTipos(prev => prev.map(t => t.key === key ? { ...t, [field]: value } : t))
   }
 
