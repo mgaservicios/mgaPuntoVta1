@@ -56,7 +56,7 @@ export async function DELETE(_: NextRequest, { params }: Ctx) {
     tipo: 'venta',
     referencia_id: Number(id),
     numero: venta.numero,
-    cliente_nombre: (venta.clientes as { nombre: string } | null)?.nombre ?? null,
+    cliente_nombre: (() => { const c = venta.clientes as unknown; return (Array.isArray(c) ? (c as {nombre:string}[])[0]?.nombre : (c as {nombre:string}|null)?.nombre) ?? null })(),
     total: venta.total,
     fecha_documento: venta.fecha,
     sucursal_id: venta.sucursal_id,
