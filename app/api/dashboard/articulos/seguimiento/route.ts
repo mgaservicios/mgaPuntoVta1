@@ -181,7 +181,7 @@ export async function GET(req: NextRequest) {
 
   type RemitoItemRaw = {
     id: number; remito_id: number; variante_id: number | null; cantidad: number
-    articulo_variantes: { sku: string | null; variante_atributos?: { valor: string; atributo_tipos: { nombre: string } | null }[] } | null
+    articulo_variantes: { sku: string | null; variante_atributos?: { valor: string; atributo_tipos: { nombre: string } | null }[] }[] | null
   }
   const remitoItems = (remitoItemsResult.data ?? []) as RemitoItemRaw[]
   const remitoIds = [...new Set(remitoItems.map(i => i.remito_id))]
@@ -225,7 +225,7 @@ export async function GET(req: NextRequest) {
     referencia: string | null; observaciones: string | null; created_at: string; variante_id: number | null
     sucursales: { nombre: string } | null
     ventas: { numero: string } | null
-    articulo_variantes: { sku: string | null; variante_atributos?: { valor: string; atributo_tipos: { nombre: string } | null }[] } | null
+    articulo_variantes: { sku: string | null; variante_atributos?: { valor: string; atributo_tipos: { nombre: string } | null }[] }[] | null
   }
   const movimientos = ((movsResult.data ?? []) as MovRaw[]).map(m => ({
     id: `mov-${m.id}`,
@@ -238,7 +238,7 @@ export async function GET(req: NextRequest) {
     fecha: m.created_at,
     variante_id: m.variante_id,
     sucursal: m.sucursales?.nombre ?? null,
-    variante: m.articulo_variantes,
+    variante: m.articulo_variantes?.[0] ?? null,
   }))
 
   // ── Normalizar remito_items ──
@@ -257,7 +257,7 @@ export async function GET(req: NextRequest) {
         fecha: r.fecha,
         variante_id: item.variante_id,
         sucursal: sucursalesMap[r.sucursal_id] ?? null,
-        variante: item.articulo_variantes,
+        variante: item.articulo_variantes?.[0] ?? null,
       }
     })
 

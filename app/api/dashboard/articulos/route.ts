@@ -45,18 +45,21 @@ export async function GET(req: NextRequest) {
     const articuloIds = rows.map(a => a.id)
     if (articuloIds.length === 0) return rows
 
-    const { data: stockRows } = await supabase
-      .from('articulo_stock')
-      .select('articulo_id, variante_id, sucursal_id, stock_actual, sucursales(nombre)')
-      .in('articulo_id', articuloIds)
+    // Fetch stock rows and all sucursales in parallel — avoids the array/scalar
+    // ambiguity of the sucursales(nombre) FK join and ensures every sucursal
+    // always appears as a column (even with 0 stock).
+    const [{ data: stockRows }, { data: sucursalesData }] = await Promise.all([
+      supabase
+        .from('articulo_stock')
+        .select('articulo_id, variante_id, sucursal_id, stock_actual')
+        .in('articulo_id', articuloIds),
+      supabase
+        .from('sucursales')
+        .select('id, nombre'),
+    ])
 
-    // Fetch the active sucursal name so we can always show its column even when stock is 0
-    const { data: sucData } = await supabase
-      .from('sucursales')
-      .select('nombre')
-      .eq('id', activeSucursalId)
-      .maybeSingle()
-    const activeSucursalNombre = (sucData as { nombre: string } | null)?.nombre ?? null
+    const allSucursales = (sucursalesData ?? []) as Array<{ id: number; nombre: string }>
+    const sucNombreMap: Record<number, string> = Object.fromEntries(allSucursales.map(s => [s.id, s.nombre]))
 
     const byArticulo: Record<number, StockEntry[]> = {}
     const byVariante: Record<number, StockEntry[]> = {}
@@ -66,11 +69,10 @@ export async function GET(req: NextRequest) {
       variante_id: number | null
       sucursal_id: number
       stock_actual: number
-      sucursales: { nombre: string }[] | null
     }>) {
       const entry: StockEntry = {
         sucursal_id: s.sucursal_id,
-        sucursal_nombre: s.sucursales?.[0]?.nombre ?? '',
+        sucursal_nombre: sucNombreMap[s.sucursal_id] ?? '',
         stock_actual: s.stock_actual,
         is_active: s.sucursal_id === activeSucursalId,
       }
@@ -81,22 +83,23 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Ensure the active sucursal always has an entry (shows 0 when missing)
-    function withActive(entries: StockEntry[]): StockEntry[] {
-      if (!activeSucursalNombre) return entries
-      if (entries.some(e => e.sucursal_id === activeSucursalId)) return entries
-      return [
-        { sucursal_id: activeSucursalId as number, sucursal_nombre: activeSucursalNombre, stock_actual: 0, is_active: true },
-        ...entries,
-      ]
+    // Ensure ALL sucursales always have an entry (shows 0 when missing)
+    function withAll(entries: StockEntry[]): StockEntry[] {
+      const result = [...entries]
+      for (const suc of allSucursales) {
+        if (!result.some(e => e.sucursal_id === suc.id)) {
+          result.push({ sucursal_id: suc.id, sucursal_nombre: suc.nombre, stock_actual: 0, is_active: suc.id === activeSucursalId })
+        }
+      }
+      return result
     }
 
     return rows.map(a => ({
       ...a,
-      stock_sucursales: withActive(byArticulo[a.id] ?? []),
+      stock_sucursales: withAll(byArticulo[a.id] ?? []),
       articulo_variantes: (a.articulo_variantes ?? []).map((v) => ({
         ...v,
-        stock_sucursales: withActive(byVariante[v.id] ?? []),
+        stock_sucursales: withAll(byVariante[v.id] ?? []),
       })),
     }))
   }
