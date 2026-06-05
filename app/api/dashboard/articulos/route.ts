@@ -170,7 +170,8 @@ export async function GET(req: NextRequest) {
     }))
   }
 
-  let enriched: object[]
+  type EnrichedRow = { id: number; tipo_articulo: string; articulo_variantes?: Array<{ id: number }> } & Record<string, unknown>
+  let enriched: EnrichedRow[]
 
   if (q?.trim()) {
     const { data, error } = await supabase.rpc('buscar_articulos', {
@@ -178,7 +179,7 @@ export async function GET(req: NextRequest) {
       p_limit: 50,
     })
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    enriched = await enrichVariantes(data ?? [])
+    enriched = await enrichVariantes(data ?? []) as EnrichedRow[]
   } else {
     let query = supabase
       .from('articulos')
@@ -191,7 +192,7 @@ export async function GET(req: NextRequest) {
 
     const { data, error } = await query
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    enriched = data ?? []
+    enriched = (data ?? []) as EnrichedRow[]
   }
 
   const withStock = await enrichStock(enriched)
