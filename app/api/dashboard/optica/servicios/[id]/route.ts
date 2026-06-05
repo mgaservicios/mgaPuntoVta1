@@ -156,7 +156,7 @@ export async function DELETE(_: NextRequest, { params }: Ctx) {
     tipo:            'optica_servicio',
     referencia_id:   Number(id),
     numero:          servicio.numero,
-    cliente_nombre:  (servicio.clientes as { nombre: string } | null)?.nombre ?? null,
+    cliente_nombre:  (() => { const c = servicio.clientes as unknown; return (Array.isArray(c) ? (c as {nombre:string}[])[0]?.nombre : (c as {nombre:string}|null)?.nombre) ?? null })(),
     total:           servicio.total,
     fecha_documento: servicio.fecha,
     sucursal_id:     servicio.sucursal_id,
