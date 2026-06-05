@@ -129,7 +129,7 @@ export async function DELETE(_: NextRequest, { params }: Ctx) {
     tipo: 'orden_venta',
     referencia_id: Number(id),
     numero: orden.numero,
-    cliente_nombre: (orden.clientes as { nombre: string } | null)?.nombre ?? null,
+    cliente_nombre: (() => { const c = orden.clientes as unknown; return (Array.isArray(c) ? (c as {nombre:string}[])[0]?.nombre : (c as {nombre:string}|null)?.nombre) ?? null })(),
     total: orden.total,
     fecha_documento: orden.fecha,
     sucursal_id: orden.sucursal_id,
