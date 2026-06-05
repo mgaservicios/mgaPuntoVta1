@@ -40,7 +40,7 @@ export async function GET(_: NextRequest, { params }: Ctx) {
         variante_id: null,
         stock_actual: 0,
         stock_minimo: 0,
-        sucursales: { nombre: (sucData as { nombre: string }).nombre },
+        sucursales: [{ nombre: (sucData as { nombre: string }).nombre }],
         is_active: true,
       })
     }
