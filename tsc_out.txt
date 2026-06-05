@@ -1,0 +1,19 @@
+﻿app/api/dashboard/admin/usuarios/[id]/route.ts(37,41): error TS2304: Cannot find name 'supabase'.
+app/api/dashboard/admin/usuarios/[id]/route.ts(45,38): error TS2304: Cannot find name 'supabase'.
+app/api/dashboard/admin/usuarios/[id]/route.ts(49,9): error TS2304: Cannot find name 'supabase'.
+app/api/dashboard/admin/usuarios/[id]/route.ts(51,11): error TS2304: Cannot find name 'supabase'.
+app/api/dashboard/articulos/[id]/stock-sucursales/route.ts(43,23): error TS2353: Object literal may only specify known properties, and 'nombre' does not exist in type '{ nombre: any; }[]'.
+app/api/dashboard/articulos/route.ts(64,21): error TS2352: Conversion of type '{ articulo_id: any; variante_id: any; sucursal_id: any; stock_actual: any; sucursales: { nombre: any; }[]; }[]' to type '{ articulo_id: number; variante_id: number | null; sucursal_id: number; stock_actual: number; sucursales: { nombre: string; } | null; }[]' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type '{ articulo_id: any; variante_id: any; sucursal_id: any; stock_actual: any; sucursales: { nombre: any; }[]; }' is not comparable to type '{ articulo_id: number; variante_id: number | null; sucursal_id: number; stock_actual: number; sucursales: { nombre: string; } | null; }'.
+    Types of property 'sucursales' are incompatible.
+      Property 'nombre' is missing in type '{ nombre: any; }[]' but required in type '{ nombre: string; }'.
+app/api/dashboard/articulos/route.ts(128,46): error TS2345: Argument of type 'object[]' is not assignable to parameter of type '{ id: number; tipo_articulo: string; articulo_variantes?: { id: number; }[] | undefined; }[]'.
+  Type '{}' is missing the following properties from type '{ id: number; tipo_articulo: string; articulo_variantes?: { id: number; }[] | undefined; }': id, tipo_articulo
+app/api/dashboard/articulos/seguimiento/route.ts(140,23): error TS2352: Conversion of type '{ id: any; remito_id: any; variante_id: any; cantidad: any; articulo_variantes: { sku: any; variante_atributos: { valor: any; atributo_tipos: { nombre: any; }[]; }[]; }[]; }[]' to type 'RemitoItemRaw[]' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type '{ id: any; remito_id: any; variante_id: any; cantidad: any; articulo_variantes: { sku: any; variante_atributos: { valor: any; atributo_tipos: { nombre: any; }[]; }[]; }[]; }' is not comparable to type 'RemitoItemRaw'.
+    Types of property 'articulo_variantes' are incompatible.
+      Property 'sku' is missing in type '{ sku: any; variante_atributos: { valor: any; atributo_tipos: { nombre: any; }[]; }[]; }[]' but required in type '{ sku: string | null; variante_atributos?: { valor: string; atributo_tipos: { nombre: string; } | null; }[] | undefined; }'.
+app/api/dashboard/articulos/seguimiento/route.ts(184,24): error TS2352: Conversion of type '{ id: any; tipo: any; cantidad: any; stock_antes: any; stock_despues: any; referencia: any; observaciones: any; created_at: any; variante_id: any; sucursales: { nombre: any; }[]; ventas: { numero: any; }[]; articulo_variantes: { ...; }[]; }[]' to type 'MovRaw[]' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type '{ id: any; tipo: any; cantidad: any; stock_antes: any; stock_despues: any; referencia: any; observaciones: any; created_at: any; variante_id: any; sucursales: { nombre: any; }[]; ventas: { numero: any; }[]; articulo_variantes: { ...; }[]; }' is not comparable to type 'MovRaw'.
+    Types of property 'sucursales' are incompatible.
+      Property 'nombre' is missing in type '{ nombre: any; }[]' but required in type '{ nombre: string; }'.
