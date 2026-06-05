@@ -201,10 +201,15 @@ export default function OpticaServiciosClient({ isAdmin }: { isAdmin: boolean })
     if (desde) params.set('desde', desde)
     if (hasta) params.set('hasta', hasta)
 
-    const res  = await fetch(`/api/dashboard/optica/servicios?${params}`)
-    const data = await res.json()
-    setServicios(Array.isArray(data) ? data : [])
-    setLoading(false)
+    try {
+      const res  = await fetch(`/api/dashboard/optica/servicios?${params}`)
+      const data = await res.json()
+      setServicios(Array.isArray(data) ? data : [])
+    } catch {
+      toast.error('Error de red al cargar servicios')
+    } finally {
+      setLoading(false)
+    }
   }, [q, estado, desde, hasta])
 
   useEffect(() => {

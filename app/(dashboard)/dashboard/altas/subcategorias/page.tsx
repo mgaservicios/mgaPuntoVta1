@@ -55,6 +55,7 @@ export default function SubcategoriasPage() {
       const data = await res.json()
       setSubcategorias((prev) => [...prev, data])
       setNueva('')
+      setNuevaCatId(null)
       toast.success('Subcategoría creada')
     } else {
       toast.error('Error al crear')

@@ -60,12 +60,14 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     cajaSesion = nueva
   }
 
+  if (!cajaSesion) return NextResponse.json({ error: 'No hay sesión de caja activa' }, { status: 500 })
+
   // Registrar pago
   const { data: pago, error: pagoError } = await supabase
     .from('optica_orden_pagos')
     .insert({
       orden_id: Number(id),
-      caja_sesion_id: cajaSesion!.id,
+      caja_sesion_id: cajaSesion.id,
       metodo,
       monto,
       concepto,
@@ -81,7 +83,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   // Registrar en caja (solo métodos que no sean cuenta corriente)
   if (metodo !== 'CUENTA_CORRIENTE') {
     await supabase.from('caja_movimientos').insert({
-      sesion_id: cajaSesion!.id,
+      sesion_id: cajaSesion.id,
       tipo: 'ingreso',
       concepto: concepto === 'PAGO'
         ? `OT ${orden.numero} – ${METODO_LABELS[metodo] ?? metodo}`

@@ -106,7 +106,7 @@ export default function ArticuloFormPage({ params }: { params: Promise<{ id: str
     stock_actual: number
     stock_minimo: number
     is_active: boolean
-    sucursales: { nombre: string } | null
+    sucursales: { nombre: string }[] | null
   }[]>([])
 
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -682,7 +682,7 @@ export default function ArticuloFormPage({ params }: { params: Promise<{ id: str
                     stockSucursales.filter(r => r.variante_id === null).length <= 4 ? 'grid-cols-3' : 'grid-cols-4'
                   }`}>
                     {stockSucursales.filter(r => r.variante_id === null).map((row, i) => {
-                      const nombre = row.sucursales?.nombre ?? `Sucursal #${row.sucursal_id}`
+                      const nombre = row.sucursales?.[0]?.nombre ?? `Sucursal #${row.sucursal_id}`
                       const bajo = row.stock_actual <= 0
                       return (
                         <div key={i} className={`space-y-0.5 rounded-lg p-3 border ${row.is_active ? 'border-indigo-200 bg-indigo-50/40' : 'border-gray-100 bg-gray-50/50'}`}>
@@ -710,7 +710,7 @@ export default function ArticuloFormPage({ params }: { params: Promise<{ id: str
             const sucMap = new Map<number, { id: number; nombre: string; is_active: boolean }>()
             for (const r of stockSucursales) {
               if (!sucMap.has(r.sucursal_id))
-                sucMap.set(r.sucursal_id, { id: r.sucursal_id, nombre: r.sucursales?.nombre ?? `Sucursal #${r.sucursal_id}`, is_active: r.is_active })
+                sucMap.set(r.sucursal_id, { id: r.sucursal_id, nombre: r.sucursales?.[0]?.nombre ?? `Sucursal #${r.sucursal_id}`, is_active: r.is_active })
             }
             const sucList = Array.from(sucMap.values()).sort((a, b) => {
               if (a.is_active !== b.is_active) return a.is_active ? -1 : 1

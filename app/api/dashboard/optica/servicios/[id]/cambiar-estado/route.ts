@@ -20,12 +20,15 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: 'Solo se puede establecer manualmente: entregado o anulado' }, { status: 400 })
   }
 
-  const { error } = await supabase
+  const { data: updated, error } = await supabase
     .from('optica_servicios')
     .update({ estado: nuevo_estado, updated_at: new Date().toISOString() })
     .eq('id', id)
+    .select('id')
+    .maybeSingle()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (!updated) return NextResponse.json({ error: 'Servicio no encontrado' }, { status: 404 })
 
   if (nuevo_estado === 'anulado') {
     const { data: servicio } = await supabase

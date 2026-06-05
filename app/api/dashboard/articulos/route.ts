@@ -66,11 +66,11 @@ export async function GET(req: NextRequest) {
       variante_id: number | null
       sucursal_id: number
       stock_actual: number
-      sucursales: { nombre: string } | null
+      sucursales: { nombre: string }[] | null
     }>) {
       const entry: StockEntry = {
         sucursal_id: s.sucursal_id,
-        sucursal_nombre: s.sucursales?.nombre ?? '',
+        sucursal_nombre: s.sucursales?.[0]?.nombre ?? '',
         stock_actual: s.stock_actual,
         is_active: s.sucursal_id === activeSucursalId,
       }

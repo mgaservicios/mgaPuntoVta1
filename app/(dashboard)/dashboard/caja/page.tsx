@@ -427,6 +427,9 @@ export default function CajaPage() {
                         m.concepto.startsWith('Venta ') ||
                         m.concepto.startsWith('OT ') ||
                         m.concepto.startsWith('SV ') ||
+                        m.concepto.startsWith('Orden ') ||
+                        m.concepto.endsWith('– pago') ||
+                        m.concepto.endsWith('- pago') ||
                         /^OT-\d/.test(m.concepto) ||
                         /^SV-\d/.test(m.concepto)
                       )

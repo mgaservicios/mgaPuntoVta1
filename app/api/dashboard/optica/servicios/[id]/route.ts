@@ -30,7 +30,7 @@ export async function GET(_: NextRequest, { params }: Ctx) {
       optica_servicio_pagos(id, metodo, monto, concepto, referencia, fecha_pago, created_at)
     `)
     .eq('id', id)
-    .single()
+    .maybeSingle()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   if (!data) return NextResponse.json({ error: 'No encontrado' }, { status: 404 })

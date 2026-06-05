@@ -50,16 +50,20 @@ export async function GET(_: NextRequest, { params }: Ctx) {
     : { data: [] as { metodo: string; monto: number }[] }
 
   // ── OT de la sesión ────────────────────────────────────────────────────────
-  const { data: otPagos } = await supabase
+  const { data: otPagos, error: otError } = await supabase
     .from('optica_orden_pagos')
     .select('metodo, monto')
     .eq('caja_sesion_id', sesionId)
 
+  if (otError) return NextResponse.json({ error: otError.message }, { status: 500 })
+
   // ── Servicios de la sesión ─────────────────────────────────────────────────
-  const { data: svPagos } = await supabase
+  const { data: svPagos, error: svError } = await supabase
     .from('optica_servicio_pagos')
     .select('metodo, monto')
     .eq('caja_sesion_id', sesionId)
+
+  if (svError) return NextResponse.json({ error: svError.message }, { status: 500 })
 
   return NextResponse.json({
     ventas:    groupByMetodo((ventaPagos ?? []) as { metodo: string; monto: number }[]),

@@ -147,7 +147,7 @@ export async function POST(req: NextRequest) {
       .single()
     cajaSesionId = caja?.id ?? null
 
-    await supabase.from('optica_servicio_pagos').insert({
+    const { error: anticipoError } = await supabase.from('optica_servicio_pagos').insert({
       servicio_id:    servicio.id,
       caja_sesion_id: cajaSesionId,
       metodo:         anticipo_metodo,
@@ -156,6 +156,7 @@ export async function POST(req: NextRequest) {
       fecha_pago:     new Date().toISOString().slice(0, 10),
       usuario_id:     session.user.id,
     })
+    if (anticipoError) return NextResponse.json({ error: `Servicio creado pero falló el anticipo: ${anticipoError.message}` }, { status: 500 })
     if (cajaSesionId) {
       await supabase.from('caja_movimientos').insert({
         sesion_id:  cajaSesionId,
