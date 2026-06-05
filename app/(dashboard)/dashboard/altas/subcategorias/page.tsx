@@ -19,7 +19,7 @@ export default function SubcategoriasPage() {
   const [loading, setLoading] = useState(true)
   const [filtroCat, setFiltroCat] = useState<string>('todas')
   const [nueva, setNueva] = useState('')
-  const [nuevaCatId, setNuevaCatId] = useState<string>('')
+  const [nuevaCatId, setNuevaCatId] = useState<string | null>(null)
   const [creando, setCreando] = useState(false)
   const [editId, setEditId] = useState<number | null>(null)
   const [editNombre, setEditNombre] = useState('')
@@ -101,7 +101,7 @@ export default function SubcategoriasPage() {
       <div className="flex gap-2 mb-4 flex-wrap">
         <Input placeholder="Nueva subcategoría…" value={nueva} onChange={(e) => setNueva(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleCrear()} className="max-w-xs" />
-        <Select value={nuevaCatId} onValueChange={setNuevaCatId}>
+        <Select value={nuevaCatId ?? ''} onValueChange={(v) => setNuevaCatId(v)}>
           <SelectTrigger className="w-48"><SelectValue placeholder="Categoría…" /></SelectTrigger>
           <SelectContent>
             {categorias.map((c) => <SelectItem key={c.id} value={String(c.id)}>{c.nombre}</SelectItem>)}
@@ -113,7 +113,7 @@ export default function SubcategoriasPage() {
       </div>
 
       <div className="mb-4 w-56">
-        <Select value={filtroCat} onValueChange={setFiltroCat}>
+        <Select value={filtroCat} onValueChange={(v) => setFiltroCat(v ?? 'todas')}>
           <SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="todas">Todas las categorías</SelectItem>
