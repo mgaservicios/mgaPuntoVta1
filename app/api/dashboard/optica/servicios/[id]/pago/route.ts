@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { getTenantClient } from '@/services/supabase-tenant'
-import { getActiveSucursalId } from '@/lib/sucursal'
+import { getHomeSucursalId } from '@/lib/sucursal'
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
 
   if (!servicio) return NextResponse.json({ error: 'Servicio no encontrado' }, { status: 404 })
 
-  const sucursalId = await getActiveSucursalId()
+  const sucursalId = await getHomeSucursalId()
   if (!sucursalId) return NextResponse.json({ error: 'sin_sucursal_activa' }, { status: 403 })
 
   let { data: cajaSesion } = await supabase

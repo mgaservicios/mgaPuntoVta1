@@ -27,7 +27,8 @@ type LookupState =
   | { status: 'idle' }
   | { status: 'loading' }
   | { status: 'found'; name: string; isAdmin: boolean; sucursales: SucursalOption[] }
-  | { status: 'not_found' }
+  | { status: 'empresa_not_found' }
+  | { status: 'user_not_found' }
 
 export default function SignInPage() {
   const [showPassword, setShowPassword] = useState(false)
@@ -56,7 +57,7 @@ export default function SignInPage() {
       })
       const data = await res.json()
       if (!res.ok || !data.found) {
-        setLookup({ status: 'not_found' })
+        setLookup({ status: data.reason === 'empresa_not_found' ? 'empresa_not_found' : 'user_not_found' })
         setSelectedSucursalId(null)
         return
       }
@@ -68,13 +69,23 @@ export default function SignInPage() {
       })
       setSelectedSucursalId(data.sucursales[0]?.id ?? null)
     } catch {
-      setLookup({ status: 'not_found' })
+      setLookup({ status: 'idle' })
     }
   }
 
   const onSubmit = async (data: FormData) => {
-    setIsSubmitting(true)
     setError(null)
+
+    if (lookup.status === 'empresa_not_found') {
+      setError('No existe ninguna empresa con ese código.')
+      return
+    }
+    if (lookup.status === 'user_not_found') {
+      setError('El email no está registrado en esta empresa.')
+      return
+    }
+
+    setIsSubmitting(true)
 
     const result = await signIn('credentials', {
       empresa_codigo: data.empresa_codigo.toUpperCase().trim(),
@@ -86,7 +97,7 @@ export default function SignInPage() {
     setIsSubmitting(false)
 
     if (!result || result.error) {
-      setError('Código de empresa, email o contraseña incorrectos.')
+      setError('Contraseña incorrecta.')
       return
     }
 
@@ -120,13 +131,18 @@ export default function SignInPage() {
               type="text"
               placeholder="Ej: MGA2025"
               autoComplete="organization"
-              className={`pl-9 uppercase ${errors.empresa_codigo ? 'border-red-400' : ''}`}
-              {...register('empresa_codigo')}
+              className={`pl-9 uppercase ${errors.empresa_codigo || lookup.status === 'empresa_not_found' ? 'border-red-400' : ''}`}
+              {...register('empresa_codigo', {
+                onChange: () => { if (lookup.status !== 'idle' && lookup.status !== 'loading') setLookup({ status: 'idle' }) },
+              })}
               onBlur={lookupUser}
             />
           </div>
           {errors.empresa_codigo && (
             <p className="text-xs text-red-600">{errors.empresa_codigo.message}</p>
+          )}
+          {lookup.status === 'empresa_not_found' && (
+            <p className="text-xs text-red-600">No existe ninguna empresa con ese código.</p>
           )}
         </div>
 
@@ -137,19 +153,24 @@ export default function SignInPage() {
             type="email"
             placeholder="tu@email.com"
             autoComplete="email"
-            {...register('email')}
-            className={errors.email ? 'border-red-400' : ''}
+            {...register('email', {
+              onChange: () => { if (lookup.status === 'user_not_found') setLookup({ status: 'idle' }) },
+            })}
+            className={errors.email || lookup.status === 'user_not_found' ? 'border-red-400' : ''}
             onBlur={lookupUser}
           />
           {errors.email && (
             <p className="text-xs text-red-600">{errors.email.message}</p>
+          )}
+          {lookup.status === 'user_not_found' && (
+            <p className="text-xs text-red-600">El email no está registrado en esta empresa.</p>
           )}
         </div>
 
         {lookup.status === 'loading' && (
           <div className="flex items-center gap-2 text-sm text-gray-400 py-1">
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            Buscando sucursal...
+            Verificando...
           </div>
         )}
 

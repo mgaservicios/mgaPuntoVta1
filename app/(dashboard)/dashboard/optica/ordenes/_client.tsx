@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { Plus, Search, RefreshCw, CreditCard, Eye, Pencil, Trash2, Printer } from 'lucide-react'
+import { useSelectedSucursal } from '@/hooks/useSelectedSucursal'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -71,7 +72,7 @@ const METODOS_PAGO: MetodoPagoOptica[] = ['EFECTIVO', 'TRANSFERENCIA', 'TARJETA_
 
 // ── Vista completa de la OT ──────────────────────────────────────────────────
 
-function OrdenViewDialog({ orden, onClose }: { orden: OpticaOrden | null; onClose: () => void }) {
+function OrdenViewDialog({ orden, onClose, canEdit }: { orden: OpticaOrden | null; onClose: () => void; canEdit: boolean }) {
   if (!orden) return null
   const items = orden.optica_orden_items ?? []
   const tareas = orden.optica_orden_tareas ?? []
@@ -261,12 +262,14 @@ function OrdenViewDialog({ orden, onClose }: { orden: OpticaOrden | null; onClos
             <Printer className="w-3.5 h-3.5" />
             Imprimir
           </Button>
-          <Link href={`/dashboard/optica/ordenes/${orden.id}`}>
-            <Button className="gap-2">
-              <Pencil className="w-3.5 h-3.5" />
-              Editar
-            </Button>
-          </Link>
+          {canEdit && (
+            <Link href={`/dashboard/optica/ordenes/${orden.id}`}>
+              <Button className="gap-2">
+                <Pencil className="w-3.5 h-3.5" />
+                Editar
+              </Button>
+            </Link>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -276,6 +279,8 @@ function OrdenViewDialog({ orden, onClose }: { orden: OpticaOrden | null; onClos
 // ── Página principal ─────────────────────────────────────────────────────────
 
 export default function OpticaOrdenesClient({ isAdmin }: { isAdmin: boolean }) {
+  const { isHome } = useSelectedSucursal()
+  const canWrite = isHome !== false
   const [ordenes, setOrdenes] = useState<OrdenRow[]>([])
   const [loading, setLoading] = useState(true)
   const [q, setQ] = useState('')
@@ -377,12 +382,14 @@ export default function OpticaOrdenesClient({ isAdmin }: { isAdmin: boolean }) {
           <h1 className="text-xl font-semibold text-gray-900">Órdenes de trabajo óptica</h1>
           <p className="text-sm text-gray-500">{ordenes.length} resultado{ordenes.length !== 1 ? 's' : ''}</p>
         </div>
-        <Link href="/dashboard/optica/ordenes/nueva">
-          <Button className="gap-2">
-            <Plus className="w-4 h-4" />
-            Nueva OT
-          </Button>
-        </Link>
+        {canWrite && (
+          <Link href="/dashboard/optica/ordenes/nueva">
+            <Button className="gap-2">
+              <Plus className="w-4 h-4" />
+              Nueva OT
+            </Button>
+          </Link>
+        )}
       </div>
 
       {/* Filtros */}
@@ -504,14 +511,16 @@ export default function OpticaOrdenesClient({ isAdmin }: { isAdmin: boolean }) {
                         >
                           <Printer className="w-4 h-4" />
                         </button>
-                        <Link
-                          href={`/dashboard/optica/ordenes/${orden.id}`}
-                          title="Editar"
-                          className="p-1.5 rounded-md text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </Link>
-                        {saldo > 0.005 && !['anulado', 'entregado'].includes(orden.estado) && (
+                        {canWrite && (
+                          <Link
+                            href={`/dashboard/optica/ordenes/${orden.id}`}
+                            title="Editar"
+                            className="p-1.5 rounded-md text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </Link>
+                        )}
+                        {canWrite && saldo > 0.005 && !['anulado', 'entregado'].includes(orden.estado) && (
                           <button
                             onClick={() => abrirPago(orden)}
                             title="Registrar pago"
@@ -520,7 +529,7 @@ export default function OpticaOrdenesClient({ isAdmin }: { isAdmin: boolean }) {
                             <CreditCard className="w-4 h-4" />
                           </button>
                         )}
-                        {isAdmin
+                        {isAdmin && canWrite
                           && (orden.optica_orden_tareas ?? []).length === 0
                           && (orden.optica_orden_pagos ?? []).length === 0
                           && (
@@ -543,7 +552,7 @@ export default function OpticaOrdenesClient({ isAdmin }: { isAdmin: boolean }) {
       </div>
 
       {/* Modal vista completa */}
-      <OrdenViewDialog orden={viewOrden} onClose={() => setViewOrden(null)} />
+      <OrdenViewDialog orden={viewOrden} onClose={() => setViewOrden(null)} canEdit={canWrite} />
 
       {/* Confirmar eliminación */}
       <Dialog open={!!deletingOrden} onOpenChange={open => { if (!open) setDeletingOrden(null) }}>

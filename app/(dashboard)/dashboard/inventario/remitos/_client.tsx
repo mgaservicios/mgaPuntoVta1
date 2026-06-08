@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { Plus, Pencil, Check, Trash2 } from 'lucide-react'
+import { Plus, Eye, Pencil, Check, Trash2 } from 'lucide-react'
+import { useSelectedSucursal } from '@/hooks/useSelectedSucursal'
 import { buttonVariants, Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -24,6 +25,8 @@ const ESTADO_LABELS: Record<string, string> = { borrador: 'Borrador', confirmado
 const CONTRAPARTE_LABELS: Record<string, string> = { sucursal: 'Sucursal', proveedor: 'Proveedor', persona: 'Persona' }
 
 export default function RemitosClient({ isAdmin }: { isAdmin: boolean }) {
+  const { isHome } = useSelectedSucursal()
+  const canWrite = isHome !== false
   const [remitos, setRemitos] = useState<RemitoRow[]>([])
   const [loading, setLoading] = useState(true)
   const [tipo, setTipo] = useState('todos')
@@ -81,10 +84,12 @@ export default function RemitosClient({ isAdmin }: { isAdmin: boolean }) {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-lg font-semibold text-gray-800">Stock — Remitos</h2>
-        <Link href="/dashboard/inventario/remitos/nuevo" className={buttonVariants()}>
-          <Plus className="w-4 h-4 mr-2" />
-          Nuevo remito
-        </Link>
+        {canWrite && (
+          <Link href="/dashboard/inventario/remitos/nuevo" className={buttonVariants()}>
+            <Plus className="w-4 h-4 mr-2" />
+            Nuevo remito
+          </Link>
+        )}
       </div>
 
       <div className="flex gap-3 mb-4">
@@ -159,13 +164,23 @@ export default function RemitosClient({ isAdmin }: { isAdmin: boolean }) {
                 <TableCell>
                   <div className="flex items-center gap-1 justify-end">
                     <Link
-                      href={`/dashboard/inventario/remitos/${r.id}${r.estado !== 'anulado' ? '/editar' : ''}`}
+                      href={`/dashboard/inventario/remitos/${r.id}`}
                       className={buttonVariants({ variant: 'ghost', size: 'sm' })}
+                      title="Ver detalle"
                     >
-                      <Pencil className="w-3.5 h-3.5 mr-1" />
-                      Modificar
+                      <Eye className="w-3.5 h-3.5 mr-1" />
+                      Ver
                     </Link>
-                    {r.estado === 'borrador' && (
+                    {canWrite && (
+                      <Link
+                        href={`/dashboard/inventario/remitos/${r.id}${r.estado !== 'anulado' ? '/editar' : ''}`}
+                        className={buttonVariants({ variant: 'ghost', size: 'sm' })}
+                      >
+                        <Pencil className="w-3.5 h-3.5 mr-1" />
+                        Modificar
+                      </Link>
+                    )}
+                    {canWrite && r.estado === 'borrador' && (
                       <Button
                         variant="ghost"
                         size="sm"
@@ -177,7 +192,7 @@ export default function RemitosClient({ isAdmin }: { isAdmin: boolean }) {
                         {confirmandoId === r.id ? '…' : 'Confirmar'}
                       </Button>
                     )}
-                    {isAdmin && ['borrador', 'anulado'].includes(r.estado) && (
+                    {isAdmin && canWrite && ['borrador', 'anulado'].includes(r.estado) && (
                       <button
                         onClick={() => setDeletingRemito(r)}
                         title="Eliminar remito"

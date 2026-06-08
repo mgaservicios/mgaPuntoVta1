@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { Plus, Search, RefreshCw, CreditCard, Eye, Pencil, Trash2, Printer } from 'lucide-react'
+import { useSelectedSucursal } from '@/hooks/useSelectedSucursal'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -48,7 +49,7 @@ const METODOS_PAGO: MetodoPagoOptica[] = ['EFECTIVO', 'TRANSFERENCIA', 'TARJETA_
 
 // ── Vista rápida ──────────────────────────────────────────────────────────────
 
-function ServicioViewDialog({ servicio, onClose }: { servicio: OpticaServicio | null; onClose: () => void }) {
+function ServicioViewDialog({ servicio, onClose, canEdit }: { servicio: OpticaServicio | null; onClose: () => void; canEdit: boolean }) {
   if (!servicio) return null
   const tipos = servicio.optica_servicio_tipos ?? []
   const pagos = servicio.optica_servicio_pagos ?? []
@@ -161,12 +162,14 @@ function ServicioViewDialog({ servicio, onClose }: { servicio: OpticaServicio | 
             <Printer className="w-3.5 h-3.5" />
             Imprimir
           </Button>
-          <Link href={`/dashboard/optica/servicios/${servicio.id}`}>
-            <Button className="gap-2">
-              <Pencil className="w-3.5 h-3.5" />
-              Editar
-            </Button>
-          </Link>
+          {canEdit && (
+            <Link href={`/dashboard/optica/servicios/${servicio.id}`}>
+              <Button className="gap-2">
+                <Pencil className="w-3.5 h-3.5" />
+                Editar
+              </Button>
+            </Link>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -176,6 +179,8 @@ function ServicioViewDialog({ servicio, onClose }: { servicio: OpticaServicio | 
 // ── Página principal ──────────────────────────────────────────────────────────
 
 export default function OpticaServiciosClient({ isAdmin }: { isAdmin: boolean }) {
+  const { isHome } = useSelectedSucursal()
+  const canWrite = isHome !== false
   const [servicios, setServicios] = useState<ServicioRow[]>([])
   const [loading, setLoading]     = useState(true)
   const [q, setQ]                 = useState('')
@@ -275,12 +280,14 @@ export default function OpticaServiciosClient({ isAdmin }: { isAdmin: boolean })
           <h1 className="text-xl font-semibold text-gray-900">Servicios óptica</h1>
           <p className="text-sm text-gray-500">{servicios.length} resultado{servicios.length !== 1 ? 's' : ''}</p>
         </div>
-        <Link href="/dashboard/optica/servicios/nueva">
-          <Button className="gap-2">
-            <Plus className="w-4 h-4" />
-            Nuevo servicio
-          </Button>
-        </Link>
+        {canWrite && (
+          <Link href="/dashboard/optica/servicios/nueva">
+            <Button className="gap-2">
+              <Plus className="w-4 h-4" />
+              Nuevo servicio
+            </Button>
+          </Link>
+        )}
       </div>
 
       {/* Filtros */}
@@ -393,14 +400,16 @@ export default function OpticaServiciosClient({ isAdmin }: { isAdmin: boolean })
                         >
                           <Printer className="w-4 h-4" />
                         </button>
-                        <Link
-                          href={`/dashboard/optica/servicios/${s.id}`}
-                          title="Editar"
-                          className="p-1.5 rounded-md text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </Link>
-                        {saldo > 0.005 && !['anulado', 'entregado'].includes(s.estado) && (
+                        {canWrite && (
+                          <Link
+                            href={`/dashboard/optica/servicios/${s.id}`}
+                            title="Editar"
+                            className="p-1.5 rounded-md text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </Link>
+                        )}
+                        {canWrite && saldo > 0.005 && !['anulado', 'entregado'].includes(s.estado) && (
                           <button
                             onClick={() => abrirPago(s)}
                             title="Registrar pago"
@@ -409,7 +418,7 @@ export default function OpticaServiciosClient({ isAdmin }: { isAdmin: boolean })
                             <CreditCard className="w-4 h-4" />
                           </button>
                         )}
-                        {isAdmin
+                        {isAdmin && canWrite
                           && (s.optica_servicio_pagos ?? []).length === 0
                           && (
                           <button
@@ -431,7 +440,7 @@ export default function OpticaServiciosClient({ isAdmin }: { isAdmin: boolean })
       </div>
 
       {/* Modal vista completa */}
-      <ServicioViewDialog servicio={viewServicio} onClose={() => setViewServicio(null)} />
+      <ServicioViewDialog servicio={viewServicio} onClose={() => setViewServicio(null)} canEdit={canWrite} />
 
       {/* Confirmar eliminación */}
       <Dialog open={!!deletingServicio} onOpenChange={open => { if (!open) setDeletingServicio(null) }}>

@@ -26,6 +26,7 @@ import UsoToggle from '../../_components/UsoToggle'
 import ArmazonSearch from '../../_components/ArmazonSearch'
 import MedicoSearch from '../../_components/MedicoSearch'
 import ItemRow, { type FormItem } from '../../_components/ItemRow'
+import { useSucursalActiva } from '@/hooks/useSucursalActiva'
 
 // ── Tipos locales ──────────────────────────────────────────────────────────────
 
@@ -81,6 +82,7 @@ export default function OpticaOrdenPage({ params }: { params: Promise<{ id: stri
   const { id } = use(params)
   const isNueva = id === 'nueva'
   const router = useRouter()
+  const sucursalNombre = useSucursalActiva()
 
   const [orden, setOrden] = useState<OpticaOrden | null>(null)
   const [loading, setLoading] = useState(!isNueva)
@@ -496,7 +498,14 @@ export default function OpticaOrdenPage({ params }: { params: Promise<{ id: stri
           <ArrowLeft className="w-5 h-5" />
         </button>
         <div className="flex-1 min-w-0">
-          <h1 className="text-base font-semibold truncate">{titulo}</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-base font-semibold truncate">{titulo}</h1>
+            {sucursalNombre && (
+              <span className="text-xs text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full border border-gray-200 shrink-0 hidden sm:inline">
+                {sucursalNombre}
+              </span>
+            )}
+          </div>
           {!isNueva && (
             <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border mt-0.5 ${ESTADO_BADGE[estadoOT]}`}>
               {ESTADO_OPTICA_LABELS[estadoOT]}

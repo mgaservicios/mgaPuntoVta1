@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { getTenantClient } from '@/services/supabase-tenant'
+import { assertHomeSucursal } from '@/lib/sucursal'
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -31,11 +32,15 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
 
   const { data: existing } = await supabase
     .from('ordenes_venta')
-    .select('estado')
+    .select('estado, sucursal_id')
     .eq('id', id)
     .single()
 
   if (!existing) return NextResponse.json({ error: 'No encontrado' }, { status: 404 })
+
+  const guard = await assertHomeSucursal(existing.sucursal_id)
+  if (guard) return guard
+
   if (existing.estado !== 'borrador') return NextResponse.json({ error: 'Solo se pueden editar órdenes en borrador' }, { status: 400 })
 
   const items: {
@@ -117,6 +122,9 @@ export async function DELETE(_: NextRequest, { params }: Ctx) {
     .single()
 
   if (fetchError || !orden) return NextResponse.json({ error: 'No encontrado' }, { status: 404 })
+
+  const guardDel = await assertHomeSucursal(orden.sucursal_id)
+  if (guardDel) return guardDel
 
   if (orden.estado !== 'borrador') {
     return NextResponse.json({ error: 'Solo se pueden eliminar órdenes en borrador' }, { status: 409 })

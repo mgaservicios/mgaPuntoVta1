@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getTenantClient } from '@/services/supabase-tenant'
 import { adjustArticuloStock, syncArticuloStock } from '@/services/stock'
-import { getActiveSucursalId } from '@/lib/sucursal'
+import { getHomeSucursalId } from '@/lib/sucursal'
 import { METODO_ORDEN_LABELS } from '@/types/ordenes'
 import { requirePermission } from '@/lib/require-permission'
 
@@ -43,7 +43,7 @@ export async function POST(_: NextRequest, { params }: Ctx) {
   }
 
   // Sucursal: usar la guardada en la orden; fallback a la activa (para órdenes históricas sin sucursal_id)
-  const sucursalId = orden.sucursal_id ?? await getActiveSucursalId()
+  const sucursalId = orden.sucursal_id ?? await getHomeSucursalId()
   if (!sucursalId) return NextResponse.json({ error: 'sin_sucursal_activa' }, { status: 403 })
 
   // Descontar stock por sucursal + registrar movimiento

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { getTenantClient } from '@/services/supabase-tenant'
+import { assertHomeSucursal } from '@/lib/sucursal'
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -41,11 +42,14 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
   // Verificar estado y tareas actuales
   const { data: existing, error: fetchError } = await supabase
     .from('optica_ordenes')
-    .select('estado, optica_orden_tareas(id), optica_orden_pagos(id)')
+    .select('estado, sucursal_id, optica_orden_tareas(id), optica_orden_pagos(id)')
     .eq('id', id)
     .single()
 
   if (fetchError || !existing) return NextResponse.json({ error: 'No encontrado' }, { status: 404 })
+
+  const guard = await assertHomeSucursal(existing.sucursal_id)
+  if (guard) return guard
 
   if (ESTADOS_FINALES.includes(existing.estado)) {
     return NextResponse.json({ error: 'La orden no puede modificarse en su estado actual' }, { status: 403 })
@@ -165,6 +169,9 @@ export async function DELETE(_: NextRequest, { params }: Ctx) {
     .single()
 
   if (fetchError || !orden) return NextResponse.json({ error: 'No encontrado' }, { status: 404 })
+
+  const guardDel = await assertHomeSucursal(orden.sucursal_id)
+  if (guardDel) return guardDel
 
   const tieneTareas = (orden.optica_orden_tareas ?? []).length > 0
   const tienePagos  = (orden.optica_orden_pagos ?? []).length > 0

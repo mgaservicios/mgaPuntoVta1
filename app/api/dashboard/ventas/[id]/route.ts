@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { getTenantClient } from '@/services/supabase-tenant'
+import { assertHomeSucursal } from '@/lib/sucursal'
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -44,6 +45,9 @@ export async function DELETE(_: NextRequest, { params }: Ctx) {
     .single()
 
   if (fetchError || !venta) return NextResponse.json({ error: 'No encontrado' }, { status: 404 })
+
+  const guard = await assertHomeSucursal(venta.sucursal_id)
+  if (guard) return guard
 
   if (venta.estado !== 'anulada') {
     return NextResponse.json({ error: 'Solo se pueden eliminar ventas anuladas' }, { status: 409 })

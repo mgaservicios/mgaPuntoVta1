@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { getTenantClient } from '@/services/supabase-tenant'
+import { assertHomeSucursal } from '@/lib/sucursal'
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -17,11 +18,15 @@ export async function POST(req: NextRequest, { params }: Ctx) {
 
   const { data: sesion } = await supabase
     .from('caja_sesiones')
-    .select('id, estado')
+    .select('id, estado, sucursal_id')
     .eq('id', id)
     .single()
 
   if (!sesion) return NextResponse.json({ error: 'No encontrado' }, { status: 404 })
+
+  const guard = await assertHomeSucursal(sesion.sucursal_id)
+  if (guard) return guard
+
   if (sesion.estado !== 'abierta') return NextResponse.json({ error: 'La caja ya está cerrada' }, { status: 400 })
 
   // Calcular monto esperado

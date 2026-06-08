@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { getTenantClient } from '@/services/supabase-tenant'
-import { getActiveSucursalId } from '@/lib/sucursal'
+import { getHomeSucursalId } from '@/lib/sucursal'
 
 const ESTADOS_MANUALES = ['entregado', 'anulado'] as const
 
@@ -44,7 +44,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       const saldo = Math.round((servicio.total - pagado) * 100) / 100
 
       if (saldo > 0.005) {
-        const sucursalId = await getActiveSucursalId()
+        const sucursalId = await getHomeSucursalId()
         if (!sucursalId) return NextResponse.json({ error: 'sin_sucursal_activa' }, { status: 403 })
 
         let { data: caja } = await supabase

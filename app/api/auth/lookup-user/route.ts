@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
     .eq('activo', true)
     .single()
 
-  if (!empresa) return NextResponse.json({ found: false })
+  if (!empresa) return NextResponse.json({ found: false, reason: 'empresa_not_found' })
 
   const supabase = await getTenantAdminClient(empresa.id as string)
 
@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     .eq('email', email.toLowerCase().trim())
     .single()
 
-  if (!user) return NextResponse.json({ found: false })
+  if (!user) return NextResponse.json({ found: false, reason: 'user_not_found' })
 
   const { data: roleData } = await supabase
     .from('roles')

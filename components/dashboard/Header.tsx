@@ -41,6 +41,7 @@ interface DashboardHeaderProps {
   activeSucursalId: number | null
   isAdmin: boolean
   verTodas: boolean
+  homeSucursalNombre: string | null
 }
 
 export default function DashboardHeader({
@@ -50,6 +51,7 @@ export default function DashboardHeader({
   activeSucursalId,
   isAdmin,
   verTodas,
+  homeSucursalNombre,
 }: DashboardHeaderProps) {
   const pathname = usePathname()
   const title = getPageTitle(pathname)
@@ -82,7 +84,14 @@ export default function DashboardHeader({
 
   return (
     <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-6 flex-shrink-0">
-      <h1 className="text-base font-semibold text-gray-900">{title}</h1>
+      <div className="flex items-center gap-3 min-w-0">
+        <h1 className="text-base font-semibold text-gray-900 shrink-0">{title}</h1>
+        {homeSucursalNombre && (
+          <span className="hidden sm:inline text-xs text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full border border-gray-200 shrink-0">
+            Logueado en: <span className="font-medium text-gray-700">{homeSucursalNombre}</span>
+          </span>
+        )}
+      </div>
 
       <div className="flex items-center gap-3">
         {(sucursales.length > 0 || isAdmin) && (

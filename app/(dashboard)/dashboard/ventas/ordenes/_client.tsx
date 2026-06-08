@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { Plus, Eye, Pencil, CreditCard, Trash2, Printer } from 'lucide-react'
+import { useSelectedSucursal } from '@/hooks/useSelectedSucursal'
 import { toast } from 'sonner'
 import { buttonVariants, Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -51,6 +52,8 @@ function formatFecha(iso: string) {
 }
 
 export default function OrdenesClient({ isAdmin }: { isAdmin: boolean }) {
+  const { isHome } = useSelectedSucursal()
+  const canWrite = isHome !== false
   const [ordenes, setOrdenes] = useState<OrdenRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -138,10 +141,12 @@ export default function OrdenesClient({ isAdmin }: { isAdmin: boolean }) {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-lg font-semibold text-gray-800">Órdenes de venta</h2>
-        <Link href="/dashboard/ventas/ordenes/nueva" className={buttonVariants()}>
-          <Plus className="w-4 h-4 mr-2" />
-          Nueva orden
-        </Link>
+        {canWrite && (
+          <Link href="/dashboard/ventas/ordenes/nueva" className={buttonVariants()}>
+            <Plus className="w-4 h-4 mr-2" />
+            Nueva orden
+          </Link>
+        )}
       </div>
 
       {/* Filtros */}
@@ -222,13 +227,15 @@ export default function OrdenesClient({ isAdmin }: { isAdmin: boolean }) {
                     return saldo > 0.005 && o.estado !== 'anulada' ? (
                       <div className="flex items-center justify-end gap-1">
                         <span className="text-red-600 font-medium text-sm">{formatARS(saldo)}</span>
-                        <button
-                          onClick={() => abrirPago(o)}
-                          title="Registrar pago"
-                          className="p-1 rounded text-green-600 hover:bg-green-50"
-                        >
-                          <CreditCard className="w-3.5 h-3.5" />
-                        </button>
+                        {canWrite && (
+                          <button
+                            onClick={() => abrirPago(o)}
+                            title="Registrar pago"
+                            className="p-1 rounded text-green-600 hover:bg-green-50"
+                          >
+                            <CreditCard className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                       </div>
                     ) : <span className="text-green-600 text-sm">{formatARS(0)}</span>
                   })()}
@@ -255,14 +262,16 @@ export default function OrdenesClient({ isAdmin }: { isAdmin: boolean }) {
                     >
                       <Eye className="w-4 h-4" />
                     </Link>
-                    <Link
-                      href={`/dashboard/ventas/ordenes/${o.id}`}
-                      title="Editar"
-                      className={buttonVariants({ variant: 'ghost', size: 'icon' })}
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </Link>
-                    {isAdmin && o.estado === 'borrador' && (
+                    {canWrite && (
+                      <Link
+                        href={`/dashboard/ventas/ordenes/${o.id}`}
+                        title="Editar"
+                        className={buttonVariants({ variant: 'ghost', size: 'icon' })}
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </Link>
+                    )}
+                    {isAdmin && canWrite && o.estado === 'borrador' && (
                       <button
                         onClick={() => setDeletingOrden(o)}
                         title="Eliminar orden"

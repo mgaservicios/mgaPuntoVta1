@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { getTenantClient } from '@/services/supabase-tenant'
+import { assertHomeSucursal } from '@/lib/sucursal'
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -46,11 +47,14 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
 
   const { data: existing, error: fetchError } = await supabase
     .from('optica_servicios')
-    .select('estado')
+    .select('estado, sucursal_id')
     .eq('id', id)
     .single()
 
   if (fetchError || !existing) return NextResponse.json({ error: 'No encontrado' }, { status: 404 })
+
+  const guard = await assertHomeSucursal(existing.sucursal_id)
+  if (guard) return guard
 
   if (ESTADOS_FINALES.includes(existing.estado)) {
     return NextResponse.json({ error: 'El servicio no puede modificarse en su estado actual' }, { status: 403 })
@@ -139,6 +143,9 @@ export async function DELETE(_: NextRequest, { params }: Ctx) {
     .single()
 
   if (fetchError || !servicio) return NextResponse.json({ error: 'No encontrado' }, { status: 404 })
+
+  const guardDel = await assertHomeSucursal(servicio.sucursal_id)
+  if (guardDel) return guardDel
 
   const tienePagos = (servicio.optica_servicio_pagos ?? []).length > 0
 

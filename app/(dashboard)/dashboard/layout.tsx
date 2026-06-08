@@ -4,7 +4,7 @@ import { cookies, headers } from 'next/headers'
 import Sidebar from '@/components/dashboard/Sidebar'
 import DashboardHeader from '@/components/dashboard/Header'
 import { getTenantClient } from '@/services/supabase-tenant'
-import { SUCURSAL_COOKIE, VER_TODAS_COOKIE } from '@/lib/sucursal'
+import { SUCURSAL_COOKIE, SUCURSAL_HOME_COOKIE, VER_TODAS_COOKIE } from '@/lib/sucursal'
 import { ROUTE_TO_PERM } from '@/lib/perm-groups'
 import type { Sucursal } from '@/types/sucursales'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -39,6 +39,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const isAdmin = session.user.role === 'Administrador'
   const cookieStore = await cookies()
   const cookieVal = parseInt(cookieStore.get(SUCURSAL_COOKIE)?.value ?? '', 10) || null
+  const homeCookieVal = parseInt(cookieStore.get(SUCURSAL_HOME_COOKIE)?.value ?? '', 10) || cookieVal
   const isValidCookie = cookieVal !== null && sucursales.some((s) => s.id === cookieVal)
   const verTodas = isAdmin && cookieStore.get(VER_TODAS_COOKIE)?.value === '1'
 
@@ -47,6 +48,18 @@ export default async function DashboardLayout({ children }: { children: React.Re
   }
 
   const activeSucursalId = verTodas ? null : cookieVal as number
+
+  // Home sucursal may not be in the visible list if it was deactivated; look it up separately if needed
+  let homeSucursalNombre: string | null =
+    sucursales.find((s) => s.id === homeCookieVal)?.nombre ?? null
+  if (!homeSucursalNombre && homeCookieVal) {
+    const { data: homeSuc } = await supabase
+      .from('sucursales')
+      .select('nombre')
+      .eq('id', homeCookieVal)
+      .single()
+    homeSucursalNombre = homeSuc?.nombre ?? null
+  }
 
   // Build permission map for non-admin users
   // null = admin (show/allow everything)
@@ -94,6 +107,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           activeSucursalId={activeSucursalId}
           isAdmin={isAdmin}
           verTodas={verTodas}
+          homeSucursalNombre={homeSucursalNombre}
         />
         <main className="flex-1 overflow-y-auto p-6 lg:p-8">
           {children}

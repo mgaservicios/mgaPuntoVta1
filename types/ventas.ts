@@ -63,6 +63,7 @@ export interface CajaMovimiento {
   id: number
   sesion_id: number
   tipo: TipoMovCaja
+  tipo_concepto: string | null
   concepto: string
   monto: number
   usuario_id: string

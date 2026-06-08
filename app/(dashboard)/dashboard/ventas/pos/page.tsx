@@ -11,6 +11,7 @@ import type { Cliente } from '@/types/clientes'
 import type { NotaCredito } from '@/types/notas-credito'
 import ClienteSearch from '@/components/dashboard/ClienteSearch'
 import VarianteSelector from '../_components/VarianteSelector'
+import { useSucursalActiva } from '@/hooks/useSucursalActiva'
 
 // ── Tipos locales ─────────────────────────────────────────────────────────────
 
@@ -83,6 +84,7 @@ async function getPrecioLista(articuloId: number, listaId: number, varianteId?: 
 
 export default function POSPage() {
   const router = useRouter()
+  const sucursalNombre = useSucursalActiva()
   const [cajaSesion, setCajaSesion] = useState<CajaSesion | null | undefined>(undefined)
 
   // Listas de precio
@@ -395,6 +397,11 @@ export default function POSPage() {
         {/* Selector de lista de precios */}
         {listas.length > 0 && (
           <div className="flex items-center gap-2">
+            {sucursalNombre && (
+              <span className="text-xs text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full border border-gray-200 shrink-0">
+                {sucursalNombre}
+              </span>
+            )}
             <span className="text-xs text-gray-500 shrink-0">Lista de precios:</span>
             <select
               className="h-8 text-sm border border-input rounded-md px-2 bg-white flex-1"

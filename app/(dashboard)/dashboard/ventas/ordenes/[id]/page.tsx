@@ -25,6 +25,7 @@ import ClienteSearch from '@/components/dashboard/ClienteSearch'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
+import { useSucursalActiva } from '@/hooks/useSucursalActiva'
 
 // ── Tipos locales ─────────────────────────────────────────────────────────────
 
@@ -92,6 +93,7 @@ export default function OrdenPage({ params }: { params: Promise<{ id: string }> 
   const { id } = use(params)
   const isNew = id === 'nueva'
   const router = useRouter()
+  const sucursalNombre = useSucursalActiva()
 
   const [orden, setOrden] = useState<OrdenVenta | null>(null)
   const [loading, setLoading] = useState(!isNew)
@@ -641,6 +643,11 @@ export default function OrdenPage({ params }: { params: Promise<{ id: string }> 
           <h2 className="text-base font-semibold text-gray-900 truncate">
             {isNew ? 'Nueva orden de venta' : `Editar ${orden?.numero ?? ''}`}
           </h2>
+          {sucursalNombre && (
+            <span className="text-xs text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full border border-gray-200 shrink-0 hidden sm:inline">
+              {sucursalNombre}
+            </span>
+          )}
         </div>
         <div className="flex gap-2 shrink-0">
           <Button variant="outline" size="sm" onClick={() => { router.refresh(); router.push('/dashboard/ventas/ordenes') }}>

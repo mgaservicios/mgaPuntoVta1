@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { Eye, Printer } from 'lucide-react'
 import { buttonVariants } from '@/components/ui/button'
+import { useSelectedSucursal } from '@/hooks/useSelectedSucursal'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import {
@@ -29,6 +30,8 @@ function formatFecha(iso: string) {
 }
 
 export default function VentasPage() {
+  const { isHome } = useSelectedSucursal()
+  const canWrite = isHome !== false
   const [ventas, setVentas] = useState<VentaRow[]>([])
   const [loading, setLoading] = useState(true)
   const [estado, setEstado] = useState('todos')
@@ -56,9 +59,11 @@ export default function VentasPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-lg font-semibold text-gray-800">Historial de ventas</h2>
-        <Link href="/dashboard/ventas/pos" className={buttonVariants()}>
-          Ir al POS
-        </Link>
+        {canWrite && (
+          <Link href="/dashboard/ventas/pos" className={buttonVariants()}>
+            Ir al POS
+          </Link>
+        )}
       </div>
 
       {/* Filtros */}

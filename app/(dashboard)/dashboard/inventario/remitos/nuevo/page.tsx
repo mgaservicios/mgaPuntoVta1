@@ -18,6 +18,7 @@ import type { Sucursal } from '@/types/sucursales'
 import type { Proveedor } from '@/types/proveedores'
 import type { ContraparteTipo, TipoRemito } from '@/types/stock'
 import type { ListaPrecio } from '@/types/precios'
+import { useSucursalActiva } from '@/hooks/useSucursalActiva'
 
 type ArticuloResult = {
   id: number
@@ -47,6 +48,7 @@ type ItemForm = {
 
 export default function NuevoRemitoPage() {
   const router = useRouter()
+  const sucursalNombre = useSucursalActiva()
 
   const [tipo, setTipo] = useState<TipoRemito>('entrada')
   const [fecha, setFecha] = useState<string>(new Date().toISOString().slice(0, 10))
@@ -289,7 +291,14 @@ export default function NuevoRemitoPage() {
         Volver
       </button>
 
-      <h2 className="text-lg font-semibold text-gray-800 mb-6">Nuevo remito</h2>
+      <div className="flex items-center gap-3 mb-6">
+        <h2 className="text-lg font-semibold text-gray-800">Nuevo remito</h2>
+        {sucursalNombre && (
+          <span className="text-xs text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full border border-gray-200">
+            {sucursalNombre}
+          </span>
+        )}
+      </div>
 
       <div className="space-y-5">
         {/* Tipo + Fecha */}

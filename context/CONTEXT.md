@@ -11,7 +11,7 @@ Sistema de punto de venta y gestión de stock multi-sucursal para comercios.
 Incluye POS, órdenes de venta, gestión de stock con variantes, caja, clientes,
 notas de crédito y administración de usuarios/roles/permisos.
 
-- **Repo:** `c:\MGA\PROYECTOSWEB\mga-ptoventa`
+- **Repo:** `c:\MGA\PROYECTOSWEB\MgaPos\mga-ptoventa`
 - **Deploy:** Vercel (rama `master`)
 
 ---

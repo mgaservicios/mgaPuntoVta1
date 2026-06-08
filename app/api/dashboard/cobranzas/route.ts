@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { getTenantClient } from '@/services/supabase-tenant'
-import { getActiveSucursalId } from '@/lib/sucursal'
+import { getHomeSucursalId } from '@/lib/sucursal'
 
 // GET — todos los movimientos de cobranzas con info del cliente
 export async function GET() {
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   // Registrar ingreso en caja si hay sesión abierta
-  const sucursalId = await getActiveSucursalId()
+  const sucursalId = await getHomeSucursalId()
   if (sucursalId) {
     const { data: cajaSesion } = await supabase
       .from('caja_sesiones')

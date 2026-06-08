@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { getTenantClient } from '@/services/supabase-tenant'
-import { getActiveSucursalId, getSucursalFilter } from '@/lib/sucursal'
+import { getHomeSucursalId, getSucursalFilter } from '@/lib/sucursal'
 
 export async function GET(req: NextRequest) {
   const session = await auth()
@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
   const supabase = await getTenantClient(session)
 
-  const sucursalId = await getActiveSucursalId()
+  const sucursalId = await getHomeSucursalId()
   if (!sucursalId) return NextResponse.json({ error: 'sin_sucursal_activa' }, { status: 403 })
 
   const body = await req.json()

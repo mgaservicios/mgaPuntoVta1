@@ -35,6 +35,7 @@ import {
   Tag,
   FolderOpen,
   Layers,
+  History,
   type LucideIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -118,8 +119,9 @@ const navGroups: NavGroup[] = [
     Icon: Wallet,
     module: 'caja',
     items: [
-      { label: 'Caja',      href: '/dashboard/caja',      Icon: Wallet,     permKey: 'caja.caja.ver' },
-      { label: 'Cobranzas', href: '/dashboard/cobranzas', Icon: DollarSign, permKey: 'caja.cobranzas.ver' },
+      { label: 'Caja',      href: '/dashboard/caja',           Icon: Wallet,     permKey: 'caja.caja.ver' },
+      { label: 'Historial', href: '/dashboard/caja/historial',  Icon: History,    permKey: 'caja.caja.ver' },
+      { label: 'Cobranzas', href: '/dashboard/cobranzas',       Icon: DollarSign, permKey: 'caja.cobranzas.ver' },
     ],
   },
   {

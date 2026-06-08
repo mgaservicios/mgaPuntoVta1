@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { toast } from 'sonner'
-import { DollarSign, LogIn, LogOut, Plus, Minus } from 'lucide-react'
+import { DollarSign, LogOut, Plus, Minus } from 'lucide-react'
+
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -13,6 +14,16 @@ import {
 } from '@/components/ui/dialog'
 import type { CajaSesion, CajaMovimiento, TipoMovCaja } from '@/types/ventas'
 
+const CONCEPTOS_CAJA = [
+  'Apertura',
+  'Gastos',
+  'Retiro',
+  'Fondo de cambio',
+  'Pago a proveedor',
+  'Ingreso',
+  'Otros',
+]
+
 function formatARS(n: number) {
   return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(n)
 }
@@ -22,61 +33,6 @@ function formatDateTime(iso: string) {
     day: '2-digit', month: '2-digit', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
   })
-}
-
-// ── Dialogo apertura ──────────────────────────────────────────────────────────
-
-function AbrirCajaDialog({ open, onClose, onOpened }: {
-  open: boolean
-  onClose: () => void
-  onOpened: (s: CajaSesion) => void
-}) {
-  const [monto, setMonto] = useState('0')
-  const [saving, setSaving] = useState(false)
-
-  useEffect(() => { if (!open) setMonto('0') }, [open])
-
-  async function handleAbrir() {
-    setSaving(true)
-    const res = await fetch('/api/dashboard/caja/sesion', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ monto_apertura: monto }),
-    })
-    if (res.ok) {
-      const data = await res.json()
-      toast.success('Caja abierta')
-      onOpened(data)
-      onClose()
-    } else {
-      const err = await res.json()
-      toast.error(err.error ?? 'Error al abrir caja')
-    }
-    setSaving(false)
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-sm">
-        <DialogHeader><DialogTitle>Abrir caja</DialogTitle></DialogHeader>
-        <div className="space-y-2">
-          <Label>Monto de apertura ($)</Label>
-          <Input
-            type="number" step="0.01" min="0"
-            value={monto}
-            onChange={(e) => setMonto(e.target.value)}
-            autoFocus
-          />
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancelar</Button>
-          <Button onClick={handleAbrir} disabled={saving}>
-            {saving ? 'Abriendo…' : 'Abrir caja'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
 }
 
 // ── Dialogo cierre ────────────────────────────────────────────────────────────
@@ -156,18 +112,21 @@ function MovimientoDialog({ open, sesionId, tipo, onClose, onSaved }: {
   onClose: () => void
   onSaved: (m: CajaMovimiento) => void
 }) {
+  const [tipoConcepto, setTipoConcepto] = useState(CONCEPTOS_CAJA[0])
   const [concepto, setConcepto] = useState('')
   const [monto, setMonto] = useState('')
   const [saving, setSaving] = useState(false)
 
-  useEffect(() => { if (!open) { setConcepto(''); setMonto('') } }, [open])
+  useEffect(() => {
+    if (!open) { setTipoConcepto(CONCEPTOS_CAJA[0]); setConcepto(''); setMonto('') }
+  }, [open])
 
   async function handleSave() {
     setSaving(true)
     const res = await fetch(`/api/dashboard/caja/sesion/${sesionId}/movimientos`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tipo, concepto, monto }),
+      body: JSON.stringify({ tipo, tipo_concepto: tipoConcepto, concepto, monto }),
     })
     if (res.ok) {
       const data = await res.json()
@@ -189,12 +148,24 @@ function MovimientoDialog({ open, sesionId, tipo, onClose, onSaved }: {
         </DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1">
-            <Label>Concepto *</Label>
+            <Label>Tipo de concepto *</Label>
+            <select
+              autoFocus
+              className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              value={tipoConcepto}
+              onChange={(e) => setTipoConcepto(e.target.value)}
+            >
+              {CONCEPTOS_CAJA.map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-1">
+            <Label>Concepto / Detalle</Label>
             <Input
-              placeholder="Ej: Fondo de cambio, pago a proveedor…"
+              placeholder="Descripción del movimiento (opcional)"
               value={concepto}
               onChange={(e) => setConcepto(e.target.value)}
-              autoFocus
             />
           </div>
           <div className="space-y-1">
@@ -208,7 +179,7 @@ function MovimientoDialog({ open, sesionId, tipo, onClose, onSaved }: {
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
-          <Button onClick={handleSave} disabled={saving || !concepto.trim() || !monto}>
+          <Button onClick={handleSave} disabled={saving || !monto}>
             {saving ? 'Guardando…' : 'Guardar'}
           </Button>
         </DialogFooter>
@@ -219,32 +190,38 @@ function MovimientoDialog({ open, sesionId, tipo, onClose, onSaved }: {
 
 // ── Página principal ──────────────────────────────────────────────────────────
 
-interface MetodoMonto { metodo: string; label: string; monto: number }
-interface ResumenData { ventas: MetodoMonto[]; ot: MetodoMonto[]; servicios: MetodoMonto[] }
-
 function SinCaja() {
   return (
     <div className="flex items-center gap-3 text-gray-500 py-6">
       <DollarSign className="w-5 h-5 text-gray-300" />
-      <span className="text-sm">No hay caja abierta. Abrí una para poder vender.</span>
+      <span className="text-sm">Caja cerrada. Iniciá una nueva sesión para operar.</span>
     </div>
   )
 }
 
+// ── Tipos resumen ─────────────────────────────────────────────────────────────
+
+interface MetodoMonto { metodo: string; label: string; monto: number }
+interface ResumenData { ventas: MetodoMonto[]; ot: MetodoMonto[]; servicios: MetodoMonto[] }
+
+async function abrirCaja(): Promise<CajaSesion | null> {
+  const res = await fetch('/api/dashboard/caja/sesion', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ monto_apertura: 0 }),
+  })
+  return res.ok ? await res.json() : null
+}
+
 export default function CajaPage() {
+  const [sucursalNombre, setSucursalNombre] = useState<string | null>(null)
   const [sesion, setSesion] = useState<CajaSesion | null | undefined>(undefined)
+  const [isHomeCaja, setIsHomeCaja] = useState(true)
   const [movimientos, setMovimientos] = useState<CajaMovimiento[]>([])
   const [resumen, setResumen] = useState<ResumenData | null>(null)
-  const [showAbrir, setShowAbrir] = useState(false)
   const [showCerrar, setShowCerrar] = useState(false)
   const [movDialog, setMovDialog] = useState<TipoMovCaja | null>(null)
-
-  const loadSesion = useCallback(async () => {
-    const res = await fetch('/api/dashboard/caja/sesion')
-    const data = await res.json()
-    setSesion(data)
-    return data as CajaSesion | null
-  }, [])
+  const [openingCaja, setOpeningCaja] = useState(false)
 
   const loadMovimientos = useCallback(async (id: number) => {
     const res = await fetch(`/api/dashboard/caja/sesion/${id}/movimientos`)
@@ -257,26 +234,43 @@ export default function CajaPage() {
     if (res.ok) setResumen(await res.json())
   }, [])
 
+  // Auto-open: on mount, get or create an active session (only for home sucursal)
   useEffect(() => {
-    loadSesion().then((s) => {
-      if (s) {
-        loadMovimientos(s.id)
-        loadResumen(s.id)
-      }
-    })
-  }, [loadSesion, loadMovimientos, loadResumen])
+    async function init() {
+      const res = await fetch('/api/dashboard/caja/sesion')
+      const data: { sesion: CajaSesion | null; isHome: boolean; sucursalNombre: string | null } = await res.json()
+      setIsHomeCaja(data.isHome ?? true)
+      setSucursalNombre(data.sucursalNombre ?? null)
+      let s = data.sesion
+      if (!s && data.isHome) s = await abrirCaja()
+      setSesion(s)
+      if (s) { loadMovimientos(s.id); loadResumen(s.id) }
+    }
+    init()
+  }, [loadMovimientos, loadResumen])
 
-  function handleOpened(s: CajaSesion) {
-    setSesion(s)
-    setMovimientos([])
-    setResumen(null)
-    loadResumen(s.id)
+  async function handleAbrirNueva() {
+    setOpeningCaja(true)
+    const s = await abrirCaja()
+    if (s) {
+      setSesion(s)
+      setMovimientos([])
+      setResumen(null)
+      loadResumen(s.id)
+    } else {
+      toast.error('No se pudo abrir la caja')
+    }
+    setOpeningCaja(false)
   }
 
   function handleClosed() {
-    loadSesion()
-    setMovimientos([])
-    setResumen(null)
+    fetch('/api/dashboard/caja/sesion').then(r => r.json()).then((data: { sesion: CajaSesion | null; isHome: boolean; sucursalNombre: string | null }) => {
+      setSesion(data.sesion)
+      setIsHomeCaja(data.isHome ?? true)
+      setSucursalNombre(data.sucursalNombre ?? null)
+      setMovimientos([])
+      setResumen(null)
+    })
   }
 
   function handleMovSaved(m: CajaMovimiento) {
@@ -284,7 +278,7 @@ export default function CajaPage() {
     if (sesion) loadResumen(sesion.id)
   }
 
-  if (sesion === undefined) return <div className="text-gray-400 text-sm">Cargando…</div>
+  if (sesion === undefined) return <div className="text-gray-400 text-sm">Iniciando caja…</div>
 
   const estaAbierta = sesion?.estado === 'abierta'
   const ing = movimientos.filter(m => m.tipo === 'ingreso').reduce((s, m) => s + Number(m.monto), 0)
@@ -296,17 +290,30 @@ export default function CajaPage() {
 
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-gray-800">Caja</h2>
-        {!estaAbierta ? (
-          <Button onClick={() => setShowAbrir(true)}>
-            <LogIn className="w-4 h-4 mr-2" />
-            Abrir caja
-          </Button>
-        ) : (
-          <Button variant="outline" className="text-red-500 hover:text-red-600" onClick={() => setShowCerrar(true)}>
-            <LogOut className="w-4 h-4 mr-2" />
-            Cerrar caja
-          </Button>
+        <div className="flex items-center gap-2.5">
+          <h2 className="text-lg font-semibold text-gray-800">Caja</h2>
+          {sucursalNombre && (
+            <span className="text-xs text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full border border-gray-200 shrink-0 hidden sm:inline">
+              {sucursalNombre}
+            </span>
+          )}
+          {!isHomeCaja && (
+            <span className="text-xs text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200 shrink-0 hidden sm:inline">
+              Solo lectura
+            </span>
+          )}
+        </div>
+        {isHomeCaja && (
+          estaAbierta ? (
+            <Button variant="outline" className="text-red-500 hover:text-red-600" onClick={() => setShowCerrar(true)}>
+              <LogOut className="w-4 h-4 mr-2" />
+              Cerrar caja
+            </Button>
+          ) : sesion !== undefined ? (
+            <Button onClick={handleAbrirNueva} disabled={openingCaja}>
+              {openingCaja ? 'Abriendo…' : 'Nueva sesión'}
+            </Button>
+          ) : null
         )}
       </div>
 
@@ -519,14 +526,16 @@ export default function CajaPage() {
               <div className="bg-white rounded-xl border border-gray-200 p-5"><SinCaja /></div>
             ) : (
               <>
-                <div className="flex justify-end gap-2">
-                  <Button size="sm" variant="outline" onClick={() => setMovDialog('ingreso')}>
-                    <Plus className="w-3.5 h-3.5 mr-1" /> Ingreso
-                  </Button>
-                  <Button size="sm" variant="outline" className="text-red-500 hover:text-red-600" onClick={() => setMovDialog('egreso')}>
-                    <Minus className="w-3.5 h-3.5 mr-1" /> Egreso
-                  </Button>
-                </div>
+                {isHomeCaja && (
+                  <div className="flex justify-end gap-2">
+                    <Button size="sm" variant="outline" onClick={() => setMovDialog('ingreso')}>
+                      <Plus className="w-3.5 h-3.5 mr-1" /> Ingreso
+                    </Button>
+                    <Button size="sm" variant="outline" className="text-red-500 hover:text-red-600" onClick={() => setMovDialog('egreso')}>
+                      <Minus className="w-3.5 h-3.5 mr-1" /> Egreso
+                    </Button>
+                  </div>
+                )}
 
                 <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
                   {movimientos.length === 0 ? (
@@ -534,12 +543,24 @@ export default function CajaPage() {
                   ) : (
                     <div className="divide-y divide-gray-100">
                       {movimientos.map((m) => (
-                        <div key={m.id} className="flex items-center justify-between px-4 py-3">
-                          <div>
-                            <p className="text-sm font-medium text-gray-800">{m.concepto}</p>
-                            <p className="text-xs text-gray-400">{formatDateTime(m.created_at)}</p>
+                        <div key={m.id} className="flex items-center justify-between px-4 py-3 gap-3">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {m.tipo_concepto && (
+                                <span className="text-xs font-semibold text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded shrink-0">
+                                  {m.tipo_concepto}
+                                </span>
+                              )}
+                              {m.concepto && (
+                                <p className="text-sm text-gray-700 truncate">{m.concepto}</p>
+                              )}
+                              {!m.tipo_concepto && !m.concepto && (
+                                <p className="text-sm text-gray-400 italic">Sin descripción</p>
+                              )}
+                            </div>
+                            <p className="text-xs text-gray-400 mt-0.5">{formatDateTime(m.created_at)}</p>
                           </div>
-                          <span className={`text-sm font-semibold ${m.tipo === 'ingreso' ? 'text-green-600' : 'text-red-500'}`}>
+                          <span className={`text-sm font-semibold shrink-0 ${m.tipo === 'ingreso' ? 'text-green-600' : 'text-red-500'}`}>
                             {m.tipo === 'ingreso' ? '+' : '-'}{formatARS(m.monto)}
                           </span>
                         </div>
@@ -551,15 +572,11 @@ export default function CajaPage() {
             )}
           </div>
         </TabsContent>
+
       </Tabs>
 
-      {/* Diálogos */}
-      <AbrirCajaDialog
-        open={showAbrir}
-        onClose={() => setShowAbrir(false)}
-        onOpened={handleOpened}
-      />
-      {sesion && (
+      {/* Diálogos — solo disponibles para la sucursal logueada */}
+      {sesion && isHomeCaja && (
         <>
           <CerrarCajaDialog
             open={showCerrar}

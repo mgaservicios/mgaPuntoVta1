@@ -1,25 +1,43 @@
 ﻿import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { getTenantClient } from '@/services/supabase-tenant'
-import { getActiveSucursalId } from '@/lib/sucursal'
+import { getSucursalFilter, getHomeSucursalId } from '@/lib/sucursal'
 
-// GET — sesión abierta actual para la sucursal activa (null si no hay)
+// GET — sesión abierta de la sucursal que se está viendo + flag isHome
+// Cuando verTodas=true siempre muestra la home (única que puede operar el usuario)
 export async function GET() {
   const session = await auth()
   if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
   const supabase = await getTenantClient(session)
 
-  const sucursalId = await getActiveSucursalId()
+  const [{ sucursalId: activoId, verTodas }, homeId] = await Promise.all([
+    getSucursalFilter(),
+    getHomeSucursalId(),
+  ])
+
+  // En modo "ver todas" siempre mostramos la caja home; fuera de ese modo, la seleccionada
+  const sucursalId = verTodas ? homeId : activoId
   if (!sucursalId) return NextResponse.json({ error: 'sin_sucursal_activa' }, { status: 403 })
 
-  const { data } = await supabase
-    .from('caja_sesiones')
-    .select('*, users(name, email)')
-    .eq('estado', 'abierta')
-    .eq('sucursal_id', sucursalId)
-    .maybeSingle()
+  const [sessionRes, sucursalRes] = await Promise.all([
+    supabase
+      .from('caja_sesiones')
+      .select('*, users(name, email)')
+      .eq('estado', 'abierta')
+      .eq('sucursal_id', sucursalId)
+      .maybeSingle(),
+    supabase
+      .from('sucursales')
+      .select('nombre')
+      .eq('id', sucursalId)
+      .single(),
+  ])
 
-  return NextResponse.json(data ?? null)
+  return NextResponse.json({
+    sesion: sessionRes.data ?? null,
+    isHome: sucursalId === homeId,
+    sucursalNombre: sucursalRes.data?.nombre ?? null,
+  })
 }
 
 // POST — abrir nueva sesión para la sucursal activa
@@ -28,7 +46,7 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
   const supabase = await getTenantClient(session)
 
-  const sucursalId = await getActiveSucursalId()
+  const sucursalId = await getHomeSucursalId()
   if (!sucursalId) return NextResponse.json({ error: 'sin_sucursal_activa' }, { status: 403 })
 
   const body = await req.json()

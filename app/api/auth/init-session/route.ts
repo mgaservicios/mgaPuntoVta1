@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { getTenantClient } from '@/services/supabase-tenant'
-import { SUCURSAL_COOKIE } from '@/lib/sucursal'
+import { SUCURSAL_COOKIE, SUCURSAL_HOME_COOKIE } from '@/lib/sucursal'
 
 export async function GET(req: NextRequest) {
   const session = await auth()
@@ -71,10 +71,8 @@ export async function GET(req: NextRequest) {
   }
 
   const res = NextResponse.redirect(new URL('/dashboard', req.url))
-  res.cookies.set(SUCURSAL_COOKIE, String(sucursalId), {
-    path: '/',
-    sameSite: 'strict',
-    httpOnly: true,
-  })
+  const cookieOpts = { path: '/', sameSite: 'strict' as const, httpOnly: true }
+  res.cookies.set(SUCURSAL_COOKIE, String(sucursalId), cookieOpts)
+  res.cookies.set(SUCURSAL_HOME_COOKIE, String(sucursalId), cookieOpts)
   return res
 }
