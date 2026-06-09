@@ -146,6 +146,18 @@ create table public.atributo_tipos (
 insert into public.atributo_tipos (nombre) values
   ('Talle'), ('Color'), ('Tamaño'), ('Material');
 
+create table public.unidades_medida (
+  id         bigint generated always as identity primary key,
+  nombre     text not null unique,
+  activo     boolean not null default true,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+insert into public.unidades_medida (nombre) values
+  ('Unidad'), ('Kg'), ('Gr'), ('Lt'), ('Ml'),
+  ('Caja'), ('Bolsa'), ('Metro'), ('Par');
+
 -- ============================================================
 -- ARTÍCULOS
 -- ============================================================
@@ -162,7 +174,7 @@ create table public.articulos (
   precio_compra numeric(12,2),
   stock_actual  numeric(10,3) not null default 0,
   stock_minimo  numeric(10,3) not null default 0,
-  unidad        text not null default 'unidad' check (unidad in ('unidad','kg','gr','lt','ml','caja','bolsa','metro','par')),
+  unidad_id     bigint references public.unidades_medida(id),
   codigo_barras text unique,
   activo        boolean not null default true,
   imagen_url    text,

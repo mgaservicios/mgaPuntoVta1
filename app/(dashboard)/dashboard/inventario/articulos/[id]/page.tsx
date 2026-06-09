@@ -150,12 +150,12 @@ export default function ArticuloFormPage({ params }: { params: Promise<{ id: str
     const [cats, mars, provs, atribs, unds, listas] = await Promise.all([
       resCat.json(), resMar.json(), resProv.json(), resAtrib.json(), resUnd.json(), resListas.json(),
     ])
-    setCategorias(cats)
-    setMarcas(mars)
-    setProveedores(provs)
-    setAtributoTipos(atribs)
-    setUnidades(unds)
-    setListasTodas((listas ?? []).filter((l: { activo: boolean }) => l.activo) as ListaPrecio[])
+    setCategorias(Array.isArray(cats) ? cats : [])
+    setMarcas(Array.isArray(mars) ? mars : [])
+    setProveedores(Array.isArray(provs) ? provs : [])
+    setAtributoTipos(Array.isArray(atribs) ? atribs : [])
+    setUnidades(Array.isArray(unds) ? unds : [])
+    setListasTodas((Array.isArray(listas) ? listas : []).filter((l: { activo: boolean }) => l.activo) as ListaPrecio[])
     return { unds: unds as UnidadMedida[], cats: cats as Categoria[] }
   }, [])
 

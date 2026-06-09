@@ -37,6 +37,11 @@ function formatDateTime(iso: string) {
 
 // ── Dialogo cierre ────────────────────────────────────────────────────────────
 
+function toDatetimeLocal(d: Date): string {
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`
+}
+
 function CerrarCajaDialog({ open, sesionId, onClose, onClosed }: {
   open: boolean
   sesionId: number
@@ -44,17 +49,21 @@ function CerrarCajaDialog({ open, sesionId, onClose, onClosed }: {
   onClosed: () => void
 }) {
   const [monto, setMonto] = useState('0')
+  const [fecha, setFecha] = useState(() => toDatetimeLocal(new Date()))
   const [obs, setObs] = useState('')
   const [saving, setSaving] = useState(false)
 
-  useEffect(() => { if (!open) { setMonto('0'); setObs('') } }, [open])
+  useEffect(() => {
+    if (!open) { setMonto('0'); setObs('') }
+    if (open) setFecha(toDatetimeLocal(new Date()))
+  }, [open])
 
   async function handleCerrar() {
     setSaving(true)
     const res = await fetch(`/api/dashboard/caja/sesion/${sesionId}/cerrar`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ monto_cierre: monto, observaciones: obs }),
+      body: JSON.stringify({ monto_cierre: monto, fecha_cierre: fecha, observaciones: obs }),
     })
     if (res.ok) {
       toast.success('Caja cerrada')
@@ -72,6 +81,14 @@ function CerrarCajaDialog({ open, sesionId, onClose, onClosed }: {
       <DialogContent className="max-w-sm">
         <DialogHeader><DialogTitle>Cerrar caja</DialogTitle></DialogHeader>
         <div className="space-y-3">
+          <div className="space-y-1">
+            <Label>Fecha y hora de cierre</Label>
+            <Input
+              type="datetime-local"
+              value={fecha}
+              onChange={(e) => setFecha(e.target.value)}
+            />
+          </div>
           <div className="space-y-1">
             <Label>Monto contado en caja ($)</Label>
             <Input

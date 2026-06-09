@@ -36,6 +36,7 @@ import {
   FolderOpen,
   Layers,
   History,
+  FileUp,
   type LucideIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -88,6 +89,7 @@ const navGroups: NavGroup[] = [
       { label: 'Remitos',          href: '/dashboard/inventario/remitos',           Icon: BarChart3,         permKey: 'inventario.remitos.ver' },
       { label: 'Proveedores',      href: '/dashboard/inventario/proveedores',       Icon: Truck,             permKey: 'inventario.proveedores.ver' },
       { label: 'Ajustes de stock', href: '/dashboard/inventario/remitos/ajustes',  Icon: SlidersHorizontal, permKey: 'inventario.ajustes.ver' },
+      { label: 'Importar óptica',  href: '/dashboard/inventario/importar-optica',  Icon: FileUp,            permKey: 'inventario.articulos.ver' },
     ],
   },
   {

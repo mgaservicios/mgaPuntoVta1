@@ -35,11 +35,14 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   const monto_esperado = esperado ?? 0
   const diferencia = monto_cierre - monto_esperado
 
+  const fechaCierreRaw = body.fecha_cierre ? new Date(body.fecha_cierre) : new Date()
+  const fecha_cierre = isNaN(fechaCierreRaw.getTime()) ? new Date() : fechaCierreRaw
+
   const { data, error } = await supabase
     .from('caja_sesiones')
     .update({
       estado: 'cerrada',
-      fecha_cierre: new Date().toISOString(),
+      fecha_cierre: fecha_cierre.toISOString(),
       monto_cierre,
       monto_esperado,
       diferencia,
