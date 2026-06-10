@@ -17,7 +17,7 @@ interface Sucursal { id: number; nombre: string }
 
 const schema = z.object({
   nombre:      z.string().min(1, 'El nombre es obligatorio'),
-  sucursal_id: z.coerce.number().min(1, 'La sucursal es obligatoria'),
+  sucursal_id: z.number().min(1, 'La sucursal es obligatoria'),
   activo:      z.boolean(),
 })
 type FormValues = z.infer<typeof schema>
