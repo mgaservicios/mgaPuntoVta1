@@ -47,41 +47,93 @@ create policy "users_service_role_all" on public.users
 -- ============================================================
 create table public.role_permissions (
   id         bigint generated always as identity primary key,
-  role_id    bigint not null references public.roles(id),
-  module     text not null,
-  can_view   boolean default false,
-  can_create boolean default false,
-  can_edit   boolean default false,
-  can_delete boolean default false,
-  unique(role_id, module)
+  role_id    bigint  not null references public.roles(id) on delete cascade,
+  operation  text    not null,
+  allowed    boolean not null default false,
+  unique(role_id, operation)
 );
 
 -- Administrador: acceso total
-insert into public.role_permissions (role_id, module, can_view, can_create, can_edit, can_delete)
-select 1, m, true, true, true, true
-from unnest(array['articulos','ventas','stock','cobranzas','caja','clientes','proveedores','admin']) as m;
+insert into public.role_permissions (role_id, operation, allowed)
+select 1, op, true
+from unnest(array[
+  'ventas.pos.cobrar',
+  'ventas.historial.ver','ventas.historial.anular',
+  'ventas.ordenes.ver','ventas.ordenes.crear','ventas.ordenes.editar','ventas.ordenes.confirmar','ventas.ordenes.anular',
+  'ventas.clientes.ver','ventas.clientes.crear','ventas.clientes.editar','ventas.clientes.desactivar',
+  'ventas.notas-credito.ver','ventas.notas-credito.crear','ventas.notas-credito.anular',
+  'inventario.articulos.ver','inventario.articulos.crear','inventario.articulos.editar','inventario.articulos.desactivar',
+  'inventario.remitos.ver','inventario.remitos.crear','inventario.remitos.confirmar','inventario.remitos.anular',
+  'inventario.ajustes.ver','inventario.ajustes.aplicar',
+  'inventario.proveedores.ver','inventario.proveedores.crear','inventario.proveedores.editar','inventario.proveedores.desactivar',
+  'consultas.stock.ver','consultas.seguimiento.ver','consultas.precios_costo.ver',
+  'listados.cobranzas.ver','listados.ventas_articulos.ver','listados.precios.ver',
+  'caja.caja.ver','caja.caja.abrir','caja.caja.cerrar','caja.caja.movimiento',
+  'caja.cobranzas.ver',
+  'optica.ordenes.ver','optica.ordenes.crear','optica.ordenes.editar','optica.ordenes.cambiar-estado','optica.ordenes.pagar',
+  'optica.medicos.ver','optica.medicos.crear','optica.medicos.editar','optica.medicos.eliminar',
+  'altas.marcas.ver','altas.marcas.crear','altas.marcas.editar','altas.marcas.eliminar',
+  'altas.categorias.ver','altas.categorias.crear','altas.categorias.editar','altas.categorias.eliminar',
+  'altas.subcategorias.ver','altas.subcategorias.crear','altas.subcategorias.editar','altas.subcategorias.eliminar',
+  'altas.atributos.ver','altas.atributos.crear','altas.atributos.editar','altas.atributos.eliminar',
+  'admin.usuarios.ver','admin.usuarios.crear','admin.usuarios.editar',
+  'admin.roles.ver','admin.roles.crear','admin.roles.editar','admin.roles.eliminar',
+  'admin.permisos.ver','admin.permisos.editar',
+  'admin.sucursales.ver','admin.sucursales.crear','admin.sucursales.editar','admin.sucursales.eliminar',
+  'admin.listas_precio.ver','admin.listas_precio.crear','admin.listas_precio.editar','admin.listas_precio.eliminar'
+]) as op;
 
 -- Supervisor
-insert into public.role_permissions (role_id, module, can_view, can_create, can_edit, can_delete) values
-  (2, 'articulos',   true,  false, false, false),
-  (2, 'ventas',      true,  false, false, false),
-  (2, 'stock',       true,  true,  true,  false),
-  (2, 'cobranzas',   true,  false, false, false),
-  (2, 'caja',        true,  false, false, false),
-  (2, 'clientes',    true,  true,  true,  false),
-  (2, 'proveedores', true,  false, false, false),
-  (2, 'admin',       false, false, false, false);
+insert into public.role_permissions (role_id, operation, allowed) values
+  (2,'ventas.pos.cobrar',true),(2,'ventas.historial.ver',true),(2,'ventas.historial.anular',true),
+  (2,'ventas.ordenes.ver',true),(2,'ventas.ordenes.crear',true),(2,'ventas.ordenes.editar',true),(2,'ventas.ordenes.confirmar',true),(2,'ventas.ordenes.anular',true),
+  (2,'ventas.clientes.ver',true),(2,'ventas.clientes.crear',true),(2,'ventas.clientes.editar',true),(2,'ventas.clientes.desactivar',false),
+  (2,'ventas.notas-credito.ver',true),(2,'ventas.notas-credito.crear',true),(2,'ventas.notas-credito.anular',false),
+  (2,'inventario.articulos.ver',true),(2,'inventario.articulos.crear',false),(2,'inventario.articulos.editar',false),(2,'inventario.articulos.desactivar',false),
+  (2,'inventario.remitos.ver',true),(2,'inventario.remitos.crear',true),(2,'inventario.remitos.confirmar',true),(2,'inventario.remitos.anular',false),
+  (2,'inventario.ajustes.ver',true),(2,'inventario.ajustes.aplicar',true),
+  (2,'inventario.proveedores.ver',true),(2,'inventario.proveedores.crear',false),(2,'inventario.proveedores.editar',false),(2,'inventario.proveedores.desactivar',false),
+  (2,'consultas.stock.ver',true),(2,'consultas.seguimiento.ver',true),(2,'consultas.precios_costo.ver',true),
+  (2,'listados.cobranzas.ver',true),(2,'listados.ventas_articulos.ver',true),(2,'listados.precios.ver',true),
+  (2,'caja.caja.ver',true),(2,'caja.caja.abrir',true),(2,'caja.caja.cerrar',true),(2,'caja.caja.movimiento',true),
+  (2,'caja.cobranzas.ver',true),
+  (2,'optica.ordenes.ver',true),(2,'optica.ordenes.crear',true),(2,'optica.ordenes.editar',true),(2,'optica.ordenes.cambiar-estado',true),(2,'optica.ordenes.pagar',true),
+  (2,'optica.medicos.ver',true),(2,'optica.medicos.crear',false),(2,'optica.medicos.editar',false),(2,'optica.medicos.eliminar',false),
+  (2,'altas.marcas.ver',true),(2,'altas.marcas.crear',false),(2,'altas.marcas.editar',false),(2,'altas.marcas.eliminar',false),
+  (2,'altas.categorias.ver',true),(2,'altas.categorias.crear',false),(2,'altas.categorias.editar',false),(2,'altas.categorias.eliminar',false),
+  (2,'altas.subcategorias.ver',true),(2,'altas.subcategorias.crear',false),(2,'altas.subcategorias.editar',false),(2,'altas.subcategorias.eliminar',false),
+  (2,'altas.atributos.ver',true),(2,'altas.atributos.crear',false),(2,'altas.atributos.editar',false),(2,'altas.atributos.eliminar',false),
+  (2,'admin.usuarios.ver',false),(2,'admin.usuarios.crear',false),(2,'admin.usuarios.editar',false),
+  (2,'admin.roles.ver',false),(2,'admin.roles.crear',false),(2,'admin.roles.editar',false),(2,'admin.roles.eliminar',false),
+  (2,'admin.permisos.ver',false),(2,'admin.permisos.editar',false),
+  (2,'admin.sucursales.ver',false),(2,'admin.sucursales.crear',false),(2,'admin.sucursales.editar',false),(2,'admin.sucursales.eliminar',false),
+  (2,'admin.listas_precio.ver',false),(2,'admin.listas_precio.crear',false),(2,'admin.listas_precio.editar',false),(2,'admin.listas_precio.eliminar',false);
 
 -- Vendedor
-insert into public.role_permissions (role_id, module, can_view, can_create, can_edit, can_delete) values
-  (3, 'articulos',   true,  false, false, false),
-  (3, 'ventas',      true,  true,  false, false),
-  (3, 'stock',       false, false, false, false),
-  (3, 'cobranzas',   false, false, false, false),
-  (3, 'caja',        true,  true,  false, false),
-  (3, 'clientes',    true,  true,  false, false),
-  (3, 'proveedores', false, false, false, false),
-  (3, 'admin',       false, false, false, false);
+insert into public.role_permissions (role_id, operation, allowed) values
+  (3,'ventas.pos.cobrar',true),(3,'ventas.historial.ver',true),(3,'ventas.historial.anular',false),
+  (3,'ventas.ordenes.ver',true),(3,'ventas.ordenes.crear',true),(3,'ventas.ordenes.editar',false),(3,'ventas.ordenes.confirmar',false),(3,'ventas.ordenes.anular',false),
+  (3,'ventas.clientes.ver',true),(3,'ventas.clientes.crear',true),(3,'ventas.clientes.editar',false),(3,'ventas.clientes.desactivar',false),
+  (3,'ventas.notas-credito.ver',false),(3,'ventas.notas-credito.crear',false),(3,'ventas.notas-credito.anular',false),
+  (3,'inventario.articulos.ver',true),(3,'inventario.articulos.crear',false),(3,'inventario.articulos.editar',false),(3,'inventario.articulos.desactivar',false),
+  (3,'inventario.remitos.ver',false),(3,'inventario.remitos.crear',false),(3,'inventario.remitos.confirmar',false),(3,'inventario.remitos.anular',false),
+  (3,'inventario.ajustes.ver',false),(3,'inventario.ajustes.aplicar',false),
+  (3,'inventario.proveedores.ver',false),(3,'inventario.proveedores.crear',false),(3,'inventario.proveedores.editar',false),(3,'inventario.proveedores.desactivar',false),
+  (3,'consultas.stock.ver',true),(3,'consultas.seguimiento.ver',false),(3,'consultas.precios_costo.ver',false),
+  (3,'listados.cobranzas.ver',false),(3,'listados.ventas_articulos.ver',false),(3,'listados.precios.ver',false),
+  (3,'caja.caja.ver',true),(3,'caja.caja.abrir',true),(3,'caja.caja.cerrar',false),(3,'caja.caja.movimiento',false),
+  (3,'caja.cobranzas.ver',false),
+  (3,'optica.ordenes.ver',true),(3,'optica.ordenes.crear',true),(3,'optica.ordenes.editar',false),(3,'optica.ordenes.cambiar-estado',false),(3,'optica.ordenes.pagar',true),
+  (3,'optica.medicos.ver',true),(3,'optica.medicos.crear',false),(3,'optica.medicos.editar',false),(3,'optica.medicos.eliminar',false),
+  (3,'altas.marcas.ver',false),(3,'altas.marcas.crear',false),(3,'altas.marcas.editar',false),(3,'altas.marcas.eliminar',false),
+  (3,'altas.categorias.ver',false),(3,'altas.categorias.crear',false),(3,'altas.categorias.editar',false),(3,'altas.categorias.eliminar',false),
+  (3,'altas.subcategorias.ver',false),(3,'altas.subcategorias.crear',false),(3,'altas.subcategorias.editar',false),(3,'altas.subcategorias.eliminar',false),
+  (3,'altas.atributos.ver',false),(3,'altas.atributos.crear',false),(3,'altas.atributos.editar',false),(3,'altas.atributos.eliminar',false),
+  (3,'admin.usuarios.ver',false),(3,'admin.usuarios.crear',false),(3,'admin.usuarios.editar',false),
+  (3,'admin.roles.ver',false),(3,'admin.roles.crear',false),(3,'admin.roles.editar',false),(3,'admin.roles.eliminar',false),
+  (3,'admin.permisos.ver',false),(3,'admin.permisos.editar',false),
+  (3,'admin.sucursales.ver',false),(3,'admin.sucursales.crear',false),(3,'admin.sucursales.editar',false),(3,'admin.sucursales.eliminar',false),
+  (3,'admin.listas_precio.ver',false),(3,'admin.listas_precio.crear',false),(3,'admin.listas_precio.editar',false),(3,'admin.listas_precio.eliminar',false);
 
 -- ============================================================
 -- CLIENTES
@@ -475,6 +527,7 @@ create table if not exists public.remitos (
   fecha                    timestamptz not null default now(),
   estado                   text not null default 'borrador' check (estado in ('borrador','confirmado','anulado')),
   observaciones            text,
+  nro_externo              text,
   vendedor_id              bigint references public.vendedores(id),
   created_by               uuid not null references public.users(id),
   created_at               timestamptz default now(),

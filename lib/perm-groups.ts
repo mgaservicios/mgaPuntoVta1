@@ -112,6 +112,12 @@ export const PERM_MODULES: PermMod[] = [
         { id: 'optica.ordenes.cambiar-estado', label: 'Cambiar estado' },
         { id: 'optica.ordenes.pagar',         label: 'Registrar pago' },
       ]},
+      { id: 'optica.servicios', label: 'Servicios', ops: [
+        { id: 'optica.servicios.ver',    label: 'Ver servicios' },
+        { id: 'optica.servicios.crear',  label: 'Crear servicio' },
+        { id: 'optica.servicios.editar', label: 'Editar servicio' },
+        { id: 'optica.servicios.anular', label: 'Anular servicio' },
+      ]},
       { id: 'optica.medicos', label: 'Médicos', ops: [
         { id: 'optica.medicos.ver',     label: 'Ver médicos' },
         { id: 'optica.medicos.crear',   label: 'Crear médico' },
@@ -179,6 +185,17 @@ export const PERM_MODULES: PermMod[] = [
         { id: 'admin.listas_precio.editar',   label: 'Editar lista de precio' },
         { id: 'admin.listas_precio.eliminar', label: 'Desactivar lista de precio' },
       ]},
+      { id: 'admin.vendedores', label: 'Vendedores', ops: [
+        { id: 'admin.vendedores.ver',    label: 'Ver vendedores' },
+        { id: 'admin.vendedores.crear',  label: 'Crear vendedor' },
+        { id: 'admin.vendedores.editar', label: 'Editar vendedor' },
+      ]},
+      { id: 'admin.formas_pago', label: 'Formas de pago', ops: [
+        { id: 'admin.formas_pago.ver',      label: 'Ver formas de pago' },
+        { id: 'admin.formas_pago.crear',    label: 'Crear forma de pago' },
+        { id: 'admin.formas_pago.editar',   label: 'Editar forma de pago' },
+        { id: 'admin.formas_pago.eliminar', label: 'Eliminar forma de pago' },
+      ]},
     ],
   },
 ]
@@ -207,6 +224,7 @@ export const ROUTE_TO_PERM: [string, string][] = [
   ['/dashboard/caja',                         'caja.caja.ver'],
   ['/dashboard/cobranzas',                    'caja.cobranzas.ver'],
   ['/dashboard/optica/ordenes',               'optica.ordenes.ver'],
+  ['/dashboard/optica/servicios',             'optica.servicios.ver'],
   ['/dashboard/optica/medicos',               'optica.medicos.ver'],
   ['/dashboard/altas/marcas',                 'altas.marcas.ver'],
   ['/dashboard/altas/categorias',             'altas.categorias.ver'],
@@ -217,4 +235,8 @@ export const ROUTE_TO_PERM: [string, string][] = [
   ['/dashboard/admin/roles',                  'admin.roles.ver'],
   ['/dashboard/admin/permisos',               'admin.permisos.ver'],
   ['/dashboard/admin/listas-precio',          'admin.listas_precio.ver'],
+  ['/dashboard/admin/vendedores',             'admin.vendedores.ver'],
+  ['/dashboard/admin/formas-pago',            'admin.formas_pago.ver'],
+  ['/dashboard/recibos',                      'caja.cobranzas.ver'],
+  ['/dashboard/inventario/actualizar-precios','inventario.articulos.ver'],
 ]

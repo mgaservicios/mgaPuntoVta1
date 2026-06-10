@@ -1,16 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { getTenantClient } from '@/services/supabase-tenant'
+import { requirePermission } from '@/lib/require-permission'
 
 type Ctx = { params: Promise<{ id: string }> }
 
-const ROLES_ESCRITURA = ['Administrador', 'Supervisor']
-
 export async function PUT(req: NextRequest, { params }: Ctx) {
-  const session = await auth()
-  if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-  if (!ROLES_ESCRITURA.includes(session.user.role))
-    return NextResponse.json({ error: 'Sin permiso' }, { status: 403 })
+  const session = await requirePermission('admin.listas_precio.editar')
+  if (!session) return NextResponse.json({ error: 'Sin permiso' }, { status: 403 })
   const supabase = await getTenantClient(session)
 
   const { id } = await params
@@ -44,10 +41,8 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
 }
 
 export async function DELETE(_req: NextRequest, { params }: Ctx) {
-  const session = await auth()
-  if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-  if (!ROLES_ESCRITURA.includes(session.user.role))
-    return NextResponse.json({ error: 'Sin permiso' }, { status: 403 })
+  const session = await requirePermission('admin.listas_precio.eliminar')
+  if (!session) return NextResponse.json({ error: 'Sin permiso' }, { status: 403 })
   const supabase = await getTenantClient(session)
 
   const { id } = await params

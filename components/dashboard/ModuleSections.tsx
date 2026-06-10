@@ -9,6 +9,7 @@ import {
   SlidersHorizontal, Tag, FolderOpen, Layers,
   Activity, DollarSign, History, Stethoscope, FileUp,
   Settings, Building2, Shield, Lock, UserCheck, CreditCard,
+  TrendingUp,
   ChevronDown,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -38,7 +39,7 @@ type ModuleSection = {
   module?: string
   headerIcon: LucideIcon
   color: CardColor
-  items: Array<{ label: string; href: string; Icon: LucideIcon; description: string }>
+  items: Array<{ label: string; href: string; Icon: LucideIcon; description: string; permKey?: string }>
 }
 
 const MODULE_SECTIONS: ModuleSection[] = [
@@ -49,11 +50,11 @@ const MODULE_SECTIONS: ModuleSection[] = [
     headerIcon: ShoppingCart,
     color: 'blue',
     items: [
-      { label: 'Ticket de Venta',   href: '/dashboard/ventas/pos',            Icon: ShoppingCart,  description: 'Cobros y tickets'          },
-      { label: 'Órdenes de venta', href: '/dashboard/ventas/ordenes',        Icon: FileText,      description: 'Presupuestos y pedidos'    },
-      { label: 'Historial',        href: '/dashboard/ventas',                Icon: ClipboardList, description: 'Ventas realizadas'         },
-      { label: 'Clientes',         href: '/dashboard/ventas/clientes',       Icon: Users,         description: 'Empresas y particulares'   },
-      { label: 'Notas de crédito', href: '/dashboard/ventas/notas-credito',  Icon: ReceiptText,   description: 'Devoluciones y ajustes'    },
+      { label: 'Ticket de Venta',   href: '/dashboard/ventas/pos',            Icon: ShoppingCart,  description: 'Cobros y tickets',          permKey: 'ventas.pos.cobrar'         },
+      { label: 'Órdenes de venta', href: '/dashboard/ventas/ordenes',        Icon: FileText,      description: 'Presupuestos y pedidos',    permKey: 'ventas.ordenes.ver'        },
+      { label: 'Historial',        href: '/dashboard/ventas',                Icon: ClipboardList, description: 'Ventas realizadas',         permKey: 'ventas.historial.ver'      },
+      { label: 'Clientes',         href: '/dashboard/ventas/clientes',       Icon: Users,         description: 'Empresas y particulares',   permKey: 'ventas.clientes.ver'       },
+      { label: 'Notas de crédito', href: '/dashboard/ventas/notas-credito',  Icon: ReceiptText,   description: 'Devoluciones y ajustes',    permKey: 'ventas.notas-credito.ver'  },
     ],
   },
   {
@@ -63,10 +64,11 @@ const MODULE_SECTIONS: ModuleSection[] = [
     headerIcon: Package,
     color: 'emerald',
     items: [
-      { label: 'Artículos',        href: '/dashboard/inventario/articulos',         Icon: Package,           description: 'Catálogo y precios'    },
-      { label: 'Remitos',          href: '/dashboard/inventario/remitos',           Icon: BarChart3,         description: 'Entradas y salidas'    },
-      { label: 'Proveedores',      href: '/dashboard/inventario/proveedores',       Icon: Truck,             description: 'Contactos de compras'  },
-      { label: 'Ajustes de stock', href: '/dashboard/inventario/remitos/ajustes',  Icon: SlidersHorizontal, description: 'Correcciones manuales' },
+      { label: 'Artículos',          href: '/dashboard/inventario/articulos',          Icon: Package,           description: 'Catálogo y precios',     permKey: 'inventario.articulos.ver'  },
+      { label: 'Remitos',            href: '/dashboard/inventario/remitos',            Icon: BarChart3,         description: 'Entradas y salidas',     permKey: 'inventario.remitos.ver'    },
+      { label: 'Proveedores',        href: '/dashboard/inventario/proveedores',        Icon: Truck,             description: 'Contactos de compras',   permKey: 'inventario.proveedores.ver'},
+      { label: 'Ajustes de stock',   href: '/dashboard/inventario/remitos/ajustes',   Icon: SlidersHorizontal, description: 'Correcciones manuales',   permKey: 'inventario.ajustes.ver'    },
+      { label: 'Actualizar precios', href: '/dashboard/inventario/actualizar-precios', Icon: TrendingUp,        description: 'Ajuste masivo de listas', permKey: 'inventario.articulos.ver'  },
     ],
   },
   {
@@ -76,10 +78,10 @@ const MODULE_SECTIONS: ModuleSection[] = [
     headerIcon: Tag,
     color: 'orange',
     items: [
-      { label: 'Marcas',        href: '/dashboard/altas/marcas',        Icon: Tag,               description: 'Marcas de productos'      },
-      { label: 'Categorías',    href: '/dashboard/altas/categorias',    Icon: FolderOpen,        description: 'Grupos de artículos'      },
-      { label: 'Subcategorías', href: '/dashboard/altas/subcategorias', Icon: Layers,            description: 'Subgrupos de artículos'   },
-      { label: 'Atributos',     href: '/dashboard/altas/atributos',     Icon: SlidersHorizontal, description: 'Propiedades de artículos' },
+      { label: 'Marcas',        href: '/dashboard/altas/marcas',        Icon: Tag,               description: 'Marcas de productos',      permKey: 'altas.marcas.ver'        },
+      { label: 'Categorías',    href: '/dashboard/altas/categorias',    Icon: FolderOpen,        description: 'Grupos de artículos',      permKey: 'altas.categorias.ver'    },
+      { label: 'Subcategorías', href: '/dashboard/altas/subcategorias', Icon: Layers,            description: 'Subgrupos de artículos',   permKey: 'altas.subcategorias.ver' },
+      { label: 'Atributos',     href: '/dashboard/altas/atributos',     Icon: SlidersHorizontal, description: 'Propiedades de artículos', permKey: 'altas.atributos.ver'     },
     ],
   },
   {
@@ -89,9 +91,9 @@ const MODULE_SECTIONS: ModuleSection[] = [
     headerIcon: Search,
     color: 'violet',
     items: [
-      { label: 'Stock y precios',  href: '/dashboard/consultas/stock',         Icon: Search,     description: 'Disponibilidad y precios' },
-      { label: 'Seguimiento',      href: '/dashboard/consultas/seguimiento',   Icon: Activity,   description: 'Estado de órdenes'        },
-      { label: 'Precios de costo', href: '/dashboard/consultas/precios-costo', Icon: DollarSign, description: 'Costos y márgenes'        },
+      { label: 'Stock y precios',  href: '/dashboard/consultas/stock',         Icon: Search,     description: 'Disponibilidad y precios', permKey: 'consultas.stock.ver'         },
+      { label: 'Seguimiento',      href: '/dashboard/consultas/seguimiento',   Icon: Activity,   description: 'Estado de órdenes',        permKey: 'consultas.seguimiento.ver'   },
+      { label: 'Precios de costo', href: '/dashboard/consultas/precios-costo', Icon: DollarSign, description: 'Costos y márgenes',        permKey: 'consultas.precios_costo.ver' },
     ],
   },
   {
@@ -101,10 +103,10 @@ const MODULE_SECTIONS: ModuleSection[] = [
     headerIcon: Wallet,
     color: 'amber',
     items: [
-      { label: 'Caja',      href: '/dashboard/caja',           Icon: Wallet,      description: 'Sesión activa de caja'     },
-      { label: 'Historial', href: '/dashboard/caja/historial', Icon: History,     description: 'Movimientos anteriores'    },
-      { label: 'Cobranzas', href: '/dashboard/cobranzas',      Icon: DollarSign,  description: 'Cuenta corriente clientes' },
-      { label: 'Recibos',   href: '/dashboard/recibos',        Icon: ReceiptText, description: 'Comprobantes emitidos'     },
+      { label: 'Caja',              href: '/dashboard/caja',           Icon: Wallet,      description: 'Sesión activa de caja',     permKey: 'caja.caja.ver'      },
+      { label: 'Historial de cierres', href: '/dashboard/caja/historial', Icon: History,  description: 'Movimientos anteriores',    permKey: 'caja.caja.ver'      },
+      { label: 'Cobranzas',         href: '/dashboard/cobranzas',      Icon: DollarSign,  description: 'Cuenta corriente clientes', permKey: 'caja.cobranzas.ver' },
+      { label: 'Recibos',           href: '/dashboard/recibos',        Icon: ReceiptText, description: 'Comprobantes emitidos',     permKey: 'caja.cobranzas.ver' },
     ],
   },
   {
@@ -113,9 +115,9 @@ const MODULE_SECTIONS: ModuleSection[] = [
     headerIcon: BarChart3,
     color: 'slate',
     items: [
-      { label: 'Cta. Cte. Clientes', href: '/dashboard/listados/cobranzas',        Icon: DollarSign, description: 'Saldos y movimientos'   },
-      { label: 'Venta de artículos', href: '/dashboard/listados/ventas-articulos', Icon: Package,    description: 'Artículos más vendidos' },
-      { label: 'Lista de precios',   href: '/dashboard/listados/precios',          Icon: Tag,        description: 'Precios por lista'      },
+      { label: 'Cta. Cte. Clientes', href: '/dashboard/listados/cobranzas',        Icon: DollarSign, description: 'Saldos y movimientos',   permKey: 'listados.cobranzas.ver'          },
+      { label: 'Venta de artículos', href: '/dashboard/listados/ventas-articulos', Icon: Package,    description: 'Artículos más vendidos', permKey: 'listados.ventas_articulos.ver'   },
+      { label: 'Lista de precios',   href: '/dashboard/listados/precios',          Icon: Tag,        description: 'Precios por lista',      permKey: 'listados.precios.ver'            },
     ],
   },
   {
@@ -125,10 +127,10 @@ const MODULE_SECTIONS: ModuleSection[] = [
     headerIcon: Wrench,
     color: 'indigo',
     items: [
-      { label: 'Órdenes de trabajo', href: '/dashboard/optica/ordenes',              Icon: ClipboardList, description: 'Armado de lentes'          },
-      { label: 'Servicios',          href: '/dashboard/optica/servicios',            Icon: Wrench,        description: 'Reparaciones y controles'  },
-      { label: 'Médicos',            href: '/dashboard/optica/medicos',              Icon: Stethoscope,   description: 'Profesionales derivantes'  },
-      { label: 'Importar óptica',    href: '/dashboard/inventario/importar-optica', Icon: FileUp,        description: 'Carga masiva de artículos' },
+      { label: 'Órdenes de trabajo', href: '/dashboard/optica/ordenes',              Icon: ClipboardList, description: 'Armado de lentes',          permKey: 'optica.ordenes.ver'       },
+      { label: 'Servicios',          href: '/dashboard/optica/servicios',            Icon: Wrench,        description: 'Reparaciones y controles',  permKey: 'optica.servicios.ver'     },
+      { label: 'Médicos',            href: '/dashboard/optica/medicos',              Icon: Stethoscope,   description: 'Profesionales derivantes',  permKey: 'optica.medicos.ver'       },
+      { label: 'Importar óptica',    href: '/dashboard/inventario/importar-optica', Icon: FileUp,        description: 'Carga masiva de artículos', permKey: 'inventario.articulos.ver' },
     ],
   },
   {
@@ -137,23 +139,37 @@ const MODULE_SECTIONS: ModuleSection[] = [
     headerIcon: Settings,
     color: 'rose',
     items: [
-      { label: 'Sucursales',       href: '/dashboard/admin/sucursales',    Icon: Building2,  description: 'Gestión de locales'  },
-      { label: 'Usuarios',         href: '/dashboard/admin/usuarios',      Icon: Settings,   description: 'Cuentas de acceso'   },
-      { label: 'Roles',            href: '/dashboard/admin/roles',         Icon: Shield,     description: 'Perfiles de usuario' },
-      { label: 'Permisos',         href: '/dashboard/admin/permisos',      Icon: Lock,       description: 'Control de acceso'   },
-      { label: 'Listas de precio', href: '/dashboard/admin/listas-precio', Icon: Tag,        description: 'Precios por canal'   },
-      { label: 'Vendedores',       href: '/dashboard/admin/vendedores',    Icon: UserCheck,  description: 'Equipo de ventas'    },
-      { label: 'Formas de pago',   href: '/dashboard/admin/formas-pago',   Icon: CreditCard, description: 'Métodos de cobro'    },
+      { label: 'Sucursales',       href: '/dashboard/admin/sucursales',    Icon: Building2,  description: 'Gestión de locales',  permKey: 'admin.sucursales.ver'   },
+      { label: 'Usuarios',         href: '/dashboard/admin/usuarios',      Icon: Settings,   description: 'Cuentas de acceso',   permKey: 'admin.usuarios.ver'     },
+      { label: 'Roles',            href: '/dashboard/admin/roles',         Icon: Shield,     description: 'Perfiles de usuario', permKey: 'admin.roles.ver'        },
+      { label: 'Permisos',         href: '/dashboard/admin/permisos',      Icon: Lock,       description: 'Control de acceso',   permKey: 'admin.permisos.ver'     },
+      { label: 'Listas de precio', href: '/dashboard/admin/listas-precio', Icon: Tag,        description: 'Precios por canal',   permKey: 'admin.listas_precio.ver'},
+      { label: 'Vendedores',       href: '/dashboard/admin/vendedores',    Icon: UserCheck,  description: 'Equipo de ventas',    permKey: 'admin.vendedores.ver'   },
+      { label: 'Formas de pago',   href: '/dashboard/admin/formas-pago',   Icon: CreditCard, description: 'Métodos de cobro',    permKey: 'admin.formas_pago.ver'  },
     ],
   },
 ]
 
-export function ModuleSections({ modules, isAdmin }: { modules: string[]; isAdmin: boolean }) {
+export function ModuleSections({
+  modules,
+  isAdmin,
+  userPermissions,
+}: {
+  modules: string[]
+  isAdmin: boolean
+  userPermissions: Record<string, boolean> | null
+}) {
   const [openId, setOpenId] = useState<string | null>(null)
 
-  const visible = MODULE_SECTIONS.filter(
-    s => !s.module || isAdmin || modules.includes(s.module)
-  )
+  function canView(permKey?: string): boolean {
+    if (!permKey || userPermissions === null) return true
+    return userPermissions[permKey] === true
+  }
+
+  const visible = MODULE_SECTIONS
+    .filter(s => !s.module || isAdmin || modules.includes(s.module))
+    .map(s => ({ ...s, items: s.items.filter(item => canView(item.permKey)) }))
+    .filter(s => s.items.length > 0)
 
   return (
     <div className="mt-8">
@@ -177,7 +193,7 @@ export function ModuleSections({ modules, isAdmin }: { modules: string[]; isAdmi
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-bold text-sm text-white truncate">{section.label}</p>
-                  <p className="text-xs text-white/70">{section.items.length} accesos</p>
+                  <p className="text-xs text-white/70">{section.items.length} {section.items.length === 1 ? 'acceso' : 'accesos'}</p>
                 </div>
                 <ChevronDown
                   className={cn('w-4 h-4 flex-shrink-0 text-white/70 transition-transform duration-200', isOpen && 'rotate-180')}

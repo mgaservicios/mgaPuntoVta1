@@ -42,6 +42,7 @@ export default function EditarRemitoPage({ params }: { params: Promise<{ id: str
   const router = useRouter()
   const [remito, setRemito] = useState<RemitoDetail | null>(null)
   const [items, setItems] = useState<ItemForm[]>([])
+  const [nroExterno, setNroExterno] = useState('')
   const [observaciones, setObservaciones] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -57,6 +58,7 @@ export default function EditarRemitoPage({ params }: { params: Promise<{ id: str
       .then(r => r.json())
       .then((data: RemitoDetail) => {
         setRemito(data)
+        setNroExterno(data.nro_externo ?? '')
         setObservaciones(data.observaciones ?? '')
         setItems((data.remito_items ?? []).map((item: RemitoItem) => ({
           _key: crypto.randomUUID(),
@@ -174,6 +176,7 @@ export default function EditarRemitoPage({ params }: { params: Promise<{ id: str
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         observaciones: observaciones || null,
+        nro_externo: nroExterno.trim() || null,
         items: items.map(i => ({
           articulo_id: i.articulo_id,
           variante_id: i.variante_id,
@@ -329,8 +332,18 @@ export default function EditarRemitoPage({ params }: { params: Promise<{ id: str
           )}
         </div>
 
-        {/* Observaciones */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
+        {/* Factura/Remito + Observaciones */}
+        <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+          <div>
+            <label className="text-sm font-medium text-gray-700 mb-2 block">Factura/Remito</label>
+            <Input
+              value={nroExterno}
+              onChange={e => setNroExterno(e.target.value)}
+              placeholder="Nro. externo (opcional)"
+              className="w-56"
+            />
+          </div>
+          <div>
           <label className="text-sm font-medium text-gray-700 mb-2 block">Observaciones</label>
           <textarea
             value={observaciones}
@@ -339,6 +352,7 @@ export default function EditarRemitoPage({ params }: { params: Promise<{ id: str
             placeholder="Notas adicionales…"
             className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"
           />
+          </div>
         </div>
 
         {/* Actions */}

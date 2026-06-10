@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json()
   const {
     tipo, contraparte_tipo, contraparte_sucursal_id, contraparte_proveedor_id,
-    contraparte_nombre, fecha, observaciones, items, vendedor_id,
+    contraparte_nombre, fecha, observaciones, nro_externo, items, vendedor_id,
   } = body
 
   if (!tipo || !contraparte_tipo || !Array.isArray(items) || items.length === 0) {
@@ -96,6 +96,7 @@ export async function POST(req: NextRequest) {
       contraparte_nombre: contraparte_nombre?.trim() || null,
       fecha: fecha || new Date().toISOString(),
       observaciones: observaciones?.trim() || null,
+      nro_externo: nro_externo?.trim() || null,
       vendedor_id: vendedor_id ?? null,
       estado: 'borrador',
       created_by: session.user.id,

@@ -60,9 +60,11 @@ export default function NuevoRemitoPage() {
   const [contraparteSucursalId, setContraparteSucursalId] = useState<string>('')
   const [contraparteProveedorId, setContraparteProveedorId] = useState<string>('')
   const [contraparteNombre, setContraparteNombre] = useState('')
+  const [nroExterno, setNroExterno] = useState('')
   const [observaciones, setObservaciones] = useState('')
   const [items, setItems] = useState<ItemForm[]>([])
   const [saving, setSaving] = useState(false)
+  const [showExitDialog, setShowExitDialog] = useState(false)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
   const [savedRemitoId, setSavedRemitoId] = useState<number | null>(null)
   const [savedItems, setSavedItems] = useState<ItemForm[]>([])
@@ -260,6 +262,7 @@ export default function NuevoRemitoPage() {
         contraparte_nombre: contraparteTipo === 'persona' ? contraparteNombre.trim() : null,
         fecha: new Date(fecha + 'T12:00:00').toISOString(),
         observaciones: observaciones || null,
+        nro_externo: nroExterno.trim() || null,
         vendedor_id: vendedorId,
         items: items.map(i => {
           const costoVal = compraLista ? (Number(i.precios[compraLista.id]) || null) : null
@@ -305,28 +308,35 @@ export default function NuevoRemitoPage() {
   return (
     <div className="max-w-3xl">
       <button
-        onClick={() => router.push('/dashboard/inventario/remitos')}
-        className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 mb-6"
+        onClick={() => setShowExitDialog(true)}
+        className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 mb-4"
       >
         <ArrowLeft className="w-4 h-4" />
         Volver
       </button>
 
-      <div className="flex items-center gap-3 mb-6">
-        <h2 className="text-lg font-semibold text-gray-800">Nuevo remito</h2>
-        {sucursalNombre && (
-          <span className="text-xs text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full border border-gray-200">
-            {sucursalNombre}
-          </span>
-        )}
+      <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center gap-3">
+          <h2 className="text-lg font-semibold text-gray-800">Nuevo remito</h2>
+          {sucursalNombre && (
+            <span className="text-xs text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full border border-gray-200">
+              {sucursalNombre}
+            </span>
+          )}
+        </div>
+        <Button onClick={handleSubmit} disabled={saving}>
+          {saving ? 'Guardando…' : 'Guardar como borrador'}
+        </Button>
       </div>
 
       <div className="space-y-5">
-        {/* Tipo + Fecha */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
-          <div className="flex gap-6">
-            <div>
-              <Label className="mb-2 block">Tipo</Label>
+        {/* Info + Origen/Destino — una sola card */}
+        <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+
+          {/* Fila 1: Tipo · Fecha · Vendedor */}
+          <div className="flex items-center gap-5 flex-wrap">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-500 shrink-0">Tipo</span>
               <div className="flex rounded-lg border border-gray-200 overflow-hidden">
                 {(['entrada', 'salida'] as TipoRemito[]).map(t => (
                   <button
@@ -334,10 +344,8 @@ export default function NuevoRemitoPage() {
                     type="button"
                     onClick={() => setTipo(t)}
                     className={cn(
-                      'px-5 py-2 text-sm font-medium transition-colors capitalize',
-                      tipo === t
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-white text-gray-600 hover:bg-gray-50',
+                      'px-4 py-1.5 text-sm font-medium transition-colors',
+                      tipo === t ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50',
                       t === 'salida' && 'border-l border-gray-200'
                     )}
                   >
@@ -346,19 +354,19 @@ export default function NuevoRemitoPage() {
                 ))}
               </div>
             </div>
-            <div>
-              <Label className="mb-2 block">Fecha</Label>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-500 shrink-0">Fecha</span>
               <Input
                 type="date"
                 value={fecha}
                 onChange={e => setFecha(e.target.value)}
-                className="w-40"
+                className="w-36 h-8 text-sm"
               />
             </div>
-            <div>
-              <Label className="mb-2 block">Vendedor</Label>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-500 shrink-0">Vendedor</span>
               <Select value={vendedorId?.toString() ?? ''} onValueChange={v => setVendedorId(Number(v))}>
-                <SelectTrigger className="w-48">
+                <SelectTrigger className="w-44 h-8 text-sm">
                   <SelectValue placeholder="Seleccionar…" />
                 </SelectTrigger>
                 <SelectContent>
@@ -369,20 +377,20 @@ export default function NuevoRemitoPage() {
               </Select>
             </div>
           </div>
-        </div>
 
-        {/* Origen / Destino */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
-          <h3 className="text-sm font-medium text-gray-700">
-            {tipo === 'entrada' ? 'Origen' : 'Destino'}
-          </h3>
-          <div className="flex gap-3">
-            <div className="w-44">
+          <div className="border-t border-gray-100" />
+
+          {/* Fila 2: Origen / Destino */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-500 w-28 shrink-0">
+              {tipo === 'entrada' ? 'Origen' : 'Destino'}
+            </span>
+            <div className="flex gap-2 flex-1">
               <Select
                 value={contraparteTipo}
                 onValueChange={(v) => { if (v) setContraparteTipo(v as ContraparteTipo) }}
               >
-                <SelectTrigger>
+                <SelectTrigger className="w-32 h-8 text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -391,15 +399,13 @@ export default function NuevoRemitoPage() {
                   <SelectItem value="persona">Persona</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-            <div className="flex-1">
               {contraparteTipo === 'proveedor' && (
-                <div className="flex gap-2">
+                <>
                   <Select
                     value={contraparteProveedorId}
                     onValueChange={(v) => { if (v) setContraparteProveedorId(v) }}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="flex-1 h-8 text-sm">
                       <SelectValue placeholder="Seleccioná proveedor">
                         {proveedores.find(p => String(p.id) === contraparteProveedorId)?.nombre}
                       </SelectValue>
@@ -410,17 +416,17 @@ export default function NuevoRemitoPage() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <Button type="button" variant="outline" size="icon" onClick={() => setShowNuevoProveedor(true)} title="Nuevo proveedor">
-                    <Plus className="w-4 h-4" />
+                  <Button type="button" variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={() => setShowNuevoProveedor(true)} title="Nuevo proveedor">
+                    <Plus className="w-3.5 h-3.5" />
                   </Button>
-                </div>
+                </>
               )}
               {contraparteTipo === 'sucursal' && (
                 <Select
                   value={contraparteSucursalId}
                   onValueChange={(v) => { if (v) setContraparteSucursalId(v) }}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="flex-1 h-8 text-sm">
                     <SelectValue placeholder="Seleccioná sucursal">
                       {sucursales.find(s => String(s.id) === contraparteSucursalId)?.nombre}
                     </SelectValue>
@@ -437,10 +443,23 @@ export default function NuevoRemitoPage() {
                   value={contraparteNombre}
                   onChange={e => setContraparteNombre(e.target.value)}
                   placeholder="Ej: Juan García, Dueño, Vendedor 1…"
+                  className="flex-1 h-8 text-sm"
                 />
               )}
             </div>
           </div>
+
+          {/* Fila 3: Factura/Remito */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-500 w-28 shrink-0">Factura/Remito</span>
+            <Input
+              value={nroExterno}
+              onChange={e => setNroExterno(e.target.value)}
+              placeholder="Nro. externo (opcional)"
+              className="w-52 h-8 text-sm"
+            />
+          </div>
+
         </div>
 
         {/* Ítems */}
@@ -588,7 +607,7 @@ export default function NuevoRemitoPage() {
 
         {/* Actions */}
         <div className="flex justify-end gap-3 pb-6">
-          <Button variant="outline" onClick={() => router.push('/dashboard/inventario/remitos')}>
+          <Button variant="outline" onClick={() => setShowExitDialog(true)}>
             Cancelar
           </Button>
           <Button onClick={handleSubmit} disabled={saving}>
@@ -641,6 +660,17 @@ export default function NuevoRemitoPage() {
             >
               {confirmingNew ? 'Confirmando…' : 'Confirmar'}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showExitDialog} onOpenChange={setShowExitDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>¿Salir sin guardar?</DialogTitle></DialogHeader>
+          <p className="text-sm text-gray-600">Se perderán los datos ingresados. ¿Querés salir de todas formas?</p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowExitDialog(false)}>Quedarse</Button>
+            <Button variant="destructive" onClick={() => router.push('/dashboard/inventario/remitos')}>Salir</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

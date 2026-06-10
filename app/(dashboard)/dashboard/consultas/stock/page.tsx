@@ -71,18 +71,20 @@ export default function ConsultaStockPage() {
   const [articulos, setArticulos] = useState<ArticuloData[]>([])
   const [loading, setLoading] = useState(true)
   const [q, setQ] = useState('')
+  const [soloConStock, setSoloConStock] = useState(false)
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
 
   const fetchData = useCallback(async () => {
     setLoading(true)
     const params = new URLSearchParams()
     if (q.trim()) params.set('q', q.trim())
+    if (soloConStock && !q.trim()) params.set('con_stock', 'true')
     const res = await fetch(`/api/dashboard/articulos?${params}`)
     const data = await res.json()
     setArticulos(Array.isArray(data) ? data : [])
     setLastUpdate(new Date())
     setLoading(false)
-  }, [q])
+  }, [q, soloConStock])
 
   useEffect(() => {
     const t = setTimeout(fetchData, 300)
@@ -110,10 +112,24 @@ export default function ConsultaStockPage() {
     })
   })()
 
-  const activeSucursalNombre = sucursales.find(s => s.isActive)?.nombre ?? ''
+  const activeSucursal = sucursales.find(s => s.isActive)
+  const activeSucursalNombre = activeSucursal?.nombre ?? ''
+
+  // When no search text: API already filtered by stock server-side.
+  // When search text is active: filter client-side from RPC results.
+  const articulosFiltrados = soloConStock && activeSucursal && q.trim()
+    ? articulos.filter(a => {
+        if (a.tipo_articulo === 'con_variantes') {
+          return (a.articulo_variantes ?? []).some(v =>
+            v.activo && (v.stock_sucursales?.find(s => s.sucursal_id === activeSucursal.id)?.stock_actual ?? 0) > 0
+          )
+        }
+        return (a.stock_sucursales?.find(s => s.sucursal_id === activeSucursal.id)?.stock_actual ?? 0) > 0
+      })
+    : articulos
 
   // Flatten to display rows
-  const rows: DisplayRow[] = articulos.flatMap(a => {
+  const rows: DisplayRow[] = articulosFiltrados.flatMap(a => {
     if (a.tipo_articulo === 'con_variantes') {
       const parent: DisplayRow = {
         key: `art-${a.id}`,
@@ -181,6 +197,16 @@ export default function ConsultaStockPage() {
             autoFocus
           />
         </div>
+
+        <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none whitespace-nowrap">
+          <input
+            type="checkbox"
+            checked={soloConStock}
+            onChange={e => setSoloConStock(e.target.checked)}
+            className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+          />
+          Con stock
+        </label>
 
         <div className="ml-auto flex items-center gap-4 text-xs text-gray-400">
           {!loading && <span>{articulos.length} artículos</span>}

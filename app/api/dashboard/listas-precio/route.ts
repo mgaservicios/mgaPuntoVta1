@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { getTenantClient } from '@/services/supabase-tenant'
+import { requirePermission } from '@/lib/require-permission'
 
 export async function GET() {
   const session = await auth()
@@ -16,13 +17,9 @@ export async function GET() {
   return NextResponse.json(data)
 }
 
-const ROLES_ESCRITURA = ['Administrador', 'Supervisor']
-
 export async function POST(req: NextRequest) {
-  const session = await auth()
-  if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-  if (!ROLES_ESCRITURA.includes(session.user.role))
-    return NextResponse.json({ error: 'Sin permiso' }, { status: 403 })
+  const session = await requirePermission('admin.listas_precio.crear')
+  if (!session) return NextResponse.json({ error: 'Sin permiso' }, { status: 403 })
   const supabase = await getTenantClient(session)
 
   const body = await req.json()

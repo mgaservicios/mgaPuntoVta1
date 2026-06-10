@@ -67,11 +67,11 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
 
   if (remito.estado === 'anulado') return NextResponse.json({ error: 'No se puede editar un remito anulado' }, { status: 400 })
 
-  const { observaciones, items } = await req.json()
+  const { observaciones, nro_externo, items } = await req.json()
 
   await supabase
     .from('remitos')
-    .update({ observaciones: observaciones?.trim() || null, updated_at: new Date().toISOString() })
+    .update({ observaciones: observaciones?.trim() || null, nro_externo: nro_externo?.trim() || null, updated_at: new Date().toISOString() })
     .eq('id', id)
 
   if (!Array.isArray(items)) return NextResponse.json({ ok: true })

@@ -294,7 +294,7 @@ export default function CajaHistorialPage() {
   return (
     <div className="max-w-2xl space-y-4">
 
-      <h2 className="text-lg font-semibold text-gray-800">Historial de caja</h2>
+      <h2 className="text-lg font-semibold text-gray-800">Historial de cierres</h2>
 
       {/* Filtro de rango */}
       <div className="bg-white rounded-xl border border-gray-200 p-4">

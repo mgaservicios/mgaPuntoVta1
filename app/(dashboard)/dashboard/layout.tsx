@@ -144,7 +144,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           homeSucursalNombre={homeSucursalNombre}
           empresaNombre={session.user.empresa_nombre ?? ''}
         />
-        <QuickActionsBar modules={session.user.modules ?? []} color={brandColor} />
+        <QuickActionsBar modules={session.user.modules ?? []} color={brandColor} userPermissions={permMap} />
         <main className="flex-1 overflow-y-auto p-6 lg:p-8">
           {children}
         </main>

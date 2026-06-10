@@ -134,15 +134,15 @@ export default function DashboardHeader({
   )
 }
 
-type QuickAction = { href: string; label: string; Icon: LucideIcon; module?: string }
+type QuickAction = { href: string; label: string; Icon: LucideIcon; module?: string; permKey?: string }
 
 const QUICK_ACTIONS: QuickAction[] = [
-  { href: '/dashboard/ventas/pos',              label: 'Ticket de Venta',  Icon: ShoppingCart, module: 'ventas'     },
-  { href: '/dashboard/optica/ordenes/nueva',    label: 'Nueva OT',        Icon: Glasses,      module: 'optica'     },
-  { href: '/dashboard/inventario/remitos/nuevo',label: 'Nuevo remito',    Icon: ReceiptText,  module: 'inventario' },
-  { href: '/dashboard/optica/servicios/nueva',  label: 'Nuevo servicio',  Icon: Wrench,       module: 'optica'     },
-  { href: '/dashboard/consultas/stock',         label: 'Stock y precios', Icon: Search,       module: 'inventario' },
-  { href: '/dashboard/inventario/articulos',    label: 'Artículos',       Icon: Package,      module: 'inventario' },
+  { href: '/dashboard/ventas/pos',               label: 'Ticket de Venta',  Icon: ShoppingCart, module: 'ventas',     permKey: 'ventas.pos.cobrar'       },
+  { href: '/dashboard/optica/ordenes/nueva',     label: 'Nueva OT',         Icon: Glasses,      module: 'optica',     permKey: 'optica.ordenes.ver'      },
+  { href: '/dashboard/inventario/remitos/nuevo', label: 'Nuevo remito',     Icon: ReceiptText,  module: 'inventario', permKey: 'inventario.remitos.ver'  },
+  { href: '/dashboard/optica/servicios/nueva',   label: 'Nuevo servicio',   Icon: Wrench,       module: 'optica',     permKey: 'optica.servicios.ver'    },
+  { href: '/dashboard/consultas/stock',          label: 'Stock y precios',  Icon: Search,       module: 'inventario', permKey: 'consultas.stock.ver'     },
+  { href: '/dashboard/inventario/articulos',     label: 'Artículos',        Icon: Package,      module: 'inventario', permKey: 'inventario.articulos.ver'},
 ]
 
 function hexToRgba(hex: string, alpha: number): string {
@@ -152,9 +152,21 @@ function hexToRgba(hex: string, alpha: number): string {
   return `rgba(${r},${g},${b},${alpha})`
 }
 
-export function QuickActionsBar({ modules, color }: { modules: string[]; color?: string | null }) {
+export function QuickActionsBar({
+  modules,
+  color,
+  userPermissions,
+}: {
+  modules: string[]
+  color?: string | null
+  userPermissions: Record<string, boolean> | null
+}) {
   const pathname = usePathname()
-  const visible = QUICK_ACTIONS.filter(a => !a.module || modules.includes(a.module))
+  const visible = QUICK_ACTIONS.filter(a => {
+    if (a.module && !modules.includes(a.module)) return false
+    if (!a.permKey || userPermissions === null) return true
+    return userPermissions[a.permKey] === true
+  })
 
   if (visible.length === 0) return null
 

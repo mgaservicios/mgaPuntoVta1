@@ -25,6 +25,7 @@ export interface Remito {
   contraparte_nombre: string | null
   fecha: string
   observaciones: string | null
+  nro_externo: string | null
   estado: EstadoRemito
   created_by: string
   created_at: string

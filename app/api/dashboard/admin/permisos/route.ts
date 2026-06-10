@@ -48,13 +48,25 @@ export async function PUT(req: NextRequest) {
     allowed: p.allowed,
   }))
 
-  const { error } = await supabase
+  // Delete + insert es más robusto que upsert cuando no hay certeza sobre el nombre exacto del constraint
+  const { error: delError } = await supabase
     .from('role_permissions')
-    .upsert(rows, { onConflict: 'role_id,operation' })
+    .delete()
+    .eq('role_id', role_id)
 
-  if (error) {
-    console.error('[permisos PUT]', error)
-    return NextResponse.json({ error: error.message, details: error }, { status: 500 })
+  if (delError) {
+    console.error('[permisos PUT] delete', delError)
+    return NextResponse.json({ error: delError.message }, { status: 500 })
   }
+
+  const { error: insError } = await supabase
+    .from('role_permissions')
+    .insert(rows)
+
+  if (insError) {
+    console.error('[permisos PUT] insert', insError)
+    return NextResponse.json({ error: insError.message }, { status: 500 })
+  }
+
   return NextResponse.json({ ok: true })
 }

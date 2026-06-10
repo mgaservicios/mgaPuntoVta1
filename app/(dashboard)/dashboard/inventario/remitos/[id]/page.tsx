@@ -131,6 +131,12 @@ export default function RemitoDetailPage({ params }: { params: Promise<{ id: str
             {remito.contraparte_display}
           </p>
         </div>
+        {remito.nro_externo && (
+          <div>
+            <p className="text-xs text-gray-400 mb-0.5">Factura/Remito</p>
+            <p className="text-sm font-medium text-gray-800">{remito.nro_externo}</p>
+          </div>
+        )}
         {remito.observaciones && (
           <div className="col-span-2">
             <p className="text-xs text-gray-400 mb-0.5">Observaciones</p>

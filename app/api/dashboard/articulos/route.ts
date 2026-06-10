@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { getTenantClient } from '@/services/supabase-tenant'
+import { requirePermission } from '@/lib/require-permission'
 import { getActiveSucursalId } from '@/lib/sucursal'
 
 export async function GET(req: NextRequest) {
@@ -13,6 +14,7 @@ export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl
   const q = searchParams.get('q')
   const soloActivos = searchParams.get('activo') !== 'false'
+  const conStock = searchParams.get('con_stock') === 'true'
 
   const VARIANTES_SELECT = 'id, sku, precio_venta, stock_actual, activo, articulo_id, variante_atributos(valor, atributo_tipos(nombre))'
 
@@ -193,6 +195,17 @@ export async function GET(req: NextRequest) {
 
     if (soloActivos) query = query.eq('activo', true)
 
+    if (conStock) {
+      const { data: stockIds } = await supabase
+        .from('articulo_stock')
+        .select('articulo_id')
+        .eq('sucursal_id', activeSucursalId)
+        .gt('stock_actual', 0)
+      const artIds = [...new Set((stockIds ?? []).map((s: { articulo_id: number }) => s.articulo_id))]
+      if (artIds.length === 0) return NextResponse.json([])
+      query = query.in('id', artIds)
+    }
+
     const { data, error } = await query
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     enriched = (data ?? []) as EnrichedRow[]
@@ -224,12 +237,9 @@ export async function GET(req: NextRequest) {
   )
 }
 
-const ROLES_ESCRITURA = ['Administrador', 'Supervisor']
-
 export async function POST(req: NextRequest) {
-  const session = await auth()
-  if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-  if (!ROLES_ESCRITURA.includes(session.user.role)) return NextResponse.json({ error: 'Sin permiso' }, { status: 403 })
+  const session = await requirePermission('inventario.articulos.crear')
+  if (!session) return NextResponse.json({ error: 'Sin permiso' }, { status: 403 })
   const supabase = await getTenantClient(session)
 
   const body = await req.json()

@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { getTenantClient } from '@/services/supabase-tenant'
+import { requirePermission } from '@/lib/require-permission'
 
 type Ctx = { params: Promise<{ id: string }> }
 
-const ROLES_ESCRITURA = ['Administrador', 'Supervisor']
 
 export async function POST(req: NextRequest, { params }: Ctx) {
-  const session = await auth()
-  if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-  if (!ROLES_ESCRITURA.includes(session.user.role)) return NextResponse.json({ error: 'Sin permiso' }, { status: 403 })
+  const session = await requirePermission('inventario.articulos.editar')
+  if (!session) return NextResponse.json({ error: 'Sin permiso' }, { status: 403 })
   const supabase = await getTenantClient(session)
 
   const { id: articulo_id } = await params

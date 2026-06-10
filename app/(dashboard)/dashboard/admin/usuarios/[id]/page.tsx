@@ -35,7 +35,7 @@ export default function UsuarioFormPage({ params }: { params: Promise<{ id: stri
 
   const { register, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: {},
+    defaultValues: { name: '', email: '', password: '', role_id: '' },
   })
 
   useEffect(() => {

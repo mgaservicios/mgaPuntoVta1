@@ -109,7 +109,8 @@ export default function PreciosPanel({ articuloId, varianteId, tieneVariantes }:
   function openNuevo(listaPrecioId?: number) {
     setForm({
       ...FORM_EMPTY,
-      lista_precio_id: listaPrecioId ? String(listaPrecioId) : '',
+      lista_precio_id: listaPrecioId ? String(listaPrecioId) : '1',
+      vigente_desde: new Date().toISOString().slice(0, 10),
     })
     setPreciosDerivados({})
     setShowForm(true)
@@ -270,7 +271,9 @@ export default function PreciosPanel({ articuloId, varianteId, tieneVariantes }:
                 onValueChange={(v) => setForm((f) => ({ ...f, lista_precio_id: v ?? '' }))}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar lista…" />
+                  <SelectValue placeholder="Seleccionar lista…">
+                    {listasManual.find(l => String(l.id) === form.lista_precio_id)?.nombre}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {listasManual.map((l) => (

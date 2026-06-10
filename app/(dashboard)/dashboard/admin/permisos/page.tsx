@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback, useRef, Fragment } from 'react'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Save, ChevronDown, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -43,6 +44,7 @@ function triState(vals: boolean[]): 'all' | 'some' | 'none' {
 }
 
 export default function PermisosPage() {
+  const router = useRouter()
   const [roles, setRoles] = useState<Role[]>([])
   const [roleId, setRoleId] = useState('')
   const [perms, setPerms] = useState<Record<string, boolean>>({})
@@ -109,8 +111,13 @@ export default function PermisosPage() {
       body: JSON.stringify({ role_id: parseInt(roleId, 10), permissions }),
     })
     setSaving(false)
-    if (res.ok) toast.success('Permisos guardados')
-    else toast.error('Error al guardar')
+    if (res.ok) {
+      toast.success('Permisos guardados')
+      router.refresh()
+    } else {
+      const err = await res.json().catch(() => ({}))
+      toast.error(err.error ?? 'Error al guardar')
+    }
   }
 
   const hasPerms = Object.keys(perms).length > 0

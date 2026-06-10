@@ -1,18 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
 import { getTenantClient } from '@/services/supabase-tenant'
 import { getHomeSucursalId, assertActiveSucursalIsHome } from '@/lib/sucursal'
+import { requirePermission } from '@/lib/require-permission'
 
-const ROLES_ESCRITURA = ['Administrador', 'Supervisor']
 const PROVEEDOR_STOCK_INICIAL = 2
 const ITEMS_POR_REMITO = 50
 const PARALLEL = 10
 
 export async function POST(req: NextRequest) {
-  const session = await auth()
-  if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-  if (!ROLES_ESCRITURA.includes(session.user.role))
-    return NextResponse.json({ error: 'Sin permiso' }, { status: 403 })
+  const session = await requirePermission('inventario.articulos.crear')
+  if (!session) return NextResponse.json({ error: 'Sin permiso' }, { status: 403 })
   const supabase = await getTenantClient(session)
 
   const guardErr = await assertActiveSucursalIsHome()

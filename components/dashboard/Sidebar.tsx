@@ -38,6 +38,7 @@ import {
   FileUp,
   UserCheck,
   CreditCard,
+  TrendingUp,
   type LucideIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -85,7 +86,8 @@ const navGroups: NavGroup[] = [
       { label: 'Artículos',        href: '/dashboard/inventario/articulos',         Icon: Package,           permKey: 'inventario.articulos.ver' },
       { label: 'Remitos',          href: '/dashboard/inventario/remitos',           Icon: BarChart3,         permKey: 'inventario.remitos.ver' },
       { label: 'Proveedores',      href: '/dashboard/inventario/proveedores',       Icon: Truck,             permKey: 'inventario.proveedores.ver' },
-      { label: 'Ajustes de stock', href: '/dashboard/inventario/remitos/ajustes',  Icon: SlidersHorizontal, permKey: 'inventario.ajustes.ver' },
+      { label: 'Ajustes de stock',     href: '/dashboard/inventario/remitos/ajustes',      Icon: SlidersHorizontal, permKey: 'inventario.ajustes.ver' },
+      { label: 'Actualizar precios',   href: '/dashboard/inventario/actualizar-precios',  Icon: TrendingUp,        permKey: 'inventario.articulos.ver' },
     ],
   },
   {
@@ -118,7 +120,7 @@ const navGroups: NavGroup[] = [
     module: 'caja',
     items: [
       { label: 'Caja',      href: '/dashboard/caja',           Icon: Wallet,      permKey: 'caja.caja.ver' },
-      { label: 'Historial', href: '/dashboard/caja/historial',  Icon: History,     permKey: 'caja.caja.ver' },
+      { label: 'Historial de cierres', href: '/dashboard/caja/historial',  Icon: History,     permKey: 'caja.caja.ver' },
       { label: 'Cobranzas', href: '/dashboard/cobranzas',       Icon: DollarSign,  permKey: 'caja.cobranzas.ver' },
       { label: 'Recibos',   href: '/dashboard/recibos',         Icon: ReceiptText, permKey: 'caja.cobranzas.ver' },
     ],

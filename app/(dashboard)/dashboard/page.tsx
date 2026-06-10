@@ -23,6 +23,19 @@ export default async function DashboardPage() {
   const session = await auth()
   const { sucursalId, verTodas } = await getSucursalFilter()
 
+  let permMap: Record<string, boolean> | null = null
+  if (session && session.user.role !== 'Administrador') {
+    const supabase = await getTenantClient(session)
+    const { data } = await supabase
+      .from('role_permissions')
+      .select('operation, allowed')
+      .eq('role_id', session.user.role_id)
+    permMap = {}
+    for (const row of (data ?? []) as Array<{ operation: string; allowed: boolean }>) {
+      permMap[row.operation] = row.allowed
+    }
+  }
+
   let ventasHoy   = '—'
   let trabajosHoy = '—'
   let stockBajo   = '—'
@@ -137,7 +150,7 @@ export default async function DashboardPage() {
         <MetricCard label="Saldo a cobrar" value={saldoCobrar} />
       </div>
 
-      <ModuleSections modules={session?.user.modules ?? []} isAdmin={session?.user.role === 'Administrador'} />
+      <ModuleSections modules={session?.user.modules ?? []} isAdmin={session?.user.role === 'Administrador'} userPermissions={permMap} />
     </div>
   )
 }

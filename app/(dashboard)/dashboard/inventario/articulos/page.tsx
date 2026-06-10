@@ -77,6 +77,7 @@ export default function ArticulosPage() {
   const [listas, setListas] = useState<ListaCol[]>([])
   const [loading, setLoading] = useState(true)
   const [q, setQ] = useState('')
+  const [soloConStock, setSoloConStock] = useState(false)
   const [confirmId, setConfirmId] = useState<number | null>(null)
   const [desactivando, setDesactivando] = useState(false)
 
@@ -84,6 +85,7 @@ export default function ArticulosPage() {
     setLoading(true)
     const params = new URLSearchParams({ activo: 'false' })
     if (q) params.set('q', q)
+    if (soloConStock && !q) params.set('con_stock', 'true')
     const res = await fetch(`/api/dashboard/articulos?${params}`)
     const data: ArticuloRow[] = await res.json()
 
@@ -122,7 +124,7 @@ export default function ArticulosPage() {
     setSucursales(sucList)
     setArticulos(data)
     setLoading(false)
-  }, [q])
+  }, [q, soloConStock])
 
   useEffect(() => {
     const t = setTimeout(fetchArticulos, 300)
@@ -146,20 +148,46 @@ export default function ArticulosPage() {
     setConfirmId(null)
   }
 
+  const activeSucursalId = sucursales.find(s => s.is_active)?.id ?? null
+
+  // When no search text: API already filtered by stock server-side.
+  // When search text is active: filter client-side from RPC results.
+  const articulosFiltrados = soloConStock && activeSucursalId && q.trim()
+    ? articulos.filter(a => {
+        if (a.tipo_articulo === 'con_variantes') {
+          return (a.articulo_variantes ?? []).some(v =>
+            (v.stock_sucursales?.find(s => s.sucursal_id === activeSucursalId)?.stock_actual ?? 0) > 0
+          )
+        }
+        return (a.stock_sucursales?.find(s => s.sucursal_id === activeSucursalId)?.stock_actual ?? 0) > 0
+      })
+    : articulos
+
   // Total columns: 6 fixed + listas + sucursales (min 1 each if no data yet)
   const colCount = 6 + Math.max(listas.length, 1) + Math.max(sucursales.length, 1)
 
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <div className="relative w-72">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <Input
-            placeholder="Buscar por nombre, código o barras…"
-            className="pl-9"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-          />
+        <div className="flex items-center gap-3">
+          <div className="relative w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Input
+              placeholder="Buscar por nombre, código o barras…"
+              className="pl-9"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
+          </div>
+          <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none whitespace-nowrap">
+            <input
+              type="checkbox"
+              checked={soloConStock}
+              onChange={e => setSoloConStock(e.target.checked)}
+              className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+            />
+            Con stock
+          </label>
         </div>
         <Link href="/dashboard/inventario/articulos/nuevo" className={buttonVariants()}>
           <Plus className="w-4 h-4 mr-2" />
@@ -224,7 +252,7 @@ export default function ArticulosPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              articulos.flatMap((a) => {
+              articulosFiltrados.flatMap((a) => {
                 const mainRow = (
                   <TableRow key={`art-${a.id}`} className={!a.activo ? 'opacity-50' : ''}>
                     <TableCell className="font-medium">{a.nombre}</TableCell>

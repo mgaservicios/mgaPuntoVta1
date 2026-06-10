@@ -40,7 +40,12 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     .select('id, name, description, is_default')
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) {
+    if (error.code === '23505') {
+      return NextResponse.json({ error: 'Ya existe un rol con ese nombre' }, { status: 409 })
+    }
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
   return NextResponse.json(data)
 }
 

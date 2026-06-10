@@ -1,15 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
 import { getTenantClient } from '@/services/supabase-tenant'
+import { requirePermission } from '@/lib/require-permission'
 
 const RUBRO_MAP: Record<string, number> = { ANS: 2, ARM: 3, LCQ: 4 }
-const ROLES_ESCRITURA = ['Administrador', 'Supervisor']
 
 export async function POST(req: NextRequest) {
-  const session = await auth()
-  if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-  if (!ROLES_ESCRITURA.includes(session.user.role))
-    return NextResponse.json({ error: 'Sin permiso' }, { status: 403 })
+  const session = await requirePermission('inventario.articulos.crear')
+  if (!session) return NextResponse.json({ error: 'Sin permiso' }, { status: 403 })
   const supabase = await getTenantClient(session)
 
   const { rows } = await req.json() as {
