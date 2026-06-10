@@ -27,6 +27,8 @@ export async function GET(_: NextRequest, { params }: Ctx) {
     .select(`
       *,
       clientes(id, nombre, telefono),
+      vendedores(nombre),
+      sucursales(nombre, logo_url),
       optica_servicio_tipos(id, tipo, detalle, precio, estado),
       optica_servicio_pagos(id, metodo, monto, concepto, referencia, fecha_pago, created_at)
     `)

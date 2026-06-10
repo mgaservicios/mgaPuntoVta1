@@ -3,15 +3,18 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Search, X, Plus, Minus, Trash2, CheckCircle, ChevronDown, Printer } from 'lucide-react'
+import { Search, X, Plus, Minus, Trash2, CheckCircle, ChevronDown, Printer, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import type { CajaSesion, MetodoPago } from '@/types/ventas'
+import type { CajaSesion } from '@/types/ventas'
 import type { Cliente } from '@/types/clientes'
 import type { NotaCredito } from '@/types/notas-credito'
+import type { FormaPago } from '@/types/formas-pago'
+import { TIPOS_CON_REFERENCIA } from '@/types/formas-pago'
 import ClienteSearch from '@/components/dashboard/ClienteSearch'
 import VarianteSelector from '../_components/VarianteSelector'
-import { useSucursalActiva } from '@/hooks/useSucursalActiva'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useVendedores } from '@/hooks/useVendedores'
 
 // ── Tipos locales ─────────────────────────────────────────────────────────────
 
@@ -45,20 +48,14 @@ interface CartItem {
 }
 
 interface PagoLine {
-  metodo: MetodoPago
+  metodo: string
   monto: string
   nota_credito_id?: number
+  forma_pago_id?: number | null
+  cuotas?: number | null
+  referencia?: string
+  fecha_pago?: string
 }
-
-const METODOS: { value: MetodoPago; label: string }[] = [
-  { value: 'EFECTIVO', label: 'Efectivo' },
-  { value: 'TRANSFERENCIA', label: 'Transferencia' },
-  { value: 'TARJETA_DEBITO', label: 'Tarjeta débito' },
-  { value: 'TARJETA_CREDITO', label: 'Tarjeta crédito' },
-  { value: 'CUENTA_CORRIENTE', label: 'Cuenta corriente' },
-  { value: 'NOTA_CREDITO', label: 'Nota de crédito' },
-  { value: 'OTRO', label: 'Otro' },
-]
 
 function formatARS(n: number) {
   return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(n)
@@ -68,6 +65,12 @@ function varianteLabel(v: VarianteResult) {
   const attrs = v.variante_atributos ?? []
   if (attrs.length === 0) return v.sku ?? `Variante #${v.id}`
   return attrs.map(a => `${a.atributo_tipos?.nombre ?? ''}: ${a.valor}`).join(' / ')
+}
+
+interface CajaData {
+  sesion: CajaSesion | null
+  isHome: boolean
+  sucursalNombre: string | null
 }
 
 // ── Página principal POS ──────────────────────────────────────────────────────
@@ -84,8 +87,7 @@ async function getPrecioLista(articuloId: number, listaId: number, varianteId?: 
 
 export default function POSPage() {
   const router = useRouter()
-  const sucursalNombre = useSucursalActiva()
-  const [cajaSesion, setCajaSesion] = useState<CajaSesion | null | undefined>(undefined)
+  const [cajaData, setCajaData] = useState<CajaData | undefined>(undefined)
 
   // Listas de precio
   const [listas, setListas] = useState<{ id: number; nombre: string }[]>([])
@@ -110,8 +112,18 @@ export default function POSPage() {
   const [pagos, setPagos] = useState<PagoLine[]>([{ metodo: 'EFECTIVO', monto: '' }])
   const [submitting, setSubmitting] = useState(false)
 
+  // Vendedor
+  const vendedores = useVendedores()
+  const [vendedorId, setVendedorId] = useState<number | null>(null)
+
   // Notas de crédito disponibles para el cliente seleccionado
   const [ncsDisponibles, setNcsDisponibles] = useState<NotaCredito[]>([])
+  const [saldoCC, setSaldoCC] = useState<number | null>(null)
+  const [formasPago, setFormasPago] = useState<FormaPago[]>([])
+
+  // Recargo por cuotas
+  const [recargoPct, setRecargoPct] = useState('0')
+  const [recargoMonto, setRecargoMonto] = useState(0)
 
   // Diálogo post-venta: ¿imprimir?
   const [ventaGuardada, setVentaGuardada] = useState<{ id: number; numero: string } | null>(null)
@@ -120,7 +132,16 @@ export default function POSPage() {
   useEffect(() => {
     fetch('/api/dashboard/caja/sesion')
       .then(r => r.json())
-      .then(data => setCajaSesion(data))
+      .then(setCajaData)
+  }, [])
+
+  useEffect(() => {
+    fetch('/api/dashboard/formas-pago').then(r => r.json()).then(data => {
+      const fps: FormaPago[] = Array.isArray(data) ? data : []
+      setFormasPago(fps)
+      const primero = fps[0]
+      if (primero) setPagos([{ metodo: primero.nombre, monto: '', forma_pago_id: primero.id }])
+    }).catch(() => {})
   }, [])
 
   // Cargar listas de precio de venta
@@ -136,23 +157,32 @@ export default function POSPage() {
       .catch(() => {})
   }, [])
 
-  // Cargar NCs cuando cambia el cliente
+  // Cargar NCs y saldo CC cuando cambia el cliente
   useEffect(() => {
-    if (!cliente) { setNcsDisponibles([]); return }
+    if (!cliente) { setNcsDisponibles([]); setSaldoCC(null); return }
     fetch(`/api/dashboard/notas-credito?cliente_id=${cliente.id}&estado=pendiente`)
       .then(r => r.json())
       .then(data => setNcsDisponibles(Array.isArray(data) ? data : []))
       .catch(() => setNcsDisponibles([]))
+    fetch(`/api/dashboard/listados/cobranzas?cliente_id=${cliente.id}`)
+      .then(r => r.json())
+      .then((data: { saldo_actual: number }[]) => setSaldoCC(data[0]?.saldo_actual ?? 0))
+      .catch(() => setSaldoCC(null))
   }, [cliente])
 
   // Si se quita el cliente, limpiar NC de los pagos
   useEffect(() => {
     if (!cliente) {
-      setPagos(prev => prev.map(p =>
-        p.metodo === 'NOTA_CREDITO' ? { metodo: 'EFECTIVO', monto: '' } : p
-      ))
+      setPagos(prev => {
+        const primero = formasPago[0]
+        return prev.map(p =>
+          p.metodo === 'NOTA_CREDITO'
+            ? { metodo: primero?.nombre ?? 'CUENTA_CORRIENTE', monto: '', forma_pago_id: primero?.id ?? null }
+            : p
+        )
+      })
     }
-  }, [cliente])
+  }, [cliente]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Búsqueda de artículos
   const buscar = useCallback((texto: string) => {
@@ -247,8 +277,9 @@ export default function POSPage() {
   const descPct = parseFloat(descuentoGlobal) || 0
   const descMonto = subtotal * (descPct / 100)
   const total = subtotal - descMonto
+  const totalFinal = Math.round((total + recargoMonto) * 100) / 100
 
-  // Sinc pago efectivo al total cuando hay un solo pago
+  // Sinc pago al total final cuando hay un solo pago
   function syncPagos(t: number) {
     setPagos(prev => {
       if (prev.length === 1) return [{ ...prev[0], monto: t.toFixed(2) }]
@@ -256,25 +287,48 @@ export default function POSPage() {
     })
   }
 
-  useEffect(() => { syncPagos(total) }, [total]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { syncPagos(totalFinal) }, [totalFinal]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function addPago() {
-    const usados = new Set(pagos.map(p => p.metodo))
-    const disponible = METODOS.find(m => !usados.has(m.value))
-    if (!disponible) return
-    setPagos(prev => [...prev, { metodo: disponible.value, monto: '' }])
+    const primero = formasPago[0]
+    setPagos(prev => [...prev, { metodo: primero?.nombre ?? 'CUENTA_CORRIENTE', monto: '', forma_pago_id: primero?.id ?? null }])
   }
 
   function removePago(idx: number) {
     setPagos(prev => prev.filter((_, i) => i !== idx))
   }
 
-  function updatePago(idx: number, field: 'metodo' | 'monto', value: string) {
+  function updatePagoMetodo(idx: number, value: string) {
+    const fp = formasPago.find(f => f.nombre === value)
     setPagos(prev => prev.map((p, i) => {
       if (i !== idx) return p
-      if (field === 'metodo') return { metodo: value as MetodoPago, monto: p.monto, nota_credito_id: undefined }
-      return { ...p, monto: value }
+      return { metodo: value, monto: p.monto, forma_pago_id: fp?.id ?? null, nota_credito_id: undefined, cuotas: null, referencia: '', fecha_pago: '' }
     }))
+  }
+
+  function applyRecargoCuota(fp: FormaPago, cuotaNum: number) {
+    const cuota = fp.formas_pago_cuotas?.find(c => c.cantidad_cuotas === cuotaNum)
+    if (!cuota) return
+    const pct = cuota.recargo_pct
+    const rm = Math.round(total * pct / 100 * 100) / 100
+    setRecargoPct(pct.toString())
+    setRecargoMonto(rm)
+  }
+
+  function onRecargoPctChange(val: string) {
+    setRecargoPct(val)
+    const pct = Math.max(0, parseFloat(val) || 0)
+    setRecargoMonto(Math.round(total * pct / 100 * 100) / 100)
+  }
+
+  function onRecargoMontoChange(val: string) {
+    const rm = Math.max(0, parseFloat(val) || 0)
+    setRecargoMonto(rm)
+    setRecargoPct(total > 0 ? ((rm / total) * 100).toFixed(2) : '0')
+  }
+
+  function updatePagoMonto(idx: number, value: string) {
+    setPagos(prev => prev.map((p, i) => i !== idx ? p : { ...p, monto: value }))
   }
 
   function selectNC(idx: number, ncId: string) {
@@ -290,11 +344,12 @@ export default function POSPage() {
   }
 
   const totalPagado = pagos.reduce((acc, p) => acc + (parseFloat(p.monto) || 0), 0)
-  const vuelto = pagos.some(p => p.metodo === 'EFECTIVO') ? totalPagado - total : 0
+  const tieneMoneda = pagos.some(p => formasPago.find(f => f.nombre === p.metodo)?.tipo === 'MONEDA')
+  const vuelto = tieneMoneda ? Math.max(0, totalPagado - totalFinal) : 0
 
   async function handleSubmit() {
     if (cart.length === 0) { toast.error('Agregá al menos un artículo'); return }
-    if (totalPagado < total - 0.005) { toast.error('El monto pagado no cubre el total'); return }
+    if (totalPagado < totalFinal - 0.005) { toast.error('El monto pagado no cubre el total'); return }
 
     const pagoCC = pagos.find(p => p.metodo === 'CUENTA_CORRIENTE')
     if (pagoCC && !cliente) { toast.error('Seleccioná un cliente para usar cuenta corriente'); return }
@@ -308,7 +363,9 @@ export default function POSPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         cliente_id: cliente?.id ?? null,
+        vendedor_id: vendedorId,
         descuento_pct: descPct,
+        recargo_monto: recargoMonto,
         observaciones: observaciones || null,
         items: cart.map(i => ({
           articulo_id: i.articulo_id,
@@ -320,8 +377,12 @@ export default function POSPage() {
         pagos: pagos
           .filter(p => parseFloat(p.monto) > 0)
           .map(p => ({
-            metodo: p.metodo,
-            monto: parseFloat(p.monto),
+            metodo:        p.metodo,
+            monto:         parseFloat(p.monto),
+            forma_pago_id: p.forma_pago_id ?? null,
+            cuotas:        p.cuotas ?? null,
+            referencia:    p.referencia || null,
+            fecha_pago:    p.fecha_pago || null,
             ...(p.nota_credito_id ? { nota_credito_id: p.nota_credito_id } : {}),
           })),
       }),
@@ -342,11 +403,29 @@ export default function POSPage() {
     setCart([])
     setCliente(null)
     setDescuentoGlobal('0')
-    setPagos([{ metodo: 'EFECTIVO', monto: '' }])
+    setRecargoPct('0')
+    setRecargoMonto(0)
+    const primero = formasPago[0]
+    setPagos([{ metodo: primero?.nombre ?? 'EFECTIVO', monto: '', forma_pago_id: primero?.id ?? null }])
     setObservaciones('')
+    setVendedorId(null)
   }
 
-  if (cajaSesion === undefined) return <div className="text-gray-400 text-sm">Cargando…</div>
+  if (cajaData === undefined) return <div className="text-gray-400 text-sm">Cargando…</div>
+
+  if (!cajaData.isHome) return (
+    <div className="flex flex-col items-center justify-center h-[50vh] gap-4 text-center">
+      <div className="w-14 h-14 rounded-full bg-amber-100 flex items-center justify-center">
+        <AlertTriangle className="w-7 h-7 text-amber-500" />
+      </div>
+      <div>
+        <p className="font-semibold text-gray-800">No puede operar el POS desde esta sucursal</p>
+        <p className="text-sm text-gray-500 mt-1">
+          Está visualizando otra sucursal. Seleccione su sucursal en el selector para poder vender.
+        </p>
+      </div>
+    </div>
+  )
 
   // ── POS ──
 
@@ -397,9 +476,9 @@ export default function POSPage() {
         {/* Selector de lista de precios */}
         {listas.length > 0 && (
           <div className="flex items-center gap-2">
-            {sucursalNombre && (
+            {cajaData.sucursalNombre && (
               <span className="text-xs text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full border border-gray-200 shrink-0">
-                {sucursalNombre}
+                {cajaData.sucursalNombre}
               </span>
             )}
             <span className="text-xs text-gray-500 shrink-0">Lista de precios:</span>
@@ -552,6 +631,24 @@ export default function POSPage() {
           )}
         </div>
 
+        {/* Vendedor */}
+        <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-2">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Vendedor</p>
+          <Select
+            value={vendedorId?.toString() ?? ''}
+            onValueChange={v => setVendedorId(Number(v))}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Seleccionar vendedor…" />
+            </SelectTrigger>
+            <SelectContent>
+              {vendedores.map(v => (
+                <SelectItem key={v.id} value={v.id.toString()}>{v.nombre}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
         {/* Totales */}
         <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-2">
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Totales</p>
@@ -578,9 +675,29 @@ export default function POSPage() {
             </div>
           )}
 
+          <div className="flex items-center justify-between text-sm gap-2">
+            <span className="text-gray-500 shrink-0">Recargo (%)</span>
+            <div className="flex items-center gap-1">
+              <input
+                type="number" min="0" step="0.01"
+                className="w-14 text-right border border-gray-200 rounded px-2 py-0.5 text-sm"
+                value={recargoPct}
+                onChange={e => onRecargoPctChange(e.target.value)}
+              />
+              <span className="text-gray-400 text-xs shrink-0">%</span>
+            </div>
+          </div>
+
+          {recargoMonto > 0 && (
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500">Recargo</span>
+              <span className="text-amber-600">+{formatARS(recargoMonto)}</span>
+            </div>
+          )}
+
           <div className="flex justify-between text-base font-bold border-t border-gray-100 pt-2 mt-1">
             <span>Total</span>
-            <span>{formatARS(total)}</span>
+            <span>{formatARS(totalFinal)}</span>
           </div>
         </div>
 
@@ -588,96 +705,155 @@ export default function POSPage() {
         <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
           <div className="flex items-center justify-between">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Pagos</p>
-            {pagos.length < METODOS.length && (
-              <button onClick={addPago} className="text-xs text-blue-600 hover:underline flex items-center gap-1">
-                <Plus className="w-3 h-3" /> Agregar
-              </button>
-            )}
+            <button onClick={addPago} className="text-xs text-blue-600 hover:underline flex items-center gap-1">
+              <Plus className="w-3 h-3" /> Agregar
+            </button>
           </div>
 
-          {pagos.map((pago, idx) => (
-            <div key={idx} className="space-y-1.5">
-              <div className="flex gap-2 items-center">
-                <select
-                  className="flex-1 text-sm border border-gray-200 rounded-md px-2 py-1.5 bg-white"
-                  value={pago.metodo}
-                  onChange={(e) => updatePago(idx, 'metodo', e.target.value)}
-                >
-                  {METODOS.map(m => (
-                    <option key={m.value} value={m.value}>{m.label}</option>
-                  ))}
-                </select>
-                {pago.metodo !== 'NOTA_CREDITO' && (
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    placeholder="$0"
-                    className="w-24 text-right text-sm border border-gray-200 rounded-md px-2 py-1.5"
-                    value={pago.monto}
-                    onChange={(e) => updatePago(idx, 'monto', e.target.value)}
-                  />
-                )}
-                {pagos.length > 1 && (
-                  <button onClick={() => removePago(idx)} className="text-gray-300 hover:text-red-500">
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
+          {saldoCC !== null && saldoCC < -0.001 && (
+            <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+              <p className="text-xs text-green-800">
+                <span className="font-semibold">Saldo a favor CC:</span> {formatARS(Math.abs(saldoCC))}
+              </p>
+              <button
+                type="button"
+                className="text-xs text-green-700 font-medium underline hover:no-underline ml-2 shrink-0"
+                onClick={() => {
+                  const aplicar = Math.min(Math.abs(saldoCC), total)
+                  setPagos(prev => {
+                    const yaTieneCC = prev.some(p => p.metodo === 'CUENTA_CORRIENTE')
+                    if (yaTieneCC) return prev.map(p => p.metodo === 'CUENTA_CORRIENTE' ? { ...p, monto: aplicar.toFixed(2) } : p)
+                    return [...prev, { metodo: 'CUENTA_CORRIENTE', monto: aplicar.toFixed(2) }]
+                  })
+                }}
+              >
+                Aplicar
+              </button>
+            </div>
+          )}
 
-              {pago.metodo === 'NOTA_CREDITO' && (
-                <div className="space-y-1">
-                  {!cliente ? (
-                    <p className="text-xs text-amber-600 bg-amber-50 rounded px-2 py-1">
-                      Seleccioná un cliente para ver sus notas de crédito
-                    </p>
-                  ) : ncsDisponibles.length === 0 ? (
-                    <p className="text-xs text-gray-400 bg-gray-50 rounded px-2 py-1">
-                      El cliente no tiene notas de crédito disponibles
-                    </p>
-                  ) : (
-                    <>
-                      <select
-                        className="w-full text-sm border border-gray-200 rounded-md px-2 py-1.5 bg-white"
-                        value={pago.nota_credito_id ? String(pago.nota_credito_id) : ''}
-                        onChange={(e) => selectNC(idx, e.target.value)}
-                      >
-                        <option value="">Seleccioná una nota de crédito…</option>
-                        {ncsDisponibles.map(nc => (
-                          <option key={nc.id} value={String(nc.id)}>
-                            {nc.numero} — {formatARS(nc.monto_disponible)} disp.
-                          </option>
-                        ))}
-                      </select>
-                      {pago.nota_credito_id && (
-                        <div className="flex gap-2 items-center">
-                          <span className="text-xs text-gray-500 shrink-0">Monto a usar:</span>
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            className="flex-1 text-right text-sm border border-gray-200 rounded-md px-2 py-1.5"
-                            value={pago.monto}
-                            onChange={(e) => {
-                              const nc = ncsDisponibles.find(n => n.id === pago.nota_credito_id)
-                              const max = nc ? nc.monto_disponible : Infinity
-                              const val = Math.min(parseFloat(e.target.value) || 0, max)
-                              updatePago(idx, 'monto', val.toFixed(2))
-                            }}
-                          />
-                        </div>
-                      )}
-                    </>
+          {pagos.map((pago, idx) => {
+            const fp = formasPago.find(f => f.nombre === pago.metodo)
+            const mostrarRefFecha = fp ? TIPOS_CON_REFERENCIA.includes(fp.tipo) : false
+            const mostrarCuotas  = fp?.tipo === 'TARJETA_CREDITO' && (fp.formas_pago_cuotas?.length ?? 0) > 0
+            return (
+              <div key={idx} className="space-y-1.5">
+                <div className="flex gap-2 items-center">
+                  <select
+                    className="flex-1 text-sm border border-gray-200 rounded-md px-2 py-1.5 bg-white"
+                    value={pago.metodo}
+                    onChange={(e) => updatePagoMetodo(idx, e.target.value)}
+                  >
+                    {formasPago.map(f => <option key={f.id} value={f.nombre}>{f.nombre}</option>)}
+                    <option value="CUENTA_CORRIENTE">Cuenta corriente</option>
+                    <option value="NOTA_CREDITO">Nota de crédito</option>
+                  </select>
+                  {pago.metodo !== 'NOTA_CREDITO' && (
+                    <input
+                      type="number" min="0" step="0.01" placeholder="$0"
+                      className="w-24 text-right text-sm border border-gray-200 rounded-md px-2 py-1.5"
+                      value={pago.monto}
+                      onChange={(e) => updatePagoMonto(idx, e.target.value)}
+                    />
+                  )}
+                  {pagos.length > 1 && (
+                    <button onClick={() => removePago(idx)} className="text-gray-300 hover:text-red-500">
+                      <X className="w-4 h-4" />
+                    </button>
                   )}
                 </div>
-              )}
-            </div>
-          ))}
+
+                {/* Cuotas */}
+                {mostrarCuotas && (
+                  <select
+                    className="w-full text-sm border border-gray-200 rounded-md px-2 py-1.5 bg-white"
+                    value={pago.cuotas ?? ''}
+                    onChange={e => {
+                      const cuotaNum = e.target.value ? parseInt(e.target.value) : null
+                      setPagos(prev => prev.map((p, i) => i !== idx ? p : { ...p, cuotas: cuotaNum }))
+                      if (cuotaNum && fp) applyRecargoCuota(fp, cuotaNum)
+                    }}
+                  >
+                    <option value="">Sin cuotas</option>
+                    {fp!.formas_pago_cuotas.sort((a, b) => a.cantidad_cuotas - b.cantidad_cuotas).map(c => (
+                      <option key={c.id} value={c.cantidad_cuotas}>
+                        {c.cantidad_cuotas}x {c.recargo_pct > 0 ? `+${c.recargo_pct}% rec.` : 'sin recargo'}
+                      </option>
+                    ))}
+                  </select>
+                )}
+
+                {/* Referencia + Fecha */}
+                {mostrarRefFecha && (
+                  <div className="flex gap-1.5">
+                    <input
+                      type="text" placeholder="Referencia (opcional)"
+                      className="flex-1 text-sm border border-gray-200 rounded-md px-2 py-1.5"
+                      value={pago.referencia ?? ''}
+                      onChange={e => setPagos(prev => prev.map((p, i) => i !== idx ? p : { ...p, referencia: e.target.value }))}
+                    />
+                    <input
+                      type="date"
+                      className="text-sm border border-gray-200 rounded-md px-2 py-1.5 w-36"
+                      value={pago.fecha_pago || new Date().toISOString().slice(0, 10)}
+                      onChange={e => setPagos(prev => prev.map((p, i) => i !== idx ? p : { ...p, fecha_pago: e.target.value }))}
+                    />
+                  </div>
+                )}
+
+                {/* NC */}
+                {pago.metodo === 'NOTA_CREDITO' && (
+                  <div className="space-y-1">
+                    {!cliente ? (
+                      <p className="text-xs text-amber-600 bg-amber-50 rounded px-2 py-1">
+                        Seleccioná un cliente para ver sus notas de crédito
+                      </p>
+                    ) : ncsDisponibles.length === 0 ? (
+                      <p className="text-xs text-gray-400 bg-gray-50 rounded px-2 py-1">
+                        El cliente no tiene notas de crédito disponibles
+                      </p>
+                    ) : (
+                      <>
+                        <select
+                          className="w-full text-sm border border-gray-200 rounded-md px-2 py-1.5 bg-white"
+                          value={pago.nota_credito_id ? String(pago.nota_credito_id) : ''}
+                          onChange={(e) => selectNC(idx, e.target.value)}
+                        >
+                          <option value="">Seleccioná una nota de crédito…</option>
+                          {ncsDisponibles.map(nc => (
+                            <option key={nc.id} value={String(nc.id)}>
+                              {nc.numero} — {formatARS(nc.monto_disponible)} disp.
+                            </option>
+                          ))}
+                        </select>
+                        {pago.nota_credito_id && (
+                          <div className="flex gap-2 items-center">
+                            <span className="text-xs text-gray-500 shrink-0">Monto a usar:</span>
+                            <input
+                              type="number" min="0" step="0.01"
+                              className="flex-1 text-right text-sm border border-gray-200 rounded-md px-2 py-1.5"
+                              value={pago.monto}
+                              onChange={(e) => {
+                                const nc = ncsDisponibles.find(n => n.id === pago.nota_credito_id)
+                                const max = nc ? nc.monto_disponible : Infinity
+                                const val = Math.min(parseFloat(e.target.value) || 0, max)
+                                updatePagoMonto(idx, val.toFixed(2))
+                              }}
+                            />
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            )
+          })}
 
           <div className="border-t border-gray-100 pt-2 space-y-1">
             <div className="flex justify-between text-sm">
               <span className="text-gray-500">Total pagado</span>
-              <span className={`font-medium ${totalPagado < total - 0.005 ? 'text-red-500' : 'text-green-600'}`}>
+              <span className={`font-medium ${totalPagado < totalFinal - 0.005 ? 'text-red-500' : 'text-green-600'}`}>
                 {formatARS(totalPagado)}
               </span>
             </div>

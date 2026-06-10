@@ -3,6 +3,7 @@ import { getTenantClient } from '@/services/supabase-tenant'
 import { adjustArticuloStock, syncArticuloStock } from '@/services/stock'
 import { registrarPrecio } from '@/services/precios'
 import { requirePermission } from '@/lib/require-permission'
+import { assertHomeSucursal } from '@/lib/sucursal'
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -31,6 +32,10 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     .single()
 
   if (error || !remito) return NextResponse.json({ error: 'No encontrado' }, { status: 404 })
+
+  const guard = await assertHomeSucursal(remito.sucursal_id)
+  if (guard) return guard
+
   if (remito.estado !== 'borrador') return NextResponse.json({ error: 'El remito no está en borrador' }, { status: 400 })
 
   const items = Array.isArray(remito.remito_items) ? remito.remito_items : []

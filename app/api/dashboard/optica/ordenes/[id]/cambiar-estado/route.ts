@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { getTenantClient } from '@/services/supabase-tenant'
-import { getHomeSucursalId } from '@/lib/sucursal'
+import { getHomeSucursalId, assertHomeSucursal } from '@/lib/sucursal'
 
-const ESTADOS_MANUALES = ['entregado', 'anulado'] as const
+const ESTADOS_MANUALES = ['terminado', 'entregado', 'anulado'] as const
+
+const TRANSICIONES: Record<string, string[]> = {
+  pendiente:      ['terminado', 'entregado', 'anulado'],
+  en_proceso:     ['terminado', 'entregado', 'anulado'],
+  en_laboratorio: ['terminado', 'entregado', 'anulado'],
+  terminado:      ['entregado', 'anulado'],
+}
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -17,7 +24,26 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   const nuevo_estado = body.estado
 
   if (!ESTADOS_MANUALES.includes(nuevo_estado)) {
-    return NextResponse.json({ error: 'Solo se puede establecer manualmente: entregado o anulado' }, { status: 400 })
+    return NextResponse.json({ error: 'Solo se puede establecer manualmente: terminado, entregado o anulado' }, { status: 400 })
+  }
+
+  const { data: actual, error: fetchErr } = await supabase
+    .from('optica_ordenes')
+    .select('id, estado, sucursal_id')
+    .eq('id', id)
+    .maybeSingle()
+
+  if (fetchErr || !actual) return NextResponse.json({ error: 'Orden no encontrada' }, { status: 404 })
+
+  const guard = await assertHomeSucursal(actual.sucursal_id)
+  if (guard) return guard
+
+  const transicionesValidas = TRANSICIONES[actual.estado] ?? []
+  if (!transicionesValidas.includes(nuevo_estado)) {
+    return NextResponse.json(
+      { error: `No se puede cambiar de "${actual.estado}" a "${nuevo_estado}"` },
+      { status: 403 },
+    )
   }
 
   const { error } = await supabase
@@ -27,16 +53,25 @@ export async function POST(req: NextRequest, { params }: Ctx) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
+  // Al terminar: marcar todas las tareas como terminada
+  if (nuevo_estado === 'terminado') {
+    await supabase
+      .from('optica_orden_tareas')
+      .update({ estado: 'terminada', updated_at: new Date().toISOString() })
+      .eq('orden_id', id)
+  }
+
   // Al anular: generar pago negativo para balancear el saldo pendiente
   if (nuevo_estado === 'anulado') {
     const { data: orden } = await supabase
       .from('optica_ordenes')
-      .select('numero, total, optica_orden_pagos(monto)')
+      .select('numero, total, cliente_id, optica_orden_pagos(metodo, monto)')
       .eq('id', id)
       .single()
 
     if (orden) {
-      const pagado = (orden.optica_orden_pagos ?? []).reduce((a: number, p: { monto: number }) => a + p.monto, 0)
+      const pagos = orden.optica_orden_pagos ?? []
+      const pagado = pagos.reduce((a: number, p: { monto: number }) => a + Number(p.monto), 0)
       const saldo  = Math.round((orden.total - pagado) * 100) / 100
 
       if (saldo > 0.005) {
@@ -77,6 +112,24 @@ export async function POST(req: NextRequest, { params }: Ctx) {
           tipo: 'egreso',
           concepto: `Anulación OT ${orden.numero} - OTRO`,
           monto: saldo,
+          usuario_id: session.user.id,
+        })
+      }
+
+      // Reversar CARGOs en cuenta corriente generados por pagos CC
+      const sumCC = pagos
+        .filter((p: { metodo: string }) => p.metodo === 'CUENTA_CORRIENTE')
+        .reduce((a: number, p: { monto: number }) => a + Number(p.monto), 0)
+
+      if (sumCC > 0.005 && orden.cliente_id) {
+        await supabase.from('cobranzas').insert({
+          cliente_id: orden.cliente_id,
+          tipo: 'PAGO',
+          monto: sumCC,
+          fecha: new Date().toISOString().slice(0, 10),
+          descripcion: `Anulación OT ${orden.numero}`,
+          optica_orden_id: Number(id),
+          sucursal_id: sucursalId,
           usuario_id: session.user.id,
         })
       }

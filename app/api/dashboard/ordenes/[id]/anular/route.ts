@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getTenantClient } from '@/services/supabase-tenant'
 import { adjustArticuloStock, syncArticuloStock } from '@/services/stock'
-import { getHomeSucursalId } from '@/lib/sucursal'
+import { getHomeSucursalId, assertHomeSucursal } from '@/lib/sucursal'
 import { METODO_ORDEN_LABELS } from '@/types/ordenes'
 import { requirePermission } from '@/lib/require-permission'
 
@@ -21,6 +21,10 @@ export async function POST(_: NextRequest, { params }: Ctx) {
     .single()
 
   if (error || !orden) return NextResponse.json({ error: 'No encontrado' }, { status: 404 })
+
+  const guard = await assertHomeSucursal(orden.sucursal_id)
+  if (guard) return guard
+
   if (orden.estado === 'anulada') return NextResponse.json({ error: 'La orden ya está anulada' }, { status: 400 })
 
   const items = Array.isArray(orden.orden_venta_items) ? orden.orden_venta_items : []
@@ -89,6 +93,7 @@ export async function POST(_: NextRequest, { params }: Ctx) {
         monto: (pagoCC as { monto: number }).monto,
         fecha: new Date().toISOString().slice(0, 10),
         descripcion: `Anulación orden ${orden.numero}`,
+        sucursal_id: orden.sucursal_id,
         usuario_id: session.user.id,
       })
     }

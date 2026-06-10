@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { getTenantClient } from '@/services/supabase-tenant'
 import { adjustArticuloStock, syncArticuloStock } from '@/services/stock'
+import { assertHomeSucursal } from '@/lib/sucursal'
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -60,6 +61,10 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
     .eq('id', id)
     .single()
   if (!remito) return NextResponse.json({ error: 'No encontrado' }, { status: 404 })
+
+  const guardPut = await assertHomeSucursal(remito.sucursal_id)
+  if (guardPut) return guardPut
+
   if (remito.estado === 'anulado') return NextResponse.json({ error: 'No se puede editar un remito anulado' }, { status: 400 })
 
   const { observaciones, items } = await req.json()
@@ -197,6 +202,9 @@ export async function DELETE(_: NextRequest, { params }: Ctx) {
     .single()
 
   if (fetchError || !remito) return NextResponse.json({ error: 'No encontrado' }, { status: 404 })
+
+  const guardDel = await assertHomeSucursal(remito.sucursal_id)
+  if (guardDel) return guardDel
 
   if (!['borrador', 'anulado'].includes(remito.estado)) {
     return NextResponse.json({ error: 'Solo se pueden eliminar remitos en borrador o anulados' }, { status: 409 })

@@ -7,12 +7,16 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { Cliente } from '@/types/clientes'
 import ClienteSearch from '@/components/dashboard/ClienteSearch'
+import { useVendedores } from '@/hooks/useVendedores'
 
 export default function NuevaNotaCreditoPage() {
   const router = useRouter()
+  const vendedores = useVendedores()
   const [cliente, setCliente] = useState<Cliente | null>(null)
+  const [vendedorId, setVendedorId] = useState<number | null>(null)
   const [monto, setMonto] = useState('')
   const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10))
   const [observaciones, setObservaciones] = useState('')
@@ -28,7 +32,7 @@ export default function NuevaNotaCreditoPage() {
     const res = await fetch('/api/dashboard/notas-credito', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cliente_id: cliente.id, monto: montoNum, fecha, observaciones }),
+      body: JSON.stringify({ cliente_id: cliente.id, monto: montoNum, fecha, observaciones, vendedor_id: vendedorId }),
     })
     const data = await res.json()
     setSaving(false)
@@ -54,6 +58,18 @@ export default function NuevaNotaCreditoPage() {
         <div className="space-y-1.5">
           <Label>Cliente <span className="text-red-500">*</span></Label>
           <ClienteSearch value={cliente} onChange={setCliente} />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label>Vendedor</Label>
+          <Select value={vendedorId?.toString() ?? ''} onValueChange={v => setVendedorId(Number(v))}>
+            <SelectTrigger><SelectValue placeholder="Seleccionar vendedor…" /></SelectTrigger>
+            <SelectContent>
+              {vendedores.map(v => (
+                <SelectItem key={v.id} value={v.id.toString()}>{v.nombre}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="space-y-1.5">

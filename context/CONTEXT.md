@@ -26,6 +26,7 @@ notas de crédito y administración de usuarios/roles/permisos.
 | UI components | shadcn/ui + Base UI |
 | Auth | NextAuth.js v5 beta — CredentialsProvider + JWT |
 | Base de datos | Supabase PostgreSQL |
+| Storage | Supabase Storage (buckets: `articulos`, `sucursales`, `optica`) |
 | Formularios | React Hook Form + Zod v4 |
 | Notificaciones | Sonner (toast) |
 | Íconos | Lucide React |
@@ -74,6 +75,7 @@ notas de crédito y administración de usuarios/roles/permisos.
 | Administración | [context/modulos/administracion.md](modulos/administracion.md) |
 | **Óptica — Órdenes de trabajo** | [context/modulos/optica-ordenes.md](modulos/optica-ordenes.md) |
 | **Óptica — Servicios** | [context/modulos/optica-servicios.md](modulos/optica-servicios.md) |
+| **UI Theming — Logo y Color** | [context/modulos/ui-theming.md](modulos/ui-theming.md) |
 | Schema completo de BD | [context/DATABASE.md](DATABASE.md) |
 
 ---
@@ -112,6 +114,15 @@ Se guarda en cookie (`sucursal_id`). Se lee con `getActiveSucursalId()` desde `l
 Todas las operaciones de stock (ventas, órdenes) usan la sucursal activa al momento de la transacción
 y la guardan en la fila (`ventas.sucursal_id`, `ordenes_venta.sucursal_id`).
 
+### Theming por sucursal
+El campo `sucursales.color` (hex) se aplica como variable CSS `--primary` en todo el dashboard.
+El campo `sucursales.logo_url` reemplaza el logo estático del sidebar.
+Ver [context/modulos/ui-theming.md](modulos/ui-theming.md).
+
+### Nombre de empresa en sesión
+`session.user.empresa_nombre` — cargado desde la tabla `empresas` de la DB maestra al iniciar sesión.
+Se muestra en el header en lugar de "Dashboard" en la ruta raíz.
+
 ---
 
 ## Variables de entorno requeridas
@@ -142,4 +153,4 @@ Ver `supabase/migrations/20260603_eliminaciones_log.sql`.
 
 ---
 
-**Última actualización:** 2026-06-04
+**Última actualización:** 2026-06-09

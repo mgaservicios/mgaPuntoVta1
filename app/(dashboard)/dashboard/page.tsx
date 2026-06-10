@@ -1,6 +1,7 @@
 import { auth } from '@/lib/auth'
 import { getTenantClient } from '@/services/supabase-tenant'
 import { getSucursalFilter } from '@/lib/sucursal'
+import { ModuleSections } from '@/components/dashboard/ModuleSections'
 
 function ars(n: number) {
   return new Intl.NumberFormat('es-AR', {
@@ -22,50 +23,61 @@ export default async function DashboardPage() {
   const session = await auth()
   const { sucursalId, verTodas } = await getSucursalFilter()
 
-  let ventasHoy = '—'
-  let stockBajo = '—'
-  let cajaTotal = '—'
+  let ventasHoy   = '—'
+  let trabajosHoy = '—'
+  let stockBajo   = '—'
+  let cajaTotal   = '—'
   let cajaIngresos = '—'
-  let cajaEgresos = '—'
-  let saldoCobrar = '—'
+  let cajaEgresos  = '—'
+  let saldoCobrar  = '—'
 
   if (session && (sucursalId || verTodas)) {
     const supabase = await getTenantClient(session)
     const today = new Date().toISOString().slice(0, 10)
 
     // ── Queries paralelas ────────────────────────────────────────────────────
-    let qPOS = supabase.from('ventas').select('total').eq('fecha', today).neq('estado', 'anulada')
-    let qOT  = supabase.from('optica_ordenes').select('total').eq('fecha', today).neq('estado', 'anulado')
-    const qOrdenes = supabase.from('ordenes_venta').select('total').eq('fecha', today).neq('estado', 'anulada')
-    const qArticulos = supabase.from('articulos').select('stock_actual, stock_minimo').eq('activo', true)
+    let qPOS          = supabase.from('ventas').select('total').eq('fecha', today).neq('estado', 'anulada')
+    let qOT           = supabase.from('optica_ordenes').select('total').eq('fecha', today).neq('estado', 'anulado')
+    let qOrdenes      = supabase.from('ordenes_venta').select('total').eq('fecha', today).eq('estado', 'confirmada')
+    let qServicios    = supabase.from('optica_servicios').select('total').eq('fecha', today).neq('estado', 'anulado')
+    const qArticulos  = supabase.from('articulos').select('stock_actual, stock_minimo').eq('activo', true)
     let qCajaSesiones = supabase.from('caja_sesiones').select('id, monto_apertura').eq('estado', 'abierta')
-    let qOTSaldo = supabase.from('optica_ordenes').select('total, optica_orden_pagos(monto)').neq('estado', 'anulado')
-    const qOrdSaldo = supabase.from('ordenes_venta').select('total, orden_venta_pagos(monto)').eq('estado', 'confirmada')
-    const qCobranzas = supabase.from('cobranzas').select('tipo, monto')
+    let qOTSaldo      = supabase.from('optica_ordenes').select('total, optica_orden_pagos(monto)').neq('estado', 'anulado')
+    let qOrdSaldo     = supabase.from('ordenes_venta').select('total, orden_venta_pagos(monto)').eq('estado', 'confirmada')
+    let qCobranzas  = supabase.from('cobranzas').select('tipo, monto')
 
     if (!verTodas && sucursalId) {
-      qPOS = qPOS.eq('sucursal_id', sucursalId)
-      qOT  = qOT.eq('sucursal_id', sucursalId)
+      qPOS          = qPOS.eq('sucursal_id', sucursalId)
+      qOT           = qOT.eq('sucursal_id', sucursalId)
+      qOrdenes      = qOrdenes.eq('sucursal_id', sucursalId)
+      qServicios    = qServicios.eq('sucursal_id', sucursalId)
       qCajaSesiones = qCajaSesiones.eq('sucursal_id', sucursalId)
-      qOTSaldo = qOTSaldo.eq('sucursal_id', sucursalId)
+      qOTSaldo      = qOTSaldo.eq('sucursal_id', sucursalId)
+      qOrdSaldo     = qOrdSaldo.eq('sucursal_id', sucursalId)
+      qCobranzas    = qCobranzas.or(`sucursal_id.eq.${sucursalId},sucursal_id.is.null`)
     }
 
     const [
       { data: posHoy },
       { data: otHoy },
       { data: ordenesHoy },
+      { data: serviciosHoy },
       { data: articulos },
       { data: sesiones },
       { data: otSaldo },
       { data: ordSaldo },
       { data: cobranzas },
-    ] = await Promise.all([qPOS, qOT, qOrdenes, qArticulos, qCajaSesiones, qOTSaldo, qOrdSaldo, qCobranzas])
+    ] = await Promise.all([qPOS, qOT, qOrdenes, qServicios, qArticulos, qCajaSesiones, qOTSaldo, qOrdSaldo, qCobranzas])
 
-    // ── Ventas hoy ───────────────────────────────────────────────────────────
-    const totalPOS = (posHoy ?? []).reduce((s, v) => s + Number(v.total), 0)
-    const totalOT  = (otHoy ?? []).reduce((s, v) => s + Number(v.total), 0)
+    // ── Ventas hoy (POS + Órdenes de venta confirmadas) ─────────────────────
+    const totalPOS  = (posHoy     ?? []).reduce((s, v) => s + Number(v.total), 0)
+    const totalOT   = (otHoy      ?? []).reduce((s, v) => s + Number(v.total), 0)
     const totalOrds = (ordenesHoy ?? []).reduce((s, v) => s + Number(v.total), 0)
-    ventasHoy = ars(totalPOS + totalOT + totalOrds)
+    ventasHoy = ars(totalPOS + totalOrds)
+
+    // ── Trabajos hoy (Órdenes de trabajo + Servicios) ────────────────────────
+    const totalSv = (serviciosHoy ?? []).reduce((s, v) => s + Number(v.total), 0)
+    trabajosHoy = ars(totalOT + totalSv)
 
     // ── Stock bajo ───────────────────────────────────────────────────────────
     stockBajo = String(
@@ -77,10 +89,11 @@ export default async function DashboardPage() {
     if (sesionIds.length > 0) {
       const { data: movs } = await supabase
         .from('caja_movimientos')
-        .select('tipo, monto')
+        .select('tipo, tipo_concepto, monto')
         .in('sesion_id', sesionIds)
       const apertura = (sesiones ?? []).reduce((s, ses) => s + Number(ses.monto_apertura ?? 0), 0)
-      const ing = (movs ?? []).filter(m => m.tipo === 'ingreso').reduce((s, m) => s + Number(m.monto), 0)
+      // Excluir movimiento "Apertura" de ing para no contar monto_apertura dos veces
+      const ing = (movs ?? []).filter(m => m.tipo === 'ingreso' && m.tipo_concepto !== 'Apertura').reduce((s, m) => s + Number(m.monto), 0)
       const egr = (movs ?? []).filter(m => m.tipo === 'egreso').reduce((s, m) => s + Number(m.monto), 0)
       cajaIngresos = ars(ing)
       cajaEgresos  = ars(egr)
@@ -116,12 +129,15 @@ export default async function DashboardPage() {
         Panel de control — MGA Pto. Venta
       </p>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         <MetricCard label="Ventas hoy" value={ventasHoy} />
+        <MetricCard label="Trabajos hoy" value={trabajosHoy} />
         <MetricCard label="Artículos en stock bajo" value={stockBajo} />
         <CajaCard total={cajaTotal} ingresos={cajaIngresos} egresos={cajaEgresos} />
         <MetricCard label="Saldo a cobrar" value={saldoCobrar} />
       </div>
+
+      <ModuleSections modules={session?.user.modules ?? []} isAdmin={session?.user.role === 'Administrador'} />
     </div>
   )
 }
@@ -153,3 +169,4 @@ function CajaCard({ total, ingresos, egresos }: { total: string; ingresos: strin
     </div>
   )
 }
+

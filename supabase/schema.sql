@@ -225,6 +225,7 @@ create table public.caja_sesiones (
   diferencia     numeric(12,2),
   observaciones  text,
   estado         text not null default 'abierta' check (estado in ('abierta','cerrada')),
+  vendedor_id    bigint references public.vendedores(id),
   created_at     timestamptz default now()
 );
 create unique index caja_un_abierta on public.caja_sesiones (estado) where estado = 'abierta';
@@ -236,6 +237,7 @@ create table public.caja_movimientos (
   concepto   text not null,
   monto      numeric(12,2) not null,
   usuario_id uuid not null references public.users(id),
+  vendedor_id bigint references public.vendedores(id),
   created_at timestamptz default now()
 );
 
@@ -247,7 +249,7 @@ create table public.ventas (
   numero          text not null unique,
   fecha           date not null default current_date,
   cliente_id      bigint references public.clientes(id),
-  vendedor_id     uuid not null references public.users(id),
+  vendedor_id     bigint references public.vendedores(id),
   caja_sesion_id  bigint not null references public.caja_sesiones(id),
   subtotal        numeric(12,2) not null default 0,
   descuento_pct   numeric(5,2)  not null default 0,
@@ -288,6 +290,7 @@ create table if not exists public.notas_credito (
   monto_disponible numeric(12,2) not null check (monto_disponible >= 0),
   estado           text not null default 'pendiente' check (estado in ('pendiente','utilizada','anulada')),
   observaciones    text,
+  vendedor_id      bigint references public.vendedores(id),
   created_by       uuid not null references public.users(id),
   created_at       timestamptz default now(),
   updated_at       timestamptz default now()
@@ -331,20 +334,26 @@ create index movimientos_stock_articulo_idx on public.movimientos_stock (articul
 -- COBRANZAS
 -- ============================================================
 create table public.cobranzas (
-  id          bigint generated always as identity primary key,
-  cliente_id  bigint not null references public.clientes(id),
-  venta_id    bigint references public.ventas(id),
-  tipo        text not null check (tipo in ('CARGO','PAGO')),
-  monto       numeric(12,2) not null,
-  fecha       date not null default current_date,
-  metodo      text check (metodo in ('EFECTIVO','TRANSFERENCIA','TARJETA_DEBITO','TARJETA_CREDITO','CHEQUE','OTRO')),
-  descripcion text,
-  notas       text,
-  usuario_id  uuid not null references public.users(id),
-  created_at  timestamptz default now()
+  id                  bigint generated always as identity primary key,
+  cliente_id          bigint not null references public.clientes(id),
+  venta_id            bigint references public.ventas(id),
+  orden_id            bigint references public.ordenes_venta(id),          -- OV que originó el CARGO
+  optica_orden_id     bigint references public.optica_ordenes(id),         -- OT que originó el CARGO
+  optica_servicio_id  bigint references public.optica_servicios(id),       -- SV que originó el CARGO
+  tipo                text not null check (tipo in ('CARGO','PAGO')),
+  monto               numeric(12,2) not null,
+  fecha               date not null default current_date,
+  metodo              text check (metodo in ('EFECTIVO','TRANSFERENCIA','TARJETA_DEBITO','TARJETA_CREDITO','CHEQUE','OTRO')),
+  descripcion         text,
+  notas               text,
+  usuario_id          uuid not null references public.users(id),
+  created_at          timestamptz default now()
 );
-create index cobranzas_cliente_idx on public.cobranzas (cliente_id, fecha desc);
-create index cobranzas_venta_idx   on public.cobranzas (venta_id) where venta_id is not null;
+create index cobranzas_cliente_idx           on public.cobranzas (cliente_id, fecha desc);
+create index cobranzas_venta_idx             on public.cobranzas (venta_id) where venta_id is not null;
+create index cobranzas_orden_idx             on public.cobranzas (orden_id) where orden_id is not null;
+create index cobranzas_optica_orden_idx      on public.cobranzas (optica_orden_id) where optica_orden_id is not null;
+create index cobranzas_optica_servicio_idx   on public.cobranzas (optica_servicio_id) where optica_servicio_id is not null;
 
 -- ============================================================
 -- SUCURSALES
@@ -355,6 +364,8 @@ create table if not exists public.sucursales (
   direccion  text,
   telefono   text,
   activo     boolean not null default true,
+  logo_url   text,                        -- URL pública en Supabase Storage (bucket 'sucursales')
+  color      text,                        -- Color de marca en hex (#RRGGBB), usado en sidebar y UI
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
@@ -364,6 +375,18 @@ create table if not exists public.user_sucursales (
   user_id     uuid not null references public.users(id) on delete cascade,
   sucursal_id bigint not null references public.sucursales(id) on delete cascade,
   unique(user_id, sucursal_id)
+);
+
+-- ============================================================
+-- VENDEDORES
+-- ============================================================
+create table if not exists public.vendedores (
+  id          bigint generated always as identity primary key,
+  nombre      text not null,
+  sucursal_id bigint not null references public.sucursales(id),
+  activo      boolean not null default true,
+  created_at  timestamptz default now(),
+  updated_at  timestamptz default now()
 );
 
 -- ============================================================
@@ -396,7 +419,7 @@ create table if not exists public.ordenes_venta (
   fecha           date not null default current_date,
   vencimiento     date,
   cliente_id      bigint references public.clientes(id),
-  vendedor_id     uuid not null references public.users(id),
+  vendedor_id     bigint references public.vendedores(id),
   condicion_pago  text not null default 'contado' check (condicion_pago in ('contado','cuenta_corriente','otro')),
   subtotal        numeric(12,2) not null default 0,
   descuento_pct   numeric(5,2)  not null default 0,
@@ -452,6 +475,7 @@ create table if not exists public.remitos (
   fecha                    timestamptz not null default now(),
   estado                   text not null default 'borrador' check (estado in ('borrador','confirmado','anulado')),
   observaciones            text,
+  vendedor_id              bigint references public.vendedores(id),
   created_by               uuid not null references public.users(id),
   created_at               timestamptz default now(),
   updated_at               timestamptz default now()

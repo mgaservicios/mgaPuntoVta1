@@ -16,7 +16,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from('sucursales')
-    .select('id, nombre, direccion, activo, created_at')
+    .select('id, nombre, direccion, activo, logo_url, color, created_at')
     .order('nombre')
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -28,13 +28,13 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
   const supabase = await getTenantClient(session)
 
-  const { nombre, direccion } = await req.json()
+  const { nombre, direccion, logo_url, color } = await req.json()
   if (!nombre?.trim()) return NextResponse.json({ error: 'El nombre es obligatorio' }, { status: 400 })
 
   const { data, error } = await supabase
     .from('sucursales')
-    .insert({ nombre: nombre.trim(), direccion: direccion?.trim() || null })
-    .select('id, nombre, direccion, activo')
+    .insert({ nombre: nombre.trim(), direccion: direccion?.trim() || null, logo_url: logo_url || null, color: color || null })
+    .select('id, nombre, direccion, activo, logo_url, color')
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

@@ -198,8 +198,30 @@ export async function GET(req: NextRequest) {
     enriched = (data ?? []) as EnrichedRow[]
   }
 
-  const withStock = await enrichStock(enriched)
-  return NextResponse.json(await enrichPrecios(withStock))
+  // enrichStock y enrichPrecios son independientes — ambos leen de `enriched` sin depender el uno del otro
+  const [withStock, withPrecios] = await Promise.all([
+    enrichStock(enriched),
+    enrichPrecios(enriched),
+  ])
+
+  const preciosById = new Map(withPrecios.map((a) => [a.id, a as Record<string, unknown>]))
+
+  return NextResponse.json(
+    withStock.map((a) => {
+      const ap = preciosById.get(a.id) as undefined | (typeof a & {
+        precios_vigentes: unknown
+        articulo_variantes?: Array<{ id: number; precios_vigentes: unknown }>
+      })
+      return {
+        ...a,
+        precios_vigentes: ap?.precios_vigentes,
+        articulo_variantes: (a.articulo_variantes ?? []).map((v, vi) => ({
+          ...v,
+          precios_vigentes: ap?.articulo_variantes?.[vi]?.precios_vigentes,
+        })),
+      }
+    })
+  )
 }
 
 const ROLES_ESCRITURA = ['Administrador', 'Supervisor']

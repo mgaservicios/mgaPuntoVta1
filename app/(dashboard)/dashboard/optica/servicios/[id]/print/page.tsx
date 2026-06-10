@@ -103,10 +103,10 @@ export default function PrintServicioPage({ params }: { params: Promise<{ id: st
 
           {/* ══ ENCABEZADO ══ */}
           <div className="flex items-center gap-4 border-b-2 border-gray-800 pb-4 mb-5">
-            <div className="w-16 h-16 bg-gray-800 rounded-lg flex items-center justify-center overflow-hidden shrink-0">
+            <div className="w-16 h-16 bg-white rounded-lg border border-gray-200 flex items-center justify-center overflow-hidden shrink-0">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/logos/logo blanco.png"
+                src={servicio.sucursales?.logo_url || '/logos/logo blanco.png'}
                 alt="Logo"
                 className="w-14 h-14 object-contain"
                 onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
@@ -175,6 +175,9 @@ export default function PrintServicioPage({ params }: { params: Promise<{ id: st
             {servicio.clientes?.telefono && (
               <p className="text-xs text-gray-500 mt-0.5">{servicio.clientes.telefono}</p>
             )}
+            {servicio.vendedores?.nombre && (
+              <p className="text-xs text-gray-500 mt-1">Vendedor: <span className="font-medium text-gray-700">{servicio.vendedores.nombre}</span></p>
+            )}
           </div>
 
           {/* ══ DETALLE DEL TRABAJO ══ */}
@@ -241,6 +244,12 @@ export default function PrintServicioPage({ params }: { params: Promise<{ id: st
                 <div className="flex justify-between text-gray-500">
                   <span>Descuento{servicio.descuento_pct > 0 ? ` (${servicio.descuento_pct}%)` : ''}</span>
                   <span className="text-red-600">-{formatARS(servicio.descuento_monto)}</span>
+                </div>
+              )}
+              {(servicio as unknown as { recargo_monto?: number }).recargo_monto! > 0 && (
+                <div className="flex justify-between text-gray-500">
+                  <span>Recargo</span>
+                  <span className="text-amber-600">+{formatARS((servicio as unknown as { recargo_monto: number }).recargo_monto)}</span>
                 </div>
               )}
               <div className="flex justify-between font-bold text-sm border-t border-gray-200 pt-1.5">

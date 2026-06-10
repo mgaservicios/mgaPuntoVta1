@@ -3,11 +3,9 @@
 import { useEffect, useState, use } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { ArrowLeft, XCircle, Printer } from 'lucide-react'
+import { ArrowLeft, Printer } from 'lucide-react'
 import Link from 'next/link'
-import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import ConfirmDialog from '@/components/dashboard/ConfirmDialog'
 import type { Venta, MetodoPago } from '@/types/ventas'
 
 const METODO_LABELS: Record<MetodoPago, string> = {
@@ -33,29 +31,12 @@ export default function VentaDetailPage({ params }: { params: Promise<{ id: stri
   const router = useRouter()
   const [venta, setVenta] = useState<Venta | null>(null)
   const [loading, setLoading] = useState(true)
-  const [showAnular, setShowAnular] = useState(false)
-  const [anulando, setAnulando] = useState(false)
-
   useEffect(() => {
     fetch(`/api/dashboard/ventas/${id}`)
       .then(r => r.json())
       .then(data => { setVenta(data); setLoading(false) })
       .catch(() => setLoading(false))
   }, [id])
-
-  async function handleAnular() {
-    setAnulando(true)
-    const res = await fetch(`/api/dashboard/ventas/${id}/anular`, { method: 'POST' })
-    setAnulando(false)
-    setShowAnular(false)
-    if (res.ok) {
-      toast.success('Venta anulada')
-      setVenta(prev => prev ? { ...prev, estado: 'anulada' } : prev)
-    } else {
-      const err = await res.json()
-      toast.error(err.error ?? 'Error al anular')
-    }
-  }
 
   if (loading) return <div className="text-gray-400 text-sm">Cargando…</div>
   if (!venta) return <div className="text-red-500 text-sm">Venta no encontrada</div>
@@ -93,12 +74,6 @@ export default function VentaDetailPage({ params }: { params: Promise<{ id: stri
             <Printer className="w-4 h-4" />
             Imprimir ticket
           </Link>
-          {venta.estado === 'completada' && (
-            <Button variant="outline" className="text-red-500 hover:text-red-600" onClick={() => setShowAnular(true)}>
-              <XCircle className="w-4 h-4 mr-2" />
-              Anular
-            </Button>
-          )}
         </div>
       </div>
 
@@ -200,15 +175,6 @@ export default function VentaDetailPage({ params }: { params: Promise<{ id: stri
         </div>
       </div>
 
-      <ConfirmDialog
-        open={showAnular}
-        title="Anular venta"
-        description="Esta acción anulará la venta y revertirá los movimientos de stock. ¿Confirmás?"
-        confirmLabel="Anular"
-        loading={anulando}
-        onConfirm={handleAnular}
-        onCancel={() => setShowAnular(false)}
-      />
     </div>
   )
 }

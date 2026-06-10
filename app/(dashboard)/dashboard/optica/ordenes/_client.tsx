@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { Plus, Search, RefreshCw, CreditCard, Eye, Pencil, Trash2, Printer } from 'lucide-react'
+import { Plus, Search, RefreshCw, CreditCard, Eye, Pencil, Trash2, Printer, CheckCircle2, PackageCheck } from 'lucide-react'
 import { useSelectedSucursal } from '@/hooks/useSelectedSucursal'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -301,6 +301,7 @@ export default function OpticaOrdenesClient({ isAdmin }: { isAdmin: boolean }) {
   const [pagoMetodo, setPagoMetodo] = useState<MetodoPagoOptica>('EFECTIVO')
   const [pagoMonto, setPagoMonto] = useState('')
   const [savingPago, setSavingPago] = useState(false)
+  const [changingEstado, setChangingEstado] = useState<number | null>(null)
 
   const fetchOrdenes = useCallback(async () => {
     setLoading(true)
@@ -364,6 +365,29 @@ export default function OpticaOrdenesClient({ isAdmin }: { isAdmin: boolean }) {
     toast.success(`Orden ${deletingOrden.numero} eliminada`)
     setDeletingOrden(null)
     fetchOrdenes()
+  }
+
+  async function handleCambiarEstado(orden: OrdenRow, estado: 'terminado' | 'entregado') {
+    setChangingEstado(orden.id)
+    try {
+      const res = await fetch(`/api/dashboard/optica/ordenes/${orden.id}/cambiar-estado`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ estado }),
+      })
+      if (!res.ok) {
+        const d = await res.json()
+        toast.error(d.error ?? 'Error al cambiar estado')
+        return
+      }
+      const label = estado === 'terminado' ? 'Terminada' : 'Entregada'
+      toast.success(`OT ${orden.numero} marcada como ${label}`)
+      fetchOrdenes()
+    } catch {
+      toast.error('Error de red')
+    } finally {
+      setChangingEstado(null)
+    }
   }
 
   function abrirPago(orden: OrdenRow) {
@@ -519,6 +543,26 @@ export default function OpticaOrdenesClient({ isAdmin }: { isAdmin: boolean }) {
                           >
                             <Pencil className="w-4 h-4" />
                           </Link>
+                        )}
+                        {canWrite && ['pendiente', 'en_proceso', 'en_laboratorio'].includes(orden.estado) && (
+                          <button
+                            onClick={() => handleCambiarEstado(orden, 'terminado')}
+                            title="Marcar como terminada"
+                            disabled={changingEstado === orden.id}
+                            className="p-1.5 rounded-md text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 transition-colors disabled:opacity-40"
+                          >
+                            <CheckCircle2 className="w-4 h-4" />
+                          </button>
+                        )}
+                        {canWrite && orden.estado === 'terminado' && (
+                          <button
+                            onClick={() => handleCambiarEstado(orden, 'entregado')}
+                            title="Marcar como entregada"
+                            disabled={changingEstado === orden.id}
+                            className="p-1.5 rounded-md text-gray-500 hover:text-blue-600 hover:bg-blue-50 transition-colors disabled:opacity-40"
+                          >
+                            <PackageCheck className="w-4 h-4" />
+                          </button>
                         )}
                         {canWrite && saldo > 0.005 && !['anulado', 'entregado'].includes(orden.estado) && (
                           <button

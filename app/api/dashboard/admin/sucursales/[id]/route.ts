@@ -17,7 +17,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
   const { id } = await params
   const { data, error } = await supabase
     .from('sucursales')
-    .select('id, nombre, direccion, activo')
+    .select('id, nombre, direccion, activo, logo_url, color')
     .eq('id', id)
     .single()
 
@@ -31,14 +31,14 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   const supabase = await getTenantClient(session)
 
   const { id } = await params
-  const { nombre, direccion, activo } = await req.json()
+  const { nombre, direccion, activo, logo_url, color } = await req.json()
   if (!nombre?.trim()) return NextResponse.json({ error: 'El nombre es obligatorio' }, { status: 400 })
 
   const { data, error } = await supabase
     .from('sucursales')
-    .update({ nombre: nombre.trim(), direccion: direccion?.trim() || null, activo })
+    .update({ nombre: nombre.trim(), direccion: direccion?.trim() || null, activo, logo_url: logo_url ?? null, color: color ?? null })
     .eq('id', id)
-    .select('id, nombre, direccion, activo')
+    .select('id, nombre, direccion, activo, logo_url, color')
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

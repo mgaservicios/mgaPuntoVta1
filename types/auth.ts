@@ -37,6 +37,7 @@ declare module 'next-auth' {
       role_id: number
       empresa_id: string
       empresa_codigo: string
+      empresa_nombre: string
       modules: string[]
     }
   }
@@ -49,6 +50,7 @@ declare module 'next-auth' {
     role_id: number
     empresa_id: string
     empresa_codigo: string
+    empresa_nombre: string
     modules: string[]
   }
 }
@@ -60,6 +62,7 @@ declare module 'next-auth/jwt' {
     role_id: number
     empresa_id?: string
     empresa_codigo?: string
+    empresa_nombre?: string
     modules?: string[]
   }
 }

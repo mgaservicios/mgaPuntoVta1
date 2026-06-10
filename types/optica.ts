@@ -222,6 +222,8 @@ export interface OpticaServicio {
   created_at: string
   updated_at: string
   clientes?: { id?: number; nombre: string; telefono: string | null } | null
+  vendedores?: { nombre: string } | null
+  sucursales?: { nombre: string; logo_url: string | null } | null
   optica_servicio_tipos?: OpticaServicioTipo[]
   optica_servicio_tareas?: OpticaServicioTarea[]
   optica_servicio_pagos?: OpticaServicioPago[]
@@ -266,7 +268,9 @@ export interface OpticaOrden {
   created_at: string
   updated_at: string
   clientes?: { nombre: string; telefono: string | null } | null
+  vendedores?: { nombre: string } | null
   optica_medicos?: { nombre: string; matricula: string | null } | null
+  sucursales?: { nombre: string; logo_url: string | null } | null
   optica_orden_items?: OpticaOrdenItem[]
   optica_orden_tareas?: OpticaOrdenTarea[]
   optica_orden_pagos?: OpticaOrdenPago[]

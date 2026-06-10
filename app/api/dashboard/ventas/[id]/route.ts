@@ -17,7 +17,8 @@ export async function GET(_: NextRequest, { params }: Ctx) {
     .select(`
       *,
       clientes(nombre),
-      users(name, email),
+      vendedores(nombre),
+      sucursales(nombre, logo_url),
       venta_items(*),
       venta_pagos(*)
     `)

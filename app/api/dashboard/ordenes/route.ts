@@ -1,12 +1,15 @@
 ﻿import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { getTenantClient } from '@/services/supabase-tenant'
-import { getHomeSucursalId } from '@/lib/sucursal'
+import { getHomeSucursalId, assertActiveSucursalIsHome, getSucursalFilter } from '@/lib/sucursal'
 
 export async function GET(req: NextRequest) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
   const supabase = await getTenantClient(session)
+
+  const { sucursalId, verTodas } = await getSucursalFilter()
+  if (!sucursalId && !verTodas) return NextResponse.json({ error: 'sin_sucursal_activa' }, { status: 403 })
 
   const { searchParams } = new URL(req.url)
   const estado = searchParams.get('estado')
@@ -19,8 +22,9 @@ export async function GET(req: NextRequest) {
     .select('id, numero, fecha, vencimiento, estado, condicion_pago, total, cliente_id, clientes(nombre), orden_venta_pagos(monto)')
     .order('fecha', { ascending: false })
     .order('created_at', { ascending: false })
-    .limit(200)
+    .limit(verTodas ? 500 : 200)
 
+  if (!verTodas && sucursalId) query = query.eq('sucursal_id', sucursalId)
   if (estado && estado !== 'todos') query = query.eq('estado', estado)
   if (desde) query = query.gte('fecha', desde)
   if (hasta) query = query.lte('fecha', hasta)
@@ -39,6 +43,9 @@ export async function POST(req: NextRequest) {
   const sucursalId = await getHomeSucursalId()
   if (!sucursalId) return NextResponse.json({ error: 'sin_sucursal_activa' }, { status: 403 })
 
+  const guardCreate = await assertActiveSucursalIsHome()
+  if (guardCreate) return guardCreate
+
   const body = await req.json()
 
   const items: {
@@ -54,6 +61,7 @@ export async function POST(req: NextRequest) {
   if (items.length === 0) return NextResponse.json({ error: 'La orden no tiene ítems' }, { status: 400 })
 
   const descuento_pct = parseFloat(body.descuento_pct ?? '0') || 0
+  const recargo_monto = Math.max(0, parseFloat(body.recargo_monto ?? '0') || 0)
 
   const itemsConSubtotal = items.map(item => {
     const sub = Math.round(item.cantidad * item.precio_unitario * (1 - item.descuento_pct / 100) * 100) / 100
@@ -61,7 +69,7 @@ export async function POST(req: NextRequest) {
   })
   const subtotal = itemsConSubtotal.reduce((acc, i) => acc + i.subtotal, 0)
   const descuento_monto = Math.round(subtotal * (descuento_pct / 100) * 100) / 100
-  const total = Math.round((subtotal - descuento_monto) * 100) / 100
+  const total = Math.round((subtotal - descuento_monto + recargo_monto) * 100) / 100
 
   const { count } = await supabase.from('ordenes_venta').select('id', { count: 'exact', head: true })
   const numero = `OV-${String((count ?? 0) + 1).padStart(5, '0')}`
@@ -73,12 +81,13 @@ export async function POST(req: NextRequest) {
       fecha: body.fecha ?? new Date().toISOString().slice(0, 10),
       vencimiento: body.vencimiento || null,
       cliente_id: body.cliente_id ?? null,
-      vendedor_id: session.user.id,
+      vendedor_id: body.vendedor_id ?? null,
       sucursal_id: sucursalId,
       condicion_pago: body.condicion_pago ?? 'contado',
       subtotal,
       descuento_pct,
       descuento_monto,
+      recargo_monto,
       total,
       observaciones: body.observaciones || null,
       created_by: session.user.id,

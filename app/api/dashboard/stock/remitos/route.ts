@@ -1,7 +1,7 @@
 ﻿import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { getTenantClient } from '@/services/supabase-tenant'
-import { getSucursalFilter, getHomeSucursalId } from '@/lib/sucursal'
+import { getSucursalFilter, getHomeSucursalId, assertActiveSucursalIsHome } from '@/lib/sucursal'
 
 export async function GET(req: NextRequest) {
   const session = await auth()
@@ -67,10 +67,13 @@ export async function POST(req: NextRequest) {
   const sucursalId = await getHomeSucursalId()
   if (!sucursalId) return NextResponse.json({ error: 'sin_sucursal_activa' }, { status: 403 })
 
+  const guardCreate = await assertActiveSucursalIsHome()
+  if (guardCreate) return guardCreate
+
   const body = await req.json()
   const {
     tipo, contraparte_tipo, contraparte_sucursal_id, contraparte_proveedor_id,
-    contraparte_nombre, fecha, observaciones, items,
+    contraparte_nombre, fecha, observaciones, items, vendedor_id,
   } = body
 
   if (!tipo || !contraparte_tipo || !Array.isArray(items) || items.length === 0) {
@@ -93,6 +96,7 @@ export async function POST(req: NextRequest) {
       contraparte_nombre: contraparte_nombre?.trim() || null,
       fecha: fecha || new Date().toISOString(),
       observaciones: observaciones?.trim() || null,
+      vendedor_id: vendedor_id ?? null,
       estado: 'borrador',
       created_by: session.user.id,
     })

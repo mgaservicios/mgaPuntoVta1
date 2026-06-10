@@ -6,7 +6,7 @@ export const PERM_MODULES: PermMod[] = [
   {
     id: 'ventas', label: 'Ventas',
     subs: [
-      { id: 'ventas.pos', label: 'Punto de Venta', ops: [
+      { id: 'ventas.pos', label: 'Ticket de Venta', ops: [
         { id: 'ventas.pos.cobrar', label: 'Realizar venta' },
       ]},
       { id: 'ventas.historial', label: 'Historial de ventas', ops: [

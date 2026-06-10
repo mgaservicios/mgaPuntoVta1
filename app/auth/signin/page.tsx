@@ -184,6 +184,7 @@ export default function SignInPage() {
               <Select
                 value={selectedSucursalId ? String(selectedSucursalId) : undefined}
                 onValueChange={(v) => setSelectedSucursalId(v ? parseInt(v, 10) : null)}
+                items={Object.fromEntries(lookup.sucursales.map((s) => [String(s.id), s.nombre]))}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar sucursal" />

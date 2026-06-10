@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { getTenantClient } from '@/services/supabase-tenant'
-import { getHomeSucursalId } from '@/lib/sucursal'
+import { getHomeSucursalId, assertHomeSucursal } from '@/lib/sucursal'
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -16,28 +16,34 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   const monto = parseFloat(body.monto ?? '0')
   if (isNaN(monto) || monto <= 0) return NextResponse.json({ error: 'Monto inválido' }, { status: 400 })
 
-  const metodo = body.metodo
-  const METODOS = ['EFECTIVO', 'TRANSFERENCIA', 'TARJETA_DEBITO', 'TARJETA_CREDITO', 'CUENTA_CORRIENTE', 'CHEQUE', 'OTRO']
-  if (!METODOS.includes(metodo)) return NextResponse.json({ error: 'Método de pago inválido' }, { status: 400 })
+  const metodo: string = body.metodo?.trim()
+  if (!metodo) return NextResponse.json({ error: 'Método de pago requerido' }, { status: 400 })
 
   const concepto: string = body.concepto?.trim() || 'PAGO'
+  const today = new Date().toISOString().slice(0, 10)
 
-  const METODO_LABELS: Record<string, string> = {
-    EFECTIVO: 'Efectivo', TRANSFERENCIA: 'Transferencia',
-    TARJETA_DEBITO: 'Tarjeta débito', TARJETA_CREDITO: 'Tarjeta crédito',
-    CUENTA_CORRIENTE: 'Cuenta corriente', CHEQUE: 'Cheque', OTRO: 'Otro',
+  // Validar NC si corresponde
+  if (metodo === 'NOTA_CREDITO') {
+    const ncId = body.nota_credito_id
+    if (!ncId) return NextResponse.json({ error: 'Nota de crédito requerida' }, { status: 400 })
+    const { data: nc } = await supabase
+      .from('notas_credito').select('monto_disponible, estado').eq('id', ncId).single()
+    if (!nc || nc.estado === 'anulada') return NextResponse.json({ error: 'Nota de crédito no válida' }, { status: 400 })
+    if (Number(nc.monto_disponible) < monto - 0.001) return NextResponse.json({ error: `Saldo insuficiente en NC (disponible: ${nc.monto_disponible})` }, { status: 400 })
   }
 
-  // Obtener número de orden para concepto en caja
+  // Obtener datos de la orden
   const { data: orden } = await supabase
     .from('optica_ordenes')
-    .select('numero')
+    .select('numero, cliente_id, sucursal_id')
     .eq('id', id)
     .single()
 
   if (!orden) return NextResponse.json({ error: 'Orden no encontrada' }, { status: 404 })
 
-  // Buscar o crear sesión de caja activa en la sucursal
+  const guard = await assertHomeSucursal(orden.sucursal_id)
+  if (guard) return guard
+
   const sucursalId = await getHomeSucursalId()
   if (!sucursalId) return NextResponse.json({ error: 'sin_sucursal_activa' }, { status: 403 })
 
@@ -62,32 +68,46 @@ export async function POST(req: NextRequest, { params }: Ctx) {
 
   if (!cajaSesion) return NextResponse.json({ error: 'No hay sesión de caja activa' }, { status: 500 })
 
-  // Registrar pago
-  const { data: pago, error: pagoError } = await supabase
-    .from('optica_orden_pagos')
-    .insert({
-      orden_id: Number(id),
-      caja_sesion_id: cajaSesion.id,
-      metodo,
-      monto,
-      concepto,
-      referencia: body.referencia?.trim() || null,
-      fecha_pago: body.fecha_pago || new Date().toISOString().slice(0, 10),
-      usuario_id: session.user.id,
-    })
-    .select()
-    .single()
+  // Registrar pago + CARGO CC de forma atómica
+  const { data: pago, error: pagoError } = await supabase.rpc('registrar_pago_optica_orden', {
+    p_orden_id:       Number(id),
+    p_caja_sesion_id: cajaSesion.id,
+    p_metodo:         metodo,
+    p_monto:          monto,
+    p_concepto:       concepto,
+    p_referencia:     body.referencia?.trim() || '',
+    p_fecha_pago:     body.fecha_pago || today,
+    p_usuario_id:     session.user.id,
+    p_cliente_id:     orden.cliente_id ?? null,
+    p_sucursal_id:    orden.sucursal_id,
+    p_numero:         orden.numero,
+    p_forma_pago_id:  body.forma_pago_id ?? null,
+    p_cuotas:         body.cuotas ?? null,
+    p_recargo_monto:  body.recargo_monto ?? 0,
+  })
 
   if (pagoError) return NextResponse.json({ error: pagoError.message }, { status: 500 })
 
-  // Registrar en caja (solo métodos que no sean cuenta corriente)
-  if (metodo !== 'CUENTA_CORRIENTE') {
+  // Descontar saldo de NC si corresponde
+  if (metodo === 'NOTA_CREDITO' && body.nota_credito_id) {
+    const { data: nc } = await supabase
+      .from('notas_credito').select('monto_disponible').eq('id', body.nota_credito_id).single()
+    if (nc) {
+      const nuevo = Math.max(0, Number(nc.monto_disponible) - monto)
+      await supabase.from('notas_credito').update({
+        monto_disponible: nuevo,
+        estado: nuevo <= 0 ? 'utilizada' : 'pendiente',
+        updated_at: new Date().toISOString(),
+      }).eq('id', body.nota_credito_id)
+    }
+  }
+
+  // Movimiento de caja (no para CC ni NC)
+  if (metodo !== 'CUENTA_CORRIENTE' && metodo !== 'NOTA_CREDITO') {
     await supabase.from('caja_movimientos').insert({
       sesion_id: cajaSesion.id,
       tipo: 'ingreso',
-      concepto: concepto === 'PAGO'
-        ? `OT ${orden.numero} – ${METODO_LABELS[metodo] ?? metodo}`
-        : `OT ${orden.numero} – ${concepto} · ${METODO_LABELS[metodo] ?? metodo}`,
+      concepto: `OT ${orden.numero} – ${concepto !== 'PAGO' ? concepto + ' · ' : ''}${metodo}`,
       monto,
       usuario_id: session.user.id,
     })

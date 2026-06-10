@@ -119,10 +119,10 @@ export default function PrintOrdenPage({ params }: { params: Promise<{ id: strin
           {/* ══ ENCABEZADO ══ */}
           <div className="flex items-center gap-4 border-b-2 border-gray-800 pb-4 mb-5">
             {/* Logo */}
-            <div className="w-16 h-16 bg-gray-800 rounded-lg flex items-center justify-center overflow-hidden shrink-0">
+            <div className="w-16 h-16 bg-white rounded-lg border border-gray-200 flex items-center justify-center overflow-hidden shrink-0">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/logos/logo blanco.png"
+                src={orden.sucursales?.logo_url || '/logos/logo blanco.png'}
                 alt="Logo"
                 className="w-14 h-14 object-contain"
                 onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
@@ -183,6 +183,9 @@ export default function PrintOrdenPage({ params }: { params: Promise<{ id: strin
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Paciente</p>
               <p className="text-sm font-semibold">{orden.clientes?.nombre ?? '—'}</p>
               {orden.clientes?.telefono && <p className="text-xs text-gray-500 mt-0.5">{orden.clientes.telefono}</p>}
+              {orden.vendedores?.nombre && (
+                <p className="text-xs text-gray-500 mt-1">Vendedor: <span className="font-medium text-gray-700">{orden.vendedores.nombre}</span></p>
+              )}
             </div>
             <div className="border border-gray-200 rounded-lg p-3">
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Médico / Receta</p>
@@ -298,6 +301,12 @@ export default function PrintOrdenPage({ params }: { params: Promise<{ id: strin
                 <div className="flex justify-between text-gray-500">
                   <span>Descuento{orden.descuento_pct > 0 ? ` (${orden.descuento_pct}%)` : ''}</span>
                   <span className="text-red-600">-{formatARS(orden.descuento_monto)}</span>
+                </div>
+              )}
+              {(orden as unknown as { recargo_monto?: number }).recargo_monto! > 0 && (
+                <div className="flex justify-between text-gray-500">
+                  <span>Recargo</span>
+                  <span className="text-amber-600">+{formatARS((orden as unknown as { recargo_monto: number }).recargo_monto)}</span>
                 </div>
               )}
               <div className="flex justify-between font-bold text-sm border-t border-gray-200 pt-1.5">

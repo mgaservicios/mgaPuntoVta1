@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { getTenantClient } from '@/services/supabase-tenant'
-import { getHomeSucursalId } from '@/lib/sucursal'
+import { getHomeSucursalId, assertActiveSucursalIsHome } from '@/lib/sucursal'
 
 const ROLES_ESCRITURA = ['Administrador', 'Supervisor']
 const PROVEEDOR_STOCK_INICIAL = 2
@@ -14,6 +14,9 @@ export async function POST(req: NextRequest) {
   if (!ROLES_ESCRITURA.includes(session.user.role))
     return NextResponse.json({ error: 'Sin permiso' }, { status: 403 })
   const supabase = await getTenantClient(session)
+
+  const guardErr = await assertActiveSucursalIsHome()
+  if (guardErr) return guardErr
 
   const sucursalId = await getHomeSucursalId()
   if (!sucursalId) return NextResponse.json({ error: 'sin_sucursal_activa' }, { status: 403 })

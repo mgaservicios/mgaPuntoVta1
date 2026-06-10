@@ -37,7 +37,9 @@ CREATE TABLE IF NOT EXISTS optica_servicio_tipos (
                   'cambio_cristales_sol_neutros','otros'
                 )),
   detalle     text,
-  precio      numeric(12,2) DEFAULT 0
+  precio      numeric(12,2) DEFAULT 0,
+  estado      text NOT NULL DEFAULT 'pendiente'
+                CHECK (estado IN ('pendiente','en_proceso','terminado'))
 );
 
 -- Tareas realizadas

@@ -68,7 +68,7 @@ UNIQUE(role_id, module)
 ---
 
 ### `public.sucursales`
-Locales/sucursales del negocio.
+Locales/sucursales del negocio. Soporta personalización visual (logo y color de marca).
 
 | Columna | Tipo | Notas |
 |---------|------|-------|
@@ -77,7 +77,12 @@ Locales/sucursales del negocio.
 | direccion | text | |
 | telefono | text | |
 | activo | boolean | default true |
+| logo_url | text | URL pública en Supabase Storage (bucket `sucursales`) |
+| color | text | Color hex `#RRGGBB` — usado como fondo del sidebar y variable CSS `--primary` |
 | created_at / updated_at | timestamptz | |
+
+Migración: `supabase/migrations/20260609_sucursales_logo_color.sql`
+Ver detalles del sistema de theming en [context/modulos/ui-theming.md](modulos/ui-theming.md).
 
 ---
 
@@ -388,15 +393,30 @@ Cargos y pagos de cuenta corriente de clientes.
 | id | bigserial PK | |
 | cliente_id | bigint NOT NULL | FK → clientes(id) |
 | venta_id | bigint | FK → ventas(id) — nullable |
+| orden_id | bigint | FK → ordenes_venta(id) — nullable; OV que generó el CARGO |
+| optica_orden_id | bigint | FK → optica_ordenes(id) — nullable; OT que generó el CARGO |
+| optica_servicio_id | bigint | FK → optica_servicios(id) — nullable; SV que generó el CARGO |
 | tipo | text | CHECK: 'CARGO','PAGO' |
 | monto | numeric(12,2) NOT NULL | |
 | fecha | date NOT NULL | |
-| metodo | text | CHECK: 'EFECTIVO','TRANSFERENCIA','TARJETA_DEBITO','TARJETA_CREDITO','CHEQUE','OTRO' |
+| metodo | text | CHECK: 'EFECTIVO','TRANSFERENCIA','TARJETA_DEBITO','TARJETA_CREDITO','CHEQUE','OTRO' — se usa en PAGOs |
 | descripcion / notas | text | |
 | usuario_id | uuid NOT NULL | FK → users(id) |
 | created_at | timestamptz | |
 
 Saldo del cliente = suma de CARGOs − suma de PAGOs (función `saldo_cliente()`).
+
+**Flujo de CARGOs:** cuando se registra un pago con CUENTA_CORRIENTE en cualquier módulo,
+se crea automáticamente un CARGO en esta tabla con la FK al documento origen:
+- POS: `venta_id`
+- Órdenes de venta (confirmación o pago adicional): `orden_id`
+- Óptica OT: `optica_orden_id`
+- Óptica SV: `optica_servicio_id`
+
+**Anulaciones:** al anular una OT o SV que tenía pagos CC, se crea un PAGO reversal con la
+misma FK para cancelar la deuda.
+
+Migración: `supabase/migrations/20260609_cobranzas_refs.sql`
 
 ---
 
@@ -619,6 +639,9 @@ Tipos de reparación por servicio (uno o varios por servicio).
 | tipo | text NOT NULL | CHECK: `garantia`, `soldadura`, `patillas`, `plaquetas`, `terminales`, `tanza`, `cristales`, `embutir_bisgra`, `pase_armazon`, `cambio_cristales_sol_neutros`, `otros` |
 | detalle | text | Descripción específica del tipo |
 | precio | numeric(12,2) | Precio individual — suma al subtotal del servicio |
+| estado | text NOT NULL | CHECK: `'pendiente'`, `'en_proceso'`, `'terminado'` — default `'pendiente'` |
+
+Migración: `supabase/migrations/20260609_servicio_tipos_estado.sql`
 
 ---
 
@@ -714,4 +737,4 @@ CREATE UNIQUE INDEX articulo_stock_variante_idx ON articulo_stock (articulo_id, 
 
 ---
 
-*Última actualización: 2026-06-04*
+*Última actualización: 2026-06-09*

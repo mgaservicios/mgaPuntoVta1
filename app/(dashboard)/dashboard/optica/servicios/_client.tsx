@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { Plus, Search, RefreshCw, CreditCard, Eye, Pencil, Trash2, Printer } from 'lucide-react'
+import { Plus, Search, RefreshCw, CreditCard, Eye, Pencil, Trash2, Printer, CheckCircle2, PackageCheck } from 'lucide-react'
 import { useSelectedSucursal } from '@/hooks/useSelectedSucursal'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -29,7 +29,7 @@ interface ServicioRow {
   total: number
   clientes: { nombre: string } | null
   optica_servicio_pagos: { monto: number }[]
-  optica_servicio_tipos: { tipo: string; estado: string }[]
+  optica_servicio_tipos: { tipo: string; estado?: string }[]
 }
 
 function formatARS(n: number) {
@@ -197,6 +197,7 @@ export default function OpticaServiciosClient({ isAdmin }: { isAdmin: boolean })
   const [pagoMetodo, setPagoMetodo]       = useState<MetodoPagoOptica>('EFECTIVO')
   const [pagoMonto, setPagoMonto]         = useState('')
   const [savingPago, setSavingPago]       = useState(false)
+  const [changingEstado, setChangingEstado] = useState<number | null>(null)
 
   const fetchServicios = useCallback(async () => {
     setLoading(true)
@@ -262,6 +263,29 @@ export default function OpticaServiciosClient({ isAdmin }: { isAdmin: boolean })
     toast.success(`Servicio ${deletingServicio.numero} eliminado`)
     setDeletingServicio(null)
     fetchServicios()
+  }
+
+  async function handleCambiarEstado(s: ServicioRow, estado: 'terminado' | 'entregado') {
+    setChangingEstado(s.id)
+    try {
+      const res = await fetch(`/api/dashboard/optica/servicios/${s.id}/cambiar-estado`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ estado }),
+      })
+      if (!res.ok) {
+        const d = await res.json()
+        toast.error(d.error ?? `Error al cambiar estado`)
+        return
+      }
+      const label = estado === 'terminado' ? 'Terminado' : 'Entregado'
+      toast.success(`${s.numero} marcado como ${label}`)
+      fetchServicios()
+    } catch {
+      toast.error('Error de red')
+    } finally {
+      setChangingEstado(null)
+    }
   }
 
   function abrirPago(s: ServicioRow) {
@@ -408,6 +432,26 @@ export default function OpticaServiciosClient({ isAdmin }: { isAdmin: boolean })
                           >
                             <Pencil className="w-4 h-4" />
                           </Link>
+                        )}
+                        {canWrite && ['pendiente', 'en_proceso'].includes(s.estado) && (
+                          <button
+                            onClick={() => handleCambiarEstado(s, 'terminado')}
+                            title="Marcar como terminado"
+                            disabled={changingEstado === s.id}
+                            className="p-1.5 rounded-md text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 transition-colors disabled:opacity-40"
+                          >
+                            <CheckCircle2 className="w-4 h-4" />
+                          </button>
+                        )}
+                        {canWrite && s.estado === 'terminado' && (
+                          <button
+                            onClick={() => handleCambiarEstado(s, 'entregado')}
+                            title="Marcar como entregado"
+                            disabled={changingEstado === s.id}
+                            className="p-1.5 rounded-md text-gray-500 hover:text-blue-600 hover:bg-blue-50 transition-colors disabled:opacity-40"
+                          >
+                            <PackageCheck className="w-4 h-4" />
+                          </button>
                         )}
                         {canWrite && saldo > 0.005 && !['anulado', 'entregado'].includes(s.estado) && (
                           <button

@@ -48,29 +48,29 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         })
         if (error || !authData.user) return null
 
-        // 3. Perfil de usuario del tenant
+        // 3+5. Perfil del tenant y módulos de la empresa en paralelo
         const tenantAdmin = await getTenantAdminClient(empresa.id as string)
-        const { data: profile } = await tenantAdmin
-          .from('users')
-          .select('id, email, name, role_id')
-          .eq('id', authData.user.id)
-          .single()
+        const [{ data: profile }, { data: modulesData }] = await Promise.all([
+          tenantAdmin
+            .from('users')
+            .select('id, email, name, role_id')
+            .eq('id', authData.user.id)
+            .single(),
+          supabaseMaster
+            .from('empresa_modulos')
+            .select('modulo')
+            .eq('empresa_id', empresa.id)
+            .eq('activo', true),
+        ])
 
         if (!profile) return null
 
-        // 4. Nombre del rol
+        // 4. Nombre del rol (requiere profile.role_id del paso anterior)
         const { data: roleData } = await tenantAdmin
           .from('roles')
           .select('name')
           .eq('id', profile.role_id)
           .single()
-
-        // 5. Módulos activos para esta empresa
-        const { data: modulesData } = await supabaseMaster
-          .from('empresa_modulos')
-          .select('modulo')
-          .eq('empresa_id', empresa.id)
-          .eq('activo', true)
 
         const modules = (modulesData ?? []).map((m: { modulo: string }) => m.modulo)
 
@@ -82,6 +82,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           role_id: profile.role_id as number,
           empresa_id: empresa.id as string,
           empresa_codigo: empresa.codigo as string,
+          empresa_nombre: empresa.nombre as string,
           modules,
         }
       },
@@ -90,6 +91,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
   session: { strategy: 'jwt' },
   pages: { signIn: '/auth/signin' },
+  cookies: {
+    sessionToken: {
+      name: 'next-auth.session-token',
+      options: {
+        httpOnly: true,
+        sameSite: 'lax' as const,
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+        // sin maxAge → cookie de sesión que expira al cerrar el navegador
+      },
+    },
+  },
 
   callbacks: {
     jwt({ token, user }) {
@@ -99,6 +112,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.role_id = user.role_id
         token.empresa_id = user.empresa_id
         token.empresa_codigo = user.empresa_codigo
+        token.empresa_nombre = user.empresa_nombre
         token.modules = user.modules
       }
       return token
@@ -109,6 +123,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       session.user.role_id = token.role_id as number
       session.user.empresa_id = (token.empresa_id ?? '') as string
       session.user.empresa_codigo = (token.empresa_codigo ?? '') as string
+      session.user.empresa_nombre = (token.empresa_nombre ?? '') as string
       session.user.modules = (token.modules ?? []) as string[]
       return session
     },

@@ -56,13 +56,13 @@ function Barcode({ value, width = 2, height = 48 }: { value: string; width?: num
 
 // ── Logo ──────────────────────────────────────────────────────────────────────
 
-function Logo({ size = 16 }: { size?: number }) {
+function Logo({ size = 16, url }: { size?: number; url?: string | null }) {
   const cls = `w-${size} h-${size}`
   return (
-    <div className={`${cls} bg-gray-800 rounded-lg flex items-center justify-center overflow-hidden shrink-0`}>
+    <div className={`${cls} bg-white rounded-lg border border-gray-200 flex items-center justify-center overflow-hidden shrink-0`}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="/logos/logo blanco.png"
+        src={url || '/logos/logo blanco.png'}
         alt="Logo"
         className="w-[85%] h-[85%] object-contain"
         onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
@@ -83,7 +83,7 @@ function LeyendaFiscal({ className = '' }: { className?: string }) {
 
 // ── Layout A4 ─────────────────────────────────────────────────────────────────
 
-function LayoutA4({ venta }: { venta: Venta }) {
+function LayoutA4({ venta, logoUrl }: { venta: Venta; logoUrl?: string | null }) {
   const items = venta.venta_items ?? []
   const pagos = venta.venta_pagos ?? []
   const totalPagado = pagos.reduce((a, p) => a + p.monto, 0)
@@ -95,7 +95,7 @@ function LayoutA4({ venta }: { venta: Venta }) {
 
       {/* ══ ENCABEZADO ══ */}
       <div className="flex items-center gap-4 border-b-2 border-gray-800 pb-4 mb-5">
-        <Logo size={16} />
+        <Logo size={16} url={logoUrl} />
 
         <div className="shrink-0">
           <Barcode value={venta.numero} width={1.8} height={44} />
@@ -121,9 +121,9 @@ function LayoutA4({ venta }: { venta: Venta }) {
       </div>
 
       {/* ══ INFO VENDEDOR ══ */}
-      {venta.users && (
+      {venta.vendedores?.nombre && (
         <div className="mb-5 text-xs text-gray-500">
-          Atendido por: <span className="font-medium text-gray-700">{venta.users.name || venta.users.email}</span>
+          Atendido por: <span className="font-medium text-gray-700">{venta.vendedores.nombre}</span>
         </div>
       )}
 
@@ -202,6 +202,12 @@ function LayoutA4({ venta }: { venta: Venta }) {
                 <span className="text-red-600">-{formatARS(venta.descuento_monto)}</span>
               </div>
             )}
+            {(venta as unknown as { recargo_monto?: number }).recargo_monto! > 0 && (
+              <div className="flex justify-between text-gray-500">
+                <span>Recargo</span>
+                <span className="text-amber-600">+{formatARS((venta as unknown as { recargo_monto: number }).recargo_monto)}</span>
+              </div>
+            )}
             <div className="flex justify-between font-bold text-sm border-t border-gray-200 pt-1.5">
               <span>TOTAL</span>
               <span>{formatARS(venta.total)}</span>
@@ -228,7 +234,7 @@ function LayoutA4({ venta }: { venta: Venta }) {
 
 // ── Layout Ticket 80mm ────────────────────────────────────────────────────────
 
-function LayoutTicket({ venta }: { venta: Venta }) {
+function LayoutTicket({ venta, logoUrl }: { venta: Venta; logoUrl?: string | null }) {
   const items = venta.venta_items ?? []
   const pagos = venta.venta_pagos ?? []
   const totalPagado = pagos.reduce((a, p) => a + p.monto, 0)
@@ -240,7 +246,7 @@ function LayoutTicket({ venta }: { venta: Venta }) {
 
       {/* ══ ENCABEZADO ══ */}
       <div className="flex flex-col items-center gap-2 border-b-2 border-gray-800 pb-3 mb-3">
-        <Logo size={14} />
+        <Logo size={14} url={logoUrl} />
         <LeyendaFiscal />
         <Barcode value={venta.numero} width={1.6} height={38} />
         <div className="text-center">
@@ -250,9 +256,17 @@ function LayoutTicket({ venta }: { venta: Venta }) {
       </div>
 
       {/* ══ CLIENTE ══ */}
-      <div className="mb-3">
-        <span className="text-gray-500">Cliente: </span>
-        <span className="font-medium">{venta.clientes?.nombre ?? 'Consumidor final'}</span>
+      <div className="mb-3 space-y-1">
+        <div>
+          <span className="text-gray-500">Cliente: </span>
+          <span className="font-medium">{venta.clientes?.nombre ?? 'Consumidor final'}</span>
+        </div>
+        {venta.vendedores?.nombre && (
+          <div>
+            <span className="text-gray-500">Vendedor: </span>
+            <span className="font-medium">{venta.vendedores.nombre}</span>
+          </div>
+        )}
       </div>
 
       {/* ══ ARTÍCULOS ══ */}
@@ -293,6 +307,12 @@ function LayoutTicket({ venta }: { venta: Venta }) {
           <div className="flex justify-between">
             <span className="text-gray-500">Descuento ({venta.descuento_pct}%)</span>
             <span className="text-red-600">−{formatARS(venta.descuento_monto)}</span>
+          </div>
+        )}
+        {(venta as unknown as { recargo_monto?: number }).recargo_monto! > 0 && (
+          <div className="flex justify-between">
+            <span className="text-gray-500">Recargo</span>
+            <span className="text-amber-600">+{formatARS((venta as unknown as { recargo_monto: number }).recargo_monto)}</span>
           </div>
         )}
         <div className="flex justify-between font-bold text-sm border-t border-gray-300 pt-1 mt-1">
@@ -413,7 +433,9 @@ export default function PrintVentaPage({ params }: { params: Promise<{ id: strin
 
       {/* Documento */}
       <div className="print:pt-0 pt-16 bg-white min-h-screen">
-        {formato === 'a4' ? <LayoutA4 venta={venta} /> : <LayoutTicket venta={venta} />}
+        {formato === 'a4'
+          ? <LayoutA4 venta={venta} logoUrl={venta.sucursales?.logo_url} />
+          : <LayoutTicket venta={venta} logoUrl={venta.sucursales?.logo_url} />}
       </div>
 
       <style>{`

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { getTenantClient } from '@/services/supabase-tenant'
-import { getHomeSucursalId, getSucursalFilter } from '@/lib/sucursal'
+import { getHomeSucursalId, getSucursalFilter, assertActiveSucursalIsHome } from '@/lib/sucursal'
 
 function derivarEstado(tipos: { estado: string }[]): string {
   if (!tipos.length) return 'pendiente'
@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
       id, numero, fecha, fecha_prometida, estado, total,
       cliente_id, clientes(nombre),
       optica_servicio_pagos(monto),
-      optica_servicio_tipos(tipo, estado)
+      optica_servicio_tipos(tipo)
     `)
     .order('fecha', { ascending: false })
     .order('created_at', { ascending: false })
@@ -66,6 +66,9 @@ export async function POST(req: NextRequest) {
   const sucursalId = await getHomeSucursalId()
   if (!sucursalId) return NextResponse.json({ error: 'sin_sucursal_activa' }, { status: 403 })
 
+  const guardCreate = await assertActiveSucursalIsHome()
+  if (guardCreate) return guardCreate
+
   const body = await req.json()
 
   const tipos: { tipo: string; detalle: string | null; precio: number; estado?: string }[] = body.tipos ?? []
@@ -74,6 +77,7 @@ export async function POST(req: NextRequest) {
   const costo_trabajo  = Math.max(0, parseFloat(body.costo_trabajo ?? '0') || 0)
   const anticipo       = Math.max(0, parseFloat(body.anticipo ?? '0') || 0)
   const descuento_pct  = parseFloat(body.descuento_pct ?? '0') || 0
+  const recargo_monto  = Math.max(0, parseFloat(body.recargo_monto ?? '0') || 0)
 
   const subtotal_tipos = tipos.reduce((acc, t) => acc + Math.max(0, t.precio || 0), 0)
   const subtotal       = Math.round((subtotal_tipos + costo_trabajo) * 100) / 100
@@ -81,7 +85,7 @@ export async function POST(req: NextRequest) {
     Math.max(0, parseFloat(body.descuento_monto ?? '0') || 0),
     subtotal,
   )
-  const total = Math.round((subtotal - descuento_monto) * 100) / 100
+  const total = Math.round((subtotal - descuento_monto + recargo_monto) * 100) / 100
 
   // Generar número correlativo
   const { count } = await supabase
@@ -103,11 +107,13 @@ export async function POST(req: NextRequest) {
       subtotal,
       descuento_pct,
       descuento_monto,
+      recargo_monto,
       total,
       estado: tipos.length > 0
         ? derivarEstado(tipos.map(t => ({ estado: t.estado ?? 'pendiente' })))
         : (ESTADOS_TRABAJO.includes(body.estado) ? body.estado : 'pendiente'),
       sucursal_id: sucursalId,
+      vendedor_id: body.vendedor_id ?? null,
       created_by:  session.user.id,
     })
     .select()
@@ -123,7 +129,7 @@ export async function POST(req: NextRequest) {
         tipo:    t.tipo,
         detalle: t.detalle?.trim() || null,
         precio:  Math.max(0, t.precio || 0),
-        estado:  ['pendiente','en_proceso','terminado'].includes(t.estado ?? '') ? t.estado : 'pendiente',
+        estado:  ESTADOS_TRABAJO.includes(t.estado ?? '') ? t.estado : 'pendiente',
       })))
 
     if (tiposError) {
@@ -134,8 +140,7 @@ export async function POST(req: NextRequest) {
 
   // Crear pago de seña si se indicó anticipo con método
   const anticipo_metodo: string | undefined = body.anticipo_metodo
-  const METODOS_VALIDOS = ['EFECTIVO', 'TRANSFERENCIA', 'TARJETA_DEBITO', 'TARJETA_CREDITO', 'CUENTA_CORRIENTE', 'CHEQUE', 'OTRO']
-  if (anticipo > 0 && anticipo_metodo && METODOS_VALIDOS.includes(anticipo_metodo)) {
+  if (anticipo > 0 && anticipo_metodo?.trim()) {
     let cajaSesionId: number | null = null
     const { data: caja } = await supabase
       .from('caja_sesiones')
@@ -147,17 +152,31 @@ export async function POST(req: NextRequest) {
       .single()
     cajaSesionId = caja?.id ?? null
 
+    const fechaPago = body.anticipo_fecha || new Date().toISOString().slice(0, 10)
     const { error: anticipoError } = await supabase.from('optica_servicio_pagos').insert({
       servicio_id:    servicio.id,
       caja_sesion_id: cajaSesionId,
       metodo:         anticipo_metodo,
       monto:          anticipo,
       concepto:       'SEÑA',
-      fecha_pago:     new Date().toISOString().slice(0, 10),
+      referencia:     body.anticipo_referencia?.trim() || null,
+      fecha_pago:     fechaPago,
+      forma_pago_id:  body.anticipo_forma_id ?? null,
       usuario_id:     session.user.id,
     })
     if (anticipoError) return NextResponse.json({ error: `Servicio creado pero falló el anticipo: ${anticipoError.message}` }, { status: 500 })
-    if (cajaSesionId) {
+    if (anticipo_metodo === 'CUENTA_CORRIENTE' && servicio.cliente_id) {
+      await supabase.from('cobranzas').insert({
+        cliente_id:  servicio.cliente_id,
+        tipo:        'CARGO',
+        monto:       anticipo,
+        fecha:       fechaPago,
+        descripcion: `${numero} – SEÑA`,
+        sucursal_id: sucursalId,
+        usuario_id:  session.user.id,
+      })
+    }
+    if (cajaSesionId && anticipo_metodo !== 'CUENTA_CORRIENTE' && anticipo_metodo !== 'NOTA_CREDITO') {
       await supabase.from('caja_movimientos').insert({
         sesion_id:  cajaSesionId,
         tipo:       'ingreso',

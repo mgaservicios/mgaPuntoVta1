@@ -106,12 +106,32 @@ function parseDate(s: string): string {
 // ─── Column mappers ───────────────────────────────────────────────────────────
 
 function mapArticulos(raw: Record<string, string>[]) {
-  return raw.map(r => ({
-    codigo:      col(r, 'codigo', 'cod', 'codart'),
-    nombre:      col(r, 'descripcion', 'nombre', 'desc'),
-    codigoRubro: col(r, 'codigorrubro', 'codigorubro', 'rubro', 'categoria', 'cat', 'codrubro'),
-    codigoBarra: col(r, 'codigobarra', 'codbarra', 'barcode', 'ean', 'barra'),
-  })).filter(r => r.codigo && r.nombre)
+  return raw.map(r => {
+    const nombre = col(r, 'descripcion', 'nombre', 'desc')
+    return {
+      codigo:      col(r, 'codigo', 'cod', 'codart'),
+      nombre,
+      marca:       nombre.trim().split(/\s+/)[0]?.toUpperCase() ?? '',
+      codigoRubro: col(r, 'codigorrubro', 'codigorubro', 'rubro', 'categoria', 'cat', 'codrubro'),
+      codigoBarra: col(r, 'codigobarra', 'codbarra', 'barcode', 'ean', 'barra'),
+    }
+  }).filter(r => r.codigo && r.nombre)
+}
+
+function diagnoseArticulos(raw: Record<string, string>[]): string | null {
+  let sinCodigo = 0, sinNombre = 0, ambos = 0
+  for (const r of raw) {
+    const codigo = col(r, 'codigo', 'cod', 'codart')
+    const nombre = col(r, 'descripcion', 'nombre', 'desc')
+    if (!codigo && !nombre) { ambos++; continue }
+    if (!codigo) sinCodigo++
+    if (!nombre) sinNombre++
+  }
+  const partes: string[] = []
+  if (sinCodigo > 0) partes.push(`${sinCodigo} sin código`)
+  if (sinNombre > 0) partes.push(`${sinNombre} sin descripción`)
+  if (ambos > 0) partes.push(`${ambos} sin código ni descripción`)
+  return partes.length > 0 ? `Descartadas: ${partes.join(' · ')}` : null
 }
 
 function mapPrecios(raw: Record<string, string>[]) {
@@ -143,6 +163,7 @@ function ImportTab<T>({
   mapper,
   previewColumns,
   extraSummary,
+  diagnoseDiscards,
 }: {
   title: string
   description: string
@@ -150,9 +171,11 @@ function ImportTab<T>({
   mapper: (raw: Record<string, string>[]) => T[]
   previewColumns: { label: string; key: keyof T }[]
   extraSummary?: (r: ImportResult) => string
+  diagnoseDiscards?: (raw: Record<string, string>[]) => string | null
 }) {
   const [rows, setRows] = useState<T[]>([])
   const [rawCount, setRawCount] = useState(0)
+  const [rawRows, setRawRows] = useState<Record<string, string>[]>([])
   const [detectedHeaders, setDetectedHeaders] = useState<string[]>([])
   const [detectedSep, setDetectedSep] = useState('')
   const [parseError, setParseError] = useState('')
@@ -170,6 +193,7 @@ function ImportTab<T>({
       setDetectedHeaders(headers)
       setDetectedSep(sep)
       setRawCount(raw.length)
+      setRawRows(raw)
       setRows(mapped)
       setStatus('idle')
       setResult(null)
@@ -266,10 +290,13 @@ function ImportTab<T>({
               <FileText className="w-4 h-4" />
               {rows.length.toLocaleString()} filas válidas
               {rawCount > rows.length && (
-                <span className="text-xs text-amber-600 font-normal">({rawCount - rows.length} descartadas)</span>
+                <span className="text-xs text-amber-600 font-normal">
+                  ({rawCount - rows.length} descartadas
+                  {diagnoseDiscards ? ` — ${diagnoseDiscards(rawRows)}` : ''})
+                </span>
               )}
             </span>
-            <Button variant="outline" size="sm" onClick={() => { setRows([]); setRawCount(0); setDetectedHeaders([]); setDetectedSep(''); setParseError(''); setResult(null); setStatus('idle') }}>
+            <Button variant="outline" size="sm" onClick={() => { setRows([]); setRawCount(0); setRawRows([]); setDetectedHeaders([]); setDetectedSep(''); setParseError(''); setResult(null); setStatus('idle') }}>
               Limpiar
             </Button>
           </div>
@@ -380,9 +407,11 @@ export default function ImportarOpticaPage() {
             description="Columnas esperadas: Codigo · Descripcion · CodigoRubro (ANS/ARM/LCQ) · codigoBarra. Se crea/actualiza por Codigo."
             endpoint="/api/dashboard/importar-optica/articulos"
             mapper={mapArticulos}
+            diagnoseDiscards={diagnoseArticulos}
             previewColumns={[
               { label: 'Código', key: 'codigo' as const },
               { label: 'Nombre', key: 'nombre' as const },
+              { label: 'Marca', key: 'marca' as const },
               { label: 'Rubro', key: 'codigoRubro' as const },
               { label: 'Cód. Barra', key: 'codigoBarra' as const },
             ]}

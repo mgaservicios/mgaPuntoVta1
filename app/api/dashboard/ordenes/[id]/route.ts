@@ -14,7 +14,7 @@ export async function GET(_: NextRequest, { params }: Ctx) {
 
   const { data, error } = await supabase
     .from('ordenes_venta')
-    .select('*, clientes(nombre, telefono), orden_venta_items(*), orden_venta_pagos(*)')
+    .select('*, clientes(nombre, telefono), vendedores(nombre), sucursales(nombre, logo_url), orden_venta_items(*), orden_venta_pagos(*)')
     .eq('id', id)
     .single()
 
@@ -56,13 +56,14 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
   if (items.length === 0) return NextResponse.json({ error: 'La orden no tiene ítems' }, { status: 400 })
 
   const descuento_pct = parseFloat(body.descuento_pct ?? '0') || 0
+  const recargo_monto = Math.max(0, parseFloat(body.recargo_monto ?? '0') || 0)
   const itemsConSubtotal = items.map(item => {
     const sub = Math.round(item.cantidad * item.precio_unitario * (1 - item.descuento_pct / 100) * 100) / 100
     return { ...item, subtotal: sub }
   })
   const subtotal = itemsConSubtotal.reduce((acc, i) => acc + i.subtotal, 0)
   const descuento_monto = Math.round(subtotal * (descuento_pct / 100) * 100) / 100
-  const total = Math.round((subtotal - descuento_monto) * 100) / 100
+  const total = Math.round((subtotal - descuento_monto + recargo_monto) * 100) / 100
 
   const { error: updateError } = await supabase
     .from('ordenes_venta')
@@ -74,6 +75,7 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
       subtotal,
       descuento_pct,
       descuento_monto,
+      recargo_monto,
       total,
       observaciones: body.observaciones || null,
       updated_at: new Date().toISOString(),

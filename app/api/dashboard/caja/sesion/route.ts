@@ -1,7 +1,7 @@
 ﻿import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { getTenantClient } from '@/services/supabase-tenant'
-import { getSucursalFilter, getHomeSucursalId } from '@/lib/sucursal'
+import { getSucursalFilter, getHomeSucursalId, assertActiveSucursalIsHome } from '@/lib/sucursal'
 
 // GET — sesión abierta de la sucursal que se está viendo + flag isHome
 // Cuando verTodas=true siempre muestra la home (única que puede operar el usuario)
@@ -49,6 +49,9 @@ export async function POST(req: NextRequest) {
   const sucursalId = await getHomeSucursalId()
   if (!sucursalId) return NextResponse.json({ error: 'sin_sucursal_activa' }, { status: 403 })
 
+  const guardCreate = await assertActiveSucursalIsHome()
+  if (guardCreate) return guardCreate
+
   const body = await req.json()
   const monto_apertura = parseFloat(body.monto_apertura ?? '0')
   if (isNaN(monto_apertura) || monto_apertura < 0)
@@ -66,10 +69,22 @@ export async function POST(req: NextRequest) {
 
   const { data, error } = await supabase
     .from('caja_sesiones')
-    .insert({ usuario_id: session.user.id, monto_apertura, sucursal_id: sucursalId })
+    .insert({ usuario_id: session.user.id, monto_apertura, sucursal_id: sucursalId, vendedor_id: body.vendedor_id })
     .select()
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  if (monto_apertura > 0) {
+    await supabase.from('caja_movimientos').insert({
+      sesion_id: data.id,
+      tipo: 'ingreso',
+      tipo_concepto: 'Apertura',
+      concepto: 'Apertura de caja',
+      monto: monto_apertura,
+      usuario_id: session.user.id,
+    })
+  }
+
   return NextResponse.json(data, { status: 201 })
 }

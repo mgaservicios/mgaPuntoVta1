@@ -63,7 +63,8 @@ export interface OrdenVenta {
   created_at: string
   updated_at: string
   clientes?: { nombre: string; telefono: string | null } | null
-  users?: { name: string | null; email: string } | null
+  vendedores?: { nombre: string } | null
+  sucursales?: { nombre: string; logo_url: string | null } | null
   orden_venta_items?: OrdenVentaItem[]
   orden_venta_pagos?: OrdenVentaPago[]
 }

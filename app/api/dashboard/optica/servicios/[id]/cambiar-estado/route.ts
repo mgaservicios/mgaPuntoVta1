@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { getTenantClient } from '@/services/supabase-tenant'
-import { getHomeSucursalId } from '@/lib/sucursal'
+import { getHomeSucursalId, assertHomeSucursal } from '@/lib/sucursal'
 
-const ESTADOS_MANUALES = ['entregado', 'anulado'] as const
+const ESTADOS_MANUALES = ['terminado', 'entregado', 'anulado'] as const
+
+const TRANSICIONES: Record<string, string[]> = {
+  pendiente:  ['terminado', 'entregado', 'anulado'],
+  en_proceso: ['terminado', 'entregado', 'anulado'],
+  terminado:  ['entregado', 'anulado'],
+}
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -17,7 +23,26 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   const nuevo_estado = body.estado
 
   if (!ESTADOS_MANUALES.includes(nuevo_estado)) {
-    return NextResponse.json({ error: 'Solo se puede establecer manualmente: entregado o anulado' }, { status: 400 })
+    return NextResponse.json({ error: 'Solo se puede establecer manualmente: terminado, entregado o anulado' }, { status: 400 })
+  }
+
+  const { data: actual, error: fetchErr } = await supabase
+    .from('optica_servicios')
+    .select('id, estado, sucursal_id')
+    .eq('id', id)
+    .maybeSingle()
+
+  if (fetchErr || !actual) return NextResponse.json({ error: 'Servicio no encontrado' }, { status: 404 })
+
+  const guard = await assertHomeSucursal(actual.sucursal_id)
+  if (guard) return guard
+
+  const transicionesValidas = TRANSICIONES[actual.estado] ?? []
+  if (!transicionesValidas.includes(nuevo_estado)) {
+    return NextResponse.json(
+      { error: `No se puede cambiar de "${actual.estado}" a "${nuevo_estado}"` },
+      { status: 403 },
+    )
   }
 
   const { data: updated, error } = await supabase
@@ -30,17 +55,23 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   if (!updated) return NextResponse.json({ error: 'Servicio no encontrado' }, { status: 404 })
 
+  if (nuevo_estado === 'terminado') {
+    await supabase
+      .from('optica_servicio_tipos')
+      .update({ estado: 'terminado' })
+      .eq('servicio_id', id)
+  }
+
   if (nuevo_estado === 'anulado') {
     const { data: servicio } = await supabase
       .from('optica_servicios')
-      .select('numero, total, optica_servicio_pagos(monto)')
+      .select('numero, total, cliente_id, optica_servicio_pagos(metodo, monto)')
       .eq('id', id)
       .single()
 
     if (servicio) {
-      const pagado = (servicio.optica_servicio_pagos ?? []).reduce(
-        (a: number, p: { monto: number }) => a + p.monto, 0
-      )
+      const pagos = servicio.optica_servicio_pagos ?? []
+      const pagado = pagos.reduce((a: number, p: { monto: number }) => a + Number(p.monto), 0)
       const saldo = Math.round((servicio.total - pagado) * 100) / 100
 
       if (saldo > 0.005) {
@@ -81,6 +112,24 @@ export async function POST(req: NextRequest, { params }: Ctx) {
           tipo:       'egreso',
           concepto:   `Anulación SV ${servicio.numero} - OTRO`,
           monto:      saldo,
+          usuario_id: session.user.id,
+        })
+      }
+
+      // Reversar CARGOs en cuenta corriente generados por pagos CC
+      const sumCC = pagos
+        .filter((p: { metodo: string }) => p.metodo === 'CUENTA_CORRIENTE')
+        .reduce((a: number, p: { monto: number }) => a + Number(p.monto), 0)
+
+      if (sumCC > 0.005 && servicio.cliente_id) {
+        await supabase.from('cobranzas').insert({
+          cliente_id: servicio.cliente_id,
+          tipo: 'PAGO',
+          monto: sumCC,
+          fecha: new Date().toISOString().slice(0, 10),
+          descripcion: `Anulación SV ${servicio.numero}`,
+          optica_servicio_id: Number(id),
+          sucursal_id: sucursalId,
           usuario_id: session.user.id,
         })
       }

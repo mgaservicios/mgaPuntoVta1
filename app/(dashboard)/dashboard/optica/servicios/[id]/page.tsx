@@ -3,7 +3,7 @@
 import { useEffect, useState, use } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { ArrowLeft, Plus, Save, CheckCircle, XCircle, Printer } from 'lucide-react'
+import { ArrowLeft, Plus, Save, CheckCircle, XCircle, Printer, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -15,12 +15,16 @@ import {
   METODO_OPTICA_LABELS, TIPO_SERVICIO_LABELS, TIPOS_SERVICIO_LIST,
   ESTADO_TIPO_SERVICIO_LABELS, ESTADO_TIPO_SERVICIO_BADGE,
   type OpticaServicio, type OpticaServicioPago,
-  type EstadoServicio, type TipoServicio, type MetodoPagoOptica,
+  type EstadoServicio, type TipoServicio,
   type EstadoTipoServicio,
 } from '@/types/optica'
 import type { Cliente } from '@/types/clientes'
+import type { NotaCredito } from '@/types/notas-credito'
+import type { FormaPago } from '@/types/formas-pago'
+import { TIPOS_CON_REFERENCIA } from '@/types/formas-pago'
 import ClienteSearch from '@/components/dashboard/ClienteSearch'
 import { useSucursalActiva } from '@/hooks/useSucursalActiva'
+import { useVendedores } from '@/hooks/useVendedores'
 
 // ── Tipos locales ─────────────────────────────────────────────────────────────
 
@@ -33,10 +37,14 @@ interface TipoForm {
 }
 
 interface PagoForm {
-  metodo: MetodoPagoOptica
+  metodo: string
   monto: string
   concepto: string
   referencia: string
+  fecha_pago: string
+  forma_pago_id: number | null
+  cuotas: number | null
+  nota_credito_id: number | null
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -49,8 +57,6 @@ function formatFecha(iso: string) {
   return new Date(iso + 'T00:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
-const METODOS: MetodoPagoOptica[] = ['EFECTIVO', 'TRANSFERENCIA', 'TARJETA_DEBITO', 'TARJETA_CREDITO', 'CUENTA_CORRIENTE', 'CHEQUE', 'OTRO']
-
 const lbl  = 'w-32 shrink-0 text-right text-xs text-gray-500 leading-none pt-[9px]'
 const lbl2 = 'w-32 shrink-0 text-right text-xs text-gray-500 leading-none'
 
@@ -60,12 +66,15 @@ export default function OpticaServicioPage({ params }: { params: Promise<{ id: s
   const { id }  = use(params)
   const isNueva = id === 'nueva'
   const router  = useRouter()
-  const sucursalNombre = useSucursalActiva()
+  const { nombre: sucursalNombre, isHome } = useSucursalActiva()
 
   const [servicio, setServicio] = useState<OpticaServicio | null>(null)
   const [loading, setLoading]   = useState(!isNueva)
   const [saving, setSaving]     = useState(false)
   const [estadoSV, setEstadoSV] = useState<EstadoServicio>('pendiente')
+
+  const vendedores = useVendedores()
+  const [vendedorId, setVendedorId] = useState<number | null>(null)
 
   const [fecha, setFecha]                   = useState(new Date().toISOString().slice(0, 10))
   const [fechaPrometida, setFechaPrometida] = useState('')
@@ -79,21 +88,31 @@ export default function OpticaServicioPage({ params }: { params: Promise<{ id: s
   const [descuentoPct, setDescuentoPct]  = useState('0')
   const [descuentoMonto, setDescuentoMonto] = useState('0')
   const [anticipo, setAnticipo]         = useState('0')
-  const [anticipoMetodo, setAnticipoMetodo] = useState<MetodoPagoOptica>('EFECTIVO')
+  const [anticipoMetodo, setAnticipoMetodo] = useState<string>('EFECTIVO')
+  const [anticipoRef, setAnticipoRef]   = useState('')
+  const [anticipoFecha, setAnticipoFecha] = useState(new Date().toISOString().slice(0, 10))
+  const [anticipoFormaId, setAnticipoFormaId] = useState<number | null>(null)
+
+  const [recargoPct, setRecargoPct]     = useState('0')
+  const [recargoMonto, setRecargoMonto] = useState(0)
 
   const [pagos, setPagos]               = useState<OpticaServicioPago[]>([])
   const [showPagoForm, setShowPagoForm] = useState(false)
-  const [pagoForm, setPagoForm]         = useState<PagoForm>({ metodo: 'EFECTIVO', monto: '', concepto: 'SEÑA', referencia: '' })
+  const [pagoForm, setPagoForm]         = useState<PagoForm>({ metodo: '', monto: '', concepto: 'SEÑA', referencia: '', fecha_pago: '', forma_pago_id: null, cuotas: null, nota_credito_id: null })
   const [savingPago, setSavingPago]     = useState(false)
+  const [saldoCC, setSaldoCC]           = useState<number | null>(null)
+  const [formasPago, setFormasPago]     = useState<FormaPago[]>([])
+  const [ncsDisponibles, setNcsDisponibles] = useState<NotaCredito[]>([])
 
+  const [confirmTerminar, setConfirmTerminar] = useState(false)
   const [confirmAnular, setConfirmAnular]     = useState(false)
   const [confirmEntregar, setConfirmEntregar] = useState(false)
   const [confirmImprimirNueva, setConfirmImprimirNueva] = useState<{ id: number; numero: string } | null>(null)
 
-  // terminado ya NO es readonly — los tipos se pueden seguir editando
+  const esTerminado  = estadoSV === 'terminado'
   const esEntregado  = estadoSV === 'entregado'
   const esAnulado    = estadoSV === 'anulado'
-  const esReadonly   = esEntregado || esAnulado
+  const esReadonly   = esTerminado || esEntregado || esAnulado
   const disabledEdit = esReadonly
 
   // ── Cargar servicio ───────────────────────────────────────────────────────────
@@ -128,12 +147,47 @@ export default function OpticaServicioPage({ params }: { params: Promise<{ id: s
       setCostoTrabajo(data.costo_trabajo?.toString() ?? '0')
       setDescuentoPct(data.descuento_pct?.toString() ?? '0')
       setDescuentoMonto(data.descuento_monto?.toString() ?? '0')
+      const rm = Number((data as unknown as { recargo_monto?: number }).recargo_monto ?? 0)
+      if (rm > 0) {
+        setRecargoMonto(rm)
+        const baseTotal = Math.round((data.subtotal - (data.descuento_monto ?? 0)) * 100) / 100
+        setRecargoPct(baseTotal > 0 ? ((rm / baseTotal) * 100).toFixed(2) : '0')
+      }
       setAnticipo(data.anticipo?.toString() ?? '0')
       setPagos(data.optica_servicio_pagos ?? [])
       setLoading(false)
     }
     load()
   }, [id, isNueva, router])
+
+  // ── Formas de pago ────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    fetch('/api/dashboard/formas-pago').then(r => r.json()).then(data => {
+      const fps: FormaPago[] = Array.isArray(data) ? data : []
+      setFormasPago(fps)
+      const primero = fps[0]
+      if (primero) {
+        setAnticipoMetodo(primero.nombre)
+        setAnticipoFormaId(primero.id)
+        setPagoForm(f => ({ ...f, metodo: primero.nombre, forma_pago_id: primero.id }))
+      }
+    }).catch(() => {})
+  }, [])
+
+  // ── Saldo CC del cliente ──────────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!cliente) { setSaldoCC(null); setNcsDisponibles([]); return }
+    fetch(`/api/dashboard/listados/cobranzas?cliente_id=${cliente.id}`)
+      .then(r => r.json())
+      .then((data: { saldo_actual: number }[]) => setSaldoCC(data[0]?.saldo_actual ?? 0))
+      .catch(() => setSaldoCC(null))
+    fetch(`/api/dashboard/notas-credito?cliente_id=${cliente.id}&estado=pendiente`)
+      .then(r => r.json())
+      .then(data => setNcsDisponibles(Array.isArray(data) ? data : []))
+      .catch(() => setNcsDisponibles([]))
+  }, [cliente])
 
   // ── Cálculos ──────────────────────────────────────────────────────────────────
 
@@ -142,10 +196,11 @@ export default function OpticaServicioPage({ params }: { params: Promise<{ id: s
   const subtotal        = Math.round((subtotalTipos + costoTrabajoNum) * 100) / 100
   const descMonto       = Math.min(Math.max(0, parseFloat(descuentoMonto) || 0), subtotal)
   const total           = Math.round((subtotal - descMonto) * 100) / 100
+  const totalFinal      = Math.round((total + recargoMonto) * 100) / 100
   const anticipoNum     = Math.max(0, parseFloat(anticipo) || 0)
-  const saldoAnticipo   = Math.round((total - anticipoNum) * 100) / 100
+  const saldoAnticipo   = Math.round((totalFinal - anticipoNum) * 100) / 100
   const pagado          = pagos.reduce((a, p) => a + p.monto, 0)
-  const saldo           = total - pagado
+  const saldo           = (isNueva ? totalFinal : (servicio?.total ?? totalFinal)) - pagado
   const puedeAgregarPago = !esAnulado && saldo > 0.005
 
   function onDescuentoPctChange(val: string) {
@@ -156,6 +211,18 @@ export default function OpticaServicioPage({ params }: { params: Promise<{ id: s
   function onDescuentoMontoChange(val: string) {
     setDescuentoMonto(val)
     setDescuentoPct(subtotal > 0 ? ((Math.max(0, parseFloat(val) || 0) / subtotal) * 100).toFixed(2) : '0')
+  }
+
+  function onRecargoPctChangeSV(val: string) {
+    setRecargoPct(val)
+    const pct = Math.max(0, parseFloat(val) || 0)
+    setRecargoMonto(Math.round(total * pct / 100 * 100) / 100)
+  }
+
+  function onRecargoMontoChangeSV(val: string) {
+    const rm = Math.max(0, parseFloat(val) || 0)
+    setRecargoMonto(rm)
+    setRecargoPct(total > 0 ? ((rm / total) * 100).toFixed(2) : '0')
   }
 
   // ── Tipos de reparación ───────────────────────────────────────────────────────
@@ -184,13 +251,18 @@ export default function OpticaServicioPage({ params }: { params: Promise<{ id: s
       fecha,
       fecha_prometida:  fechaPrometida || null,
       cliente_id:       cliente.id,
+      vendedor_id:      vendedorId,
       detalle:          detalle || null,
       observaciones:    observaciones || null,
       costo_trabajo:    costoTrabajoNum,
-      anticipo:         anticipoNum,
-      anticipo_metodo:  isNueva && anticipoNum > 0 ? anticipoMetodo : undefined,
+      anticipo:              anticipoNum,
+      anticipo_metodo:       isNueva && anticipoNum > 0 ? anticipoMetodo           : undefined,
+      anticipo_referencia:   isNueva && anticipoNum > 0 ? (anticipoRef || null)    : undefined,
+      anticipo_fecha:        isNueva && anticipoNum > 0 ? (anticipoFecha || null)  : undefined,
+      anticipo_forma_id:     isNueva && anticipoNum > 0 ? (anticipoFormaId ?? null): undefined,
       descuento_pct:    parseFloat(descuentoPct) || 0,
       descuento_monto:  descMonto,
+      recargo_monto:    recargoMonto,
       // Si no hay tipos, la API usa este campo como estado manual
       estado: estadoManual,
       tipos: tipos.map(t => ({
@@ -227,14 +299,33 @@ export default function OpticaServicioPage({ params }: { params: Promise<{ id: s
   async function handleSavePago() {
     const monto = parseFloat(pagoForm.monto)
     if (isNaN(monto) || monto <= 0) { toast.error('Monto inválido'); return }
+    if (!pagoForm.metodo) { toast.error('Seleccioná un método de pago'); return }
+    if (pagoForm.metodo === 'NOTA_CREDITO' && !pagoForm.nota_credito_id) { toast.error('Seleccioná una nota de crédito'); return }
     setSavingPago(true)
     const res  = await fetch(`/api/dashboard/optica/servicios/${id}/pago`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...pagoForm, monto }),
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        metodo:          pagoForm.metodo,
+        monto,
+        concepto:        pagoForm.concepto,
+        referencia:      pagoForm.referencia || null,
+        fecha_pago:      pagoForm.fecha_pago || new Date().toISOString().slice(0, 10),
+        forma_pago_id:   pagoForm.forma_pago_id,
+        cuotas:          pagoForm.cuotas,
+        nota_credito_id: pagoForm.nota_credito_id,
+        recargo_monto:   recargoMonto,
+      }),
     })
     const data = await res.json()
     if (!res.ok) { toast.error(data.error ?? 'Error'); setSavingPago(false); return }
+    if (recargoMonto > 0 && servicio) {
+      setServicio(prev => prev ? { ...prev, total: Math.round((prev.total - (prev as unknown as {recargo_monto?:number}).recargo_monto! + recargoMonto) * 100) / 100 } : prev)
+    }
+    setRecargoMonto(0)
+    setRecargoPct('0')
     setPagos(prev => [...prev, data])
-    setPagoForm({ metodo: 'EFECTIVO', monto: '', concepto: 'SALDO', referencia: '' })
+    const primero = formasPago[0]
+    setPagoForm({ metodo: primero?.nombre ?? '', monto: '', concepto: 'SALDO', referencia: '', fecha_pago: '', forma_pago_id: primero?.id ?? null, cuotas: null, nota_credito_id: null })
     setShowPagoForm(false)
     setSavingPago(false)
     toast.success('Pago registrado')
@@ -242,7 +333,7 @@ export default function OpticaServicioPage({ params }: { params: Promise<{ id: s
 
   // ── Cambio de estado manual ───────────────────────────────────────────────────
 
-  async function handleCambiarEstado(nuevoEstado: 'entregado' | 'anulado') {
+  async function handleCambiarEstado(nuevoEstado: 'terminado' | 'entregado' | 'anulado') {
     const res = await fetch(`/api/dashboard/optica/servicios/${id}/cambiar-estado`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ estado: nuevoEstado }),
     })
@@ -252,6 +343,8 @@ export default function OpticaServicioPage({ params }: { params: Promise<{ id: s
       const r = await fetch(`/api/dashboard/optica/servicios/${id}`)
       if (r.ok) { const d = await r.json(); setPagos(d.optica_servicio_pagos ?? []) }
       toast.success('Servicio anulado')
+    } else if (nuevoEstado === 'terminado') {
+      toast.success('Servicio marcado como terminado')
     } else {
       toast.success('Servicio marcado como entregado')
     }
@@ -263,6 +356,22 @@ export default function OpticaServicioPage({ params }: { params: Promise<{ id: s
     return (
       <div className="flex items-center justify-center h-full">
         <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
+
+  if (isNueva && !isHome) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[50vh] gap-4 text-center">
+        <div className="w-14 h-14 rounded-full bg-amber-100 flex items-center justify-center">
+          <AlertTriangle className="w-7 h-7 text-amber-500" />
+        </div>
+        <div>
+          <p className="font-semibold text-gray-800">No puede crear un servicio desde esta sucursal</p>
+          <p className="text-sm text-gray-500 mt-1">
+            Está visualizando otra sucursal. Seleccione su sucursal en el selector para continuar.
+          </p>
+        </div>
       </div>
     )
   }
@@ -313,13 +422,19 @@ export default function OpticaServicioPage({ params }: { params: Promise<{ id: s
             {saving ? 'Guardando...' : isNueva ? 'Crear servicio' : 'Guardar'}
           </Button>
         )}
-        {!isNueva && estadoSV === 'terminado' && (
+        {!isNueva && ['pendiente', 'en_proceso'].includes(estadoSV) && (
+          <Button variant="default" size="sm" className="gap-2 bg-green-600 hover:bg-green-700" onClick={() => setConfirmTerminar(true)}>
+            <CheckCircle className="w-4 h-4" />
+            Terminar
+          </Button>
+        )}
+        {!isNueva && esTerminado && (
           <Button variant="default" size="sm" className="gap-2 bg-emerald-600 hover:bg-emerald-700" onClick={() => setConfirmEntregar(true)}>
             <CheckCircle className="w-4 h-4" />
             Marcar entregado
           </Button>
         )}
-        {!isNueva && !esEntregado && !esAnulado && (
+        {!isNueva && !esReadonly && (
           <Button variant="outline" size="sm" className="gap-2 text-red-600 border-red-200 hover:bg-red-50" onClick={() => setConfirmAnular(true)}>
             <XCircle className="w-4 h-4" />
             Anular
@@ -327,9 +442,9 @@ export default function OpticaServicioPage({ params }: { params: Promise<{ id: s
         )}
       </div>
 
-      {esEntregado && (
+      {esReadonly && !esAnulado && (
         <div className="bg-blue-50 border-b border-blue-200 px-6 py-2 text-sm text-blue-800 flex items-center gap-2">
-          <span className="font-semibold">Servicio entregado</span>
+          <span className="font-semibold">{esTerminado ? 'Servicio terminado' : 'Servicio entregado'}</span>
           <span className="text-blue-700">— Solo lectura.{puedeAgregarPago ? ' Podés registrar el saldo pendiente.' : ''}</span>
         </div>
       )}
@@ -362,6 +477,26 @@ export default function OpticaServicioPage({ params }: { params: Promise<{ id: s
                 <div className="flex items-center gap-3">
                   <span className={lbl}>Teléfono</span>
                   <p className="text-sm text-gray-600">{cliente.telefono}</p>
+                </div>
+              )}
+              {isNueva && (
+                <div className="flex items-start gap-3">
+                  <span className={lbl}>Vendedor</span>
+                  <div className="flex-1 min-w-0">
+                    <Select
+                      value={vendedorId?.toString() ?? ''}
+                      onValueChange={v => setVendedorId(Number(v))}
+                    >
+                      <SelectTrigger className="h-8 text-sm">
+                        <SelectValue placeholder="Seleccionar vendedor…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {vendedores.map(v => (
+                          <SelectItem key={v.id} value={v.id.toString()}>{v.nombre}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               )}
               <div className="flex items-start gap-3 col-span-2">
@@ -555,19 +690,76 @@ export default function OpticaServicioPage({ params }: { params: Promise<{ id: s
               </div>
             </div>
 
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-xs text-amber-600 shrink-0">Recargo</span>
+              <div className="flex items-center gap-1.5">
+                <Input
+                  type="number" className="h-7 w-16 text-xs text-right"
+                  value={recargoPct}
+                  onChange={e => onRecargoPctChangeSV(e.target.value)}
+                  disabled={disabledEdit} min="0" max="100" step="0.01" placeholder="0"
+                />
+                <span className="text-gray-400 text-xs shrink-0">%  =</span>
+                <Input
+                  type="number" className="h-7 w-28 text-xs text-right text-amber-600"
+                  value={recargoMonto > 0 ? recargoMonto : ''}
+                  onChange={e => onRecargoMontoChangeSV(e.target.value)}
+                  disabled={disabledEdit} min="0" step="0.01" placeholder="0.00"
+                />
+              </div>
+            </div>
+
             <div className="flex justify-between font-semibold text-sm border-t pt-1.5">
-              <span>Total</span><span>{formatARS(total)}</span>
+              <span>Total</span><span>{formatARS(totalFinal)}</span>
             </div>
 
             {isNueva && (
               <div className="space-y-1.5 border-t pt-2">
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Seña / primer pago</p>
+                {saldoCC !== null && saldoCC < -0.001 && (
+                  <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg px-3 py-1.5">
+                    <p className="text-xs text-green-800">
+                      <span className="font-semibold">Saldo a favor en CC:</span> {formatARS(Math.abs(saldoCC))}
+                    </p>
+                    <button
+                      type="button"
+                      className="text-xs text-green-700 font-medium underline hover:no-underline ml-2"
+                      onClick={() => {
+                        const aplicar = Math.min(Math.abs(saldoCC), total)
+                        setAnticipo(aplicar.toFixed(2))
+                        setAnticipoMetodo('CUENTA_CORRIENTE')
+                      }}
+                    >
+                      Aplicar
+                    </button>
+                  </div>
+                )}
                 <div className="flex gap-1.5">
                   <Input type="number" className="h-8 flex-1 text-sm text-right" value={anticipo} onChange={e => setAnticipo(e.target.value)} min="0" step="0.01" placeholder="0.00" />
-                  <select className="h-8 text-sm border border-input rounded-md px-2 bg-white" value={anticipoMetodo} onChange={e => setAnticipoMetodo(e.target.value as MetodoPagoOptica)}>
-                    {METODOS.map(m => <option key={m} value={m}>{METODO_OPTICA_LABELS[m]}</option>)}
+                  <select
+                    className="h-8 text-sm border border-input rounded-md px-2 bg-white"
+                    value={anticipoMetodo}
+                    onChange={e => {
+                      const fp = formasPago.find(f => f.nombre === e.target.value)
+                      setAnticipoMetodo(e.target.value)
+                      setAnticipoFormaId(fp?.id ?? null)
+                      if (!fp || !TIPOS_CON_REFERENCIA.includes(fp.tipo)) { setAnticipoRef(''); setAnticipoFecha('') }
+                    }}
+                  >
+                    {formasPago.map(fp => <option key={fp.id} value={fp.nombre}>{fp.nombre}</option>)}
+                    <option value="CUENTA_CORRIENTE">Cuenta corriente</option>
                   </select>
                 </div>
+                {(() => {
+                  const fp = formasPago.find(f => f.nombre === anticipoMetodo)
+                  if (!fp || !TIPOS_CON_REFERENCIA.includes(fp.tipo)) return null
+                  return (
+                    <div className="flex gap-1.5 mt-1.5">
+                      <Input placeholder="Referencia (opcional)" className="h-7 flex-1 text-xs" value={anticipoRef} onChange={e => setAnticipoRef(e.target.value)} />
+                      <Input type="date" className="h-7 w-36 text-xs" value={anticipoFecha} onChange={e => setAnticipoFecha(e.target.value)} />
+                    </div>
+                  )
+                })()}
                 {anticipoNum > 0 && (
                   <div className="flex justify-between text-xs text-gray-500">
                     <span>Saldo a cobrar</span><span>{formatARS(saldoAnticipo)}</span>
@@ -639,15 +831,38 @@ export default function OpticaServicioPage({ params }: { params: Promise<{ id: s
 
               {showPagoForm && (
                 <div className="border rounded-lg p-3 bg-gray-50 space-y-2.5">
+                  {saldoCC !== null && saldoCC < -0.001 && (
+                    <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg px-3 py-1.5">
+                      <p className="text-xs text-green-800">
+                        <span className="font-semibold">Saldo a favor en CC:</span> {formatARS(Math.abs(saldoCC))}
+                      </p>
+                      <button
+                        type="button"
+                        className="text-xs text-green-700 font-medium underline hover:no-underline ml-2"
+                        onClick={() => {
+                          const aplicar = Math.min(Math.abs(saldoCC), saldo)
+                          setPagoForm(f => ({ ...f, metodo: 'CUENTA_CORRIENTE', monto: aplicar.toFixed(2), concepto: 'Saldo CC' }))
+                        }}
+                      >
+                        Aplicar
+                      </button>
+                    </div>
+                  )}
                   <div className="grid grid-cols-2 gap-3">
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-gray-500 w-16 text-right shrink-0">Método</span>
-                      <Select value={pagoForm.metodo} onValueChange={v => setPagoForm(f => ({ ...f, metodo: v as MetodoPagoOptica }))}>
-                        <SelectTrigger className="h-8 text-sm flex-1"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {METODOS.map(m => <SelectItem key={m} value={m}>{METODO_OPTICA_LABELS[m]}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
+                      <select
+                        className="h-8 text-sm border border-input rounded-md px-2 bg-white flex-1"
+                        value={pagoForm.metodo}
+                        onChange={e => {
+                          const fp = formasPago.find(f => f.nombre === e.target.value)
+                          setPagoForm(f => ({ ...f, metodo: e.target.value, forma_pago_id: fp?.id ?? null, cuotas: null, nota_credito_id: null, referencia: '' }))
+                        }}
+                      >
+                        {formasPago.map(fp => <option key={fp.id} value={fp.nombre}>{fp.nombre}</option>)}
+                        <option value="CUENTA_CORRIENTE">Cuenta corriente</option>
+                        <option value="NOTA_CREDITO">Nota de crédito</option>
+                      </select>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-gray-500 w-16 text-right shrink-0">Monto</span>
@@ -657,10 +872,82 @@ export default function OpticaServicioPage({ params }: { params: Promise<{ id: s
                       <span className="text-xs text-gray-500 w-16 text-right shrink-0">Concepto</span>
                       <Input placeholder="SEÑA, SALDO..." className="h-8 text-sm flex-1" value={pagoForm.concepto} onChange={e => setPagoForm(f => ({ ...f, concepto: e.target.value }))} />
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-gray-500 w-16 text-right shrink-0">Referencia</span>
-                      <Input placeholder="N° transferencia..." className="h-8 text-sm flex-1" value={pagoForm.referencia} onChange={e => setPagoForm(f => ({ ...f, referencia: e.target.value }))} />
-                    </div>
+                    {(() => {
+                      const fp = formasPago.find(f => f.nombre === pagoForm.metodo)
+                      if (!fp || !TIPOS_CON_REFERENCIA.includes(fp.tipo)) return null
+                      return (
+                        <>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-500 w-16 text-right shrink-0">Referencia</span>
+                            <Input placeholder="N° transf..." className="h-8 text-sm flex-1" value={pagoForm.referencia} onChange={e => setPagoForm(f => ({ ...f, referencia: e.target.value }))} />
+                          </div>
+                          <div className="flex items-center gap-2 col-span-2">
+                            <span className="text-xs text-gray-500 w-16 text-right shrink-0">Fecha</span>
+                            <Input type="date" className="h-8 text-sm w-36" value={pagoForm.fecha_pago || new Date().toISOString().slice(0, 10)} onChange={e => setPagoForm(f => ({ ...f, fecha_pago: e.target.value }))} />
+                          </div>
+                        </>
+                      )
+                    })()}
+                    {(() => {
+                      const fp = formasPago.find(f => f.nombre === pagoForm.metodo)
+                      if (fp?.tipo !== 'TARJETA_CREDITO' || !fp.formas_pago_cuotas?.length) return null
+                      return (
+                        <div className="flex items-center gap-2 col-span-2">
+                          <span className="text-xs text-gray-500 w-16 text-right shrink-0">Cuotas</span>
+                          <select
+                            className="h-8 text-sm border border-input rounded-md px-2 bg-white"
+                            value={pagoForm.cuotas ?? ''}
+                            onChange={e => {
+                              const cuotaNum = e.target.value ? parseInt(e.target.value) : null
+                              setPagoForm(f => ({ ...f, cuotas: cuotaNum }))
+                              if (cuotaNum) {
+                                const cuota = fp.formas_pago_cuotas?.find(c => c.cantidad_cuotas === cuotaNum)
+                                if (cuota) {
+                                  const pct = cuota.recargo_pct
+                                  const base = isNueva ? total : (servicio?.total ?? total)
+                                  setRecargoPct(pct.toString())
+                                  setRecargoMonto(Math.round(base * pct / 100 * 100) / 100)
+                                }
+                              }
+                            }}
+                          >
+                            <option value="">Sin cuotas</option>
+                            {fp.formas_pago_cuotas.sort((a, b) => a.cantidad_cuotas - b.cantidad_cuotas).map(c => (
+                              <option key={c.id} value={c.cantidad_cuotas}>
+                                {c.cantidad_cuotas}x {c.recargo_pct > 0 ? `(+${c.recargo_pct}% rec.)` : 'sin recargo'}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )
+                    })()}
+                    {pagoForm.metodo === 'NOTA_CREDITO' && (
+                      <div className="col-span-2">
+                        {!cliente ? (
+                          <p className="text-xs text-amber-600 bg-amber-50 rounded px-2 py-1">Seleccioná un cliente para ver sus NCs</p>
+                        ) : ncsDisponibles.length === 0 ? (
+                          <p className="text-xs text-gray-400 bg-gray-50 rounded px-2 py-1">Sin notas de crédito disponibles</p>
+                        ) : (
+                          <select
+                            className="w-full h-8 text-sm border border-input rounded-md px-2 bg-white"
+                            value={pagoForm.nota_credito_id ?? ''}
+                            onChange={e => {
+                              const nc = ncsDisponibles.find(n => String(n.id) === e.target.value)
+                              if (!nc) { setPagoForm(f => ({ ...f, nota_credito_id: null, monto: '' })); return }
+                              const m = Math.min(nc.monto_disponible, saldo)
+                              setPagoForm(f => ({ ...f, nota_credito_id: nc.id, monto: m.toFixed(2) }))
+                            }}
+                          >
+                            <option value="">Seleccioná una NC…</option>
+                            {ncsDisponibles.map(nc => (
+                              <option key={nc.id} value={nc.id}>
+                                {nc.numero} — {new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(nc.monto_disponible)} disp.
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <div className="flex gap-2 justify-end">
                     <Button variant="outline" size="sm" onClick={() => setShowPagoForm(false)}>Cancelar</Button>
@@ -687,7 +974,7 @@ export default function OpticaServicioPage({ params }: { params: Promise<{ id: s
                     {pagos.map(p => (
                       <tr key={p.id}>
                         <td className="py-1.5 text-gray-600">{formatFecha(p.fecha_pago)}</td>
-                        <td className="py-1.5 text-gray-600">{METODO_OPTICA_LABELS[p.metodo]}</td>
+                        <td className="py-1.5 text-gray-600">{METODO_OPTICA_LABELS[p.metodo as keyof typeof METODO_OPTICA_LABELS] ?? p.metodo}</td>
                         <td className="py-1.5 text-gray-600">{p.concepto ?? '—'}</td>
                         <td className="py-1.5 text-right font-medium">{formatARS(p.monto)}</td>
                       </tr>
@@ -701,6 +988,15 @@ export default function OpticaServicioPage({ params }: { params: Promise<{ id: s
         </div>
       </div>
 
+      <ConfirmDialog
+        open={confirmTerminar}
+        onCancel={() => setConfirmTerminar(false)}
+        onConfirm={() => { handleCambiarEstado('terminado'); setConfirmTerminar(false) }}
+        title="Marcar como terminado"
+        description="Se marcarán todos los tipos de reparación como terminados. ¿Confirmás?"
+        confirmLabel="Sí, terminar"
+        variant="default"
+      />
       <ConfirmDialog
         open={confirmEntregar}
         onCancel={() => setConfirmEntregar(false)}

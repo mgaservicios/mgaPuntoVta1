@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { toast } from 'sonner'
 import { ChevronDown, ChevronRight, DollarSign } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -13,6 +13,9 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
 
 function ars(n: number) {
   return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(n)
@@ -23,13 +26,35 @@ function fDate(iso: string) {
   })
 }
 
+const METODO_LABELS: Record<string, string> = {
+  EFECTIVO: 'Efectivo',
+  TRANSFERENCIA: 'Transferencia',
+  TARJETA_DEBITO: 'Tarjeta débito',
+  TARJETA_CREDITO: 'Tarjeta crédito',
+  CHEQUE: 'Cheque',
+  OTRO: 'Otro',
+}
+
+function docRef(m: Mov): string | null {
+  if (m.optica_orden_id)    return `OT #${m.optica_orden_id}`
+  if (m.optica_servicio_id) return `SV #${m.optica_servicio_id}`
+  if (m.orden_id)           return `OV #${m.orden_id}`
+  if (m.venta_id)           return `VTA #${m.venta_id}`
+  return null
+}
+
 interface Mov {
   id: number
   tipo: 'CARGO' | 'PAGO'
   monto: number
   fecha: string
   descripcion: string | null
+  metodo: string | null
   created_at: string
+  venta_id: number | null
+  orden_id: number | null
+  optica_orden_id: number | null
+  optica_servicio_id: number | null
 }
 
 interface ClienteRow {
@@ -47,9 +72,14 @@ interface CobranzaRaw {
   monto: number
   fecha: string
   descripcion: string | null
+  metodo: string | null
   created_at: string
   cliente_id: number
   clientes: { nombre: string } | null
+  venta_id: number | null
+  orden_id: number | null
+  optica_orden_id: number | null
+  optica_servicio_id: number | null
 }
 
 function buildRows(raw: CobranzaRaw[]): ClienteRow[] {
@@ -83,6 +113,7 @@ export default function CobranzasPage() {
   const [monto, setMonto] = useState('')
   const [descripcion, setDescripcion] = useState('')
   const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10))
+  const [metodo, setMetodo] = useState('EFECTIVO')
   const [saving, setSaving] = useState(false)
 
   const load = useCallback(async () => {
@@ -114,10 +145,12 @@ export default function CobranzasPage() {
   }
 
   function openCobro(id: number) {
+    const row = rows.find(r => r.cliente_id === id)
     setCobrandoId(id)
-    setMonto('')
+    setMonto(row ? row.saldo.toFixed(2) : '')
     setDescripcion('Cobro en cuenta corriente')
     setFecha(new Date().toISOString().slice(0, 10))
+    setMetodo('EFECTIVO')
   }
 
   async function handleCobrar() {
@@ -128,12 +161,14 @@ export default function CobranzasPage() {
     const res = await fetch('/api/dashboard/cobranzas', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cliente_id: cobrandoId, monto: montoNum, descripcion, fecha }),
+      body: JSON.stringify({ cliente_id: cobrandoId, monto: montoNum, descripcion, fecha, metodo }),
     })
     if (res.ok) {
+      const cobro = await res.json()
       toast.success('Cobro registrado')
       setCobrandoId(null)
       load()
+      window.open(`/dashboard/cobranzas/recibos/${cobro.id}/print`, '_blank')
     } else {
       const err = await res.json()
       toast.error(err.error ?? 'Error al registrar cobro')
@@ -142,6 +177,8 @@ export default function CobranzasPage() {
   }
 
   const cobrando = rows.find(r => r.cliente_id === cobrandoId)
+  const montoNum = parseFloat(monto) || 0
+  const saldoResultante = (cobrando?.saldo ?? 0) - montoNum
 
   return (
     <div className="space-y-6">
@@ -203,8 +240,8 @@ export default function CobranzasPage() {
               </TableRow>
             ) : (
               filtered.map(row => (
-                <>
-                  <TableRow key={row.cliente_id} className="cursor-pointer hover:bg-gray-50">
+                <React.Fragment key={row.cliente_id}>
+                  <TableRow className="cursor-pointer hover:bg-gray-50">
                     <TableCell>
                       <button
                         onClick={() => toggleExpand(row.cliente_id)}
@@ -233,7 +270,7 @@ export default function CobranzasPage() {
                   </TableRow>
 
                   {expanded.has(row.cliente_id) && (
-                    <TableRow key={`${row.cliente_id}-movs`}>
+                    <TableRow>
                       <TableCell />
                       <TableCell colSpan={5} className="p-0">
                         <div className="bg-gray-50 border-t border-gray-100 px-4 py-3">
@@ -242,6 +279,7 @@ export default function CobranzasPage() {
                               <tr className="text-xs text-gray-400 uppercase tracking-wide">
                                 <th className="text-left pb-2">Fecha</th>
                                 <th className="text-left pb-2">Descripción</th>
+                                <th className="text-left pb-2">Documento</th>
                                 <th className="text-right pb-2">Tipo</th>
                                 <th className="text-right pb-2">Monto</th>
                               </tr>
@@ -250,7 +288,23 @@ export default function CobranzasPage() {
                               {row.movimientos.map(m => (
                                 <tr key={m.id}>
                                   <td className="py-1.5 text-gray-500">{fDate(m.fecha)}</td>
-                                  <td className="py-1.5 text-gray-700">{m.descripcion ?? '—'}</td>
+                                  <td className="py-1.5 text-gray-700">
+                                    {m.descripcion ?? '—'}
+                                    {m.tipo === 'PAGO' && m.metodo && (
+                                      <span className="ml-1 text-xs text-gray-400">
+                                        · {METODO_LABELS[m.metodo] ?? m.metodo}
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="py-1.5">
+                                    {docRef(m) ? (
+                                      <span className="text-xs font-mono bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">
+                                        {docRef(m)}
+                                      </span>
+                                    ) : (
+                                      <span className="text-gray-400">—</span>
+                                    )}
+                                  </td>
                                   <td className="py-1.5 text-right">
                                     <span className={m.tipo === 'CARGO'
                                       ? 'text-red-600 font-medium'
@@ -267,7 +321,7 @@ export default function CobranzasPage() {
                       </TableCell>
                     </TableRow>
                   )}
-                </>
+                </React.Fragment>
               ))
             )}
           </TableBody>
@@ -278,16 +332,19 @@ export default function CobranzasPage() {
       <Dialog open={cobrandoId !== null} onOpenChange={v => !v && setCobrandoId(null)}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Registrar cobro — {cobrando?.nombre}</DialogTitle>
+            <DialogTitle>Registrar cobro</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
-            <div>
-              <p className="text-sm text-gray-500">
-                Saldo pendiente: <span className="font-semibold text-gray-900">{ars(cobrando?.saldo ?? 0)}</span>
+            {/* Cliente + saldo */}
+            <div className="bg-gray-50 rounded-lg px-3 py-2.5 space-y-0.5">
+              <p className="text-sm font-semibold text-gray-800">{cobrando?.nombre}</p>
+              <p className="text-xs text-gray-500">
+                Saldo pendiente: <span className="font-medium text-gray-700">{ars(cobrando?.saldo ?? 0)}</span>
               </p>
             </div>
+
             <div className="space-y-1">
-              <Label>Monto ($)</Label>
+              <Label>Importe a cobrar ($)</Label>
               <Input
                 type="number"
                 step="0.01"
@@ -297,10 +354,38 @@ export default function CobranzasPage() {
                 autoFocus
               />
             </div>
+
+            {/* Saldo resultante */}
+            {montoNum > 0 && (
+              <div className={`text-xs px-3 py-2 rounded-md ${saldoResultante < -0.001 ? 'bg-green-50 text-green-700' : saldoResultante > 0.001 ? 'bg-amber-50 text-amber-700' : 'bg-green-50 text-green-700'}`}>
+                {saldoResultante < -0.001
+                  ? `Saldo a favor del cliente: ${ars(Math.abs(saldoResultante))}`
+                  : saldoResultante > 0.001
+                  ? `Saldo pendiente restante: ${ars(saldoResultante)}`
+                  : 'Cuenta corriente queda al día'}
+              </div>
+            )}
+
             <div className="space-y-1">
-              <Label>Descripción</Label>
+              <Label>Método de cobro</Label>
+              <Select value={metodo} onValueChange={setMetodo}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="EFECTIVO">Efectivo</SelectItem>
+                  <SelectItem value="TRANSFERENCIA">Transferencia</SelectItem>
+                  <SelectItem value="TARJETA_DEBITO">Tarjeta débito</SelectItem>
+                  <SelectItem value="TARJETA_CREDITO">Tarjeta crédito</SelectItem>
+                  <SelectItem value="CHEQUE">Cheque</SelectItem>
+                  <SelectItem value="OTRO">Otro</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1">
+              <Label>Observaciones</Label>
               <Input value={descripcion} onChange={e => setDescripcion(e.target.value)} />
             </div>
+
             <div className="space-y-1">
               <Label>Fecha</Label>
               <Input type="date" value={fecha} onChange={e => setFecha(e.target.value)} />
@@ -309,7 +394,7 @@ export default function CobranzasPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setCobrandoId(null)}>Cancelar</Button>
             <Button onClick={handleCobrar} disabled={saving}>
-              {saving ? 'Guardando…' : 'Registrar cobro'}
+              {saving ? 'Guardando…' : 'Registrar y ver recibo'}
             </Button>
           </DialogFooter>
         </DialogContent>

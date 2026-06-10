@@ -129,6 +129,7 @@ export default function ArticulosPage() {
     return () => clearTimeout(t)
   }, [fetchArticulos])
 
+
   async function handleDesactivar() {
     if (!confirmId) return
     setDesactivando(true)

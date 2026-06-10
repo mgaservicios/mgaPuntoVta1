@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
   const supabase = await getTenantClient(session)
 
   const body = await req.json()
-  const { cliente_id, monto, fecha, observaciones } = body
+  const { cliente_id, monto, fecha, observaciones, vendedor_id } = body
 
   if (!cliente_id) return NextResponse.json({ error: 'Se requiere un cliente' }, { status: 400 })
   const montoNum = parseFloat(monto)
@@ -50,6 +50,7 @@ export async function POST(req: NextRequest) {
       monto_disponible: montoNum,
       estado: 'pendiente',
       observaciones: observaciones?.trim() || null,
+      vendedor_id: vendedor_id ?? null,
       created_by: session.user.id,
     })
     .select()

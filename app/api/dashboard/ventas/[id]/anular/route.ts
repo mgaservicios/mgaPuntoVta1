@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { getTenantClient } from '@/services/supabase-tenant'
 import { adjustArticuloStock, syncArticuloStock } from '@/services/stock'
+import { assertHomeSucursal } from '@/lib/sucursal'
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -19,6 +20,10 @@ export async function POST(_: NextRequest, { params }: Ctx) {
     .single()
 
   if (error || !venta) return NextResponse.json({ error: 'No encontrado' }, { status: 404 })
+
+  const guard = await assertHomeSucursal(venta.sucursal_id)
+  if (guard) return guard
+
   if (venta.estado !== 'completada') return NextResponse.json({ error: 'Solo se pueden anular ventas completadas' }, { status: 400 })
   if (!venta.sucursal_id) return NextResponse.json({ error: 'La venta no tiene sucursal registrada (datos históricos)' }, { status: 400 })
 
@@ -67,6 +72,7 @@ export async function POST(_: NextRequest, { params }: Ctx) {
       monto: pagoCC.monto,
       fecha: new Date().toISOString().slice(0, 10),
       descripcion: `Anulación venta ${venta.numero}`,
+      sucursal_id: venta.sucursal_id,
       usuario_id: session.user.id,
     })
   }

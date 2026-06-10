@@ -42,13 +42,13 @@ function Barcode({ value, width = 2, height = 48 }: { value: string; width?: num
 
 // ── Logo ──────────────────────────────────────────────────────────────────────
 
-function Logo({ size = 16 }: { size?: number }) {
+function Logo({ size = 16, url }: { size?: number; url?: string | null }) {
   const cls = `w-${size} h-${size}`
   return (
-    <div className={`${cls} bg-gray-800 rounded-lg flex items-center justify-center overflow-hidden shrink-0`}>
+    <div className={`${cls} bg-white rounded-lg border border-gray-200 flex items-center justify-center overflow-hidden shrink-0`}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="/logos/logo blanco.png"
+        src={url || '/logos/logo blanco.png'}
         alt="Logo"
         className="w-[85%] h-[85%] object-contain"
         onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
@@ -69,7 +69,7 @@ function LeyendaFiscal({ className = '' }: { className?: string }) {
 
 // ── Layout A4 ─────────────────────────────────────────────────────────────────
 
-function LayoutA4({ orden }: { orden: OrdenVenta }) {
+function LayoutA4({ orden, logoUrl }: { orden: OrdenVenta; logoUrl?: string | null }) {
   const items = orden.orden_venta_items ?? []
   const pagos = orden.orden_venta_pagos ?? []
   const totalPagado = pagos.reduce((a, p) => a + p.monto, 0)
@@ -80,7 +80,7 @@ function LayoutA4({ orden }: { orden: OrdenVenta }) {
 
       {/* ══ ENCABEZADO ══ */}
       <div className="flex items-center gap-4 border-b-2 border-gray-800 pb-4 mb-5">
-        <Logo size={16} />
+        <Logo size={16} url={logoUrl} />
 
         <div className="shrink-0">
           <Barcode value={orden.numero} width={1.8} height={44} />
@@ -127,10 +127,10 @@ function LayoutA4({ orden }: { orden: OrdenVenta }) {
             <p className="text-sm font-semibold">{formatFecha(orden.vencimiento)}</p>
           </div>
         )}
-        {orden.users && (
+        {orden.vendedores?.nombre && (
           <div className="border border-gray-200 rounded-lg p-3">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Vendedor</p>
-            <p className="text-sm font-semibold">{orden.users.name || orden.users.email}</p>
+            <p className="text-sm font-semibold">{orden.vendedores.nombre}</p>
           </div>
         )}
       </div>
@@ -232,6 +232,12 @@ function LayoutA4({ orden }: { orden: OrdenVenta }) {
                 <span className="text-red-600">-{formatARS(orden.descuento_monto)}</span>
               </div>
             )}
+            {(orden as unknown as { recargo_monto?: number }).recargo_monto! > 0 && (
+              <div className="flex justify-between text-gray-500">
+                <span>Recargo</span>
+                <span className="text-amber-600">+{formatARS((orden as unknown as { recargo_monto: number }).recargo_monto)}</span>
+              </div>
+            )}
             <div className="flex justify-between font-bold text-sm border-t border-gray-200 pt-1.5">
               <span>TOTAL</span>
               <span>{formatARS(orden.total)}</span>
@@ -258,7 +264,7 @@ function LayoutA4({ orden }: { orden: OrdenVenta }) {
 
 // ── Layout Ticket 80mm ────────────────────────────────────────────────────────
 
-function LayoutTicket({ orden }: { orden: OrdenVenta }) {
+function LayoutTicket({ orden, logoUrl }: { orden: OrdenVenta; logoUrl?: string | null }) {
   const items = orden.orden_venta_items ?? []
   const pagos = orden.orden_venta_pagos ?? []
   const totalPagado = pagos.reduce((a, p) => a + p.monto, 0)
@@ -269,7 +275,7 @@ function LayoutTicket({ orden }: { orden: OrdenVenta }) {
 
       {/* ══ ENCABEZADO ══ */}
       <div className="flex flex-col items-center gap-2 border-b-2 border-gray-800 pb-3 mb-3">
-        <Logo size={14} />
+        <Logo size={14} url={logoUrl} />
         <LeyendaFiscal />
         <Barcode value={orden.numero} width={1.6} height={38} />
         <div className="text-center">
@@ -292,6 +298,12 @@ function LayoutTicket({ orden }: { orden: OrdenVenta }) {
           <div>
             <span className="text-gray-500">Vence: </span>
             <span className="font-medium">{formatFecha(orden.vencimiento)}</span>
+          </div>
+        )}
+        {orden.vendedores?.nombre && (
+          <div>
+            <span className="text-gray-500">Vendedor: </span>
+            <span className="font-medium">{orden.vendedores.nombre}</span>
           </div>
         )}
       </div>
@@ -334,6 +346,12 @@ function LayoutTicket({ orden }: { orden: OrdenVenta }) {
           <div className="flex justify-between">
             <span className="text-gray-500">Descuento ({orden.descuento_pct}%)</span>
             <span className="text-red-600">−{formatARS(orden.descuento_monto)}</span>
+          </div>
+        )}
+        {(orden as unknown as { recargo_monto?: number }).recargo_monto! > 0 && (
+          <div className="flex justify-between">
+            <span className="text-gray-500">Recargo</span>
+            <span className="text-amber-600">+{formatARS((orden as unknown as { recargo_monto: number }).recargo_monto)}</span>
           </div>
         )}
         <div className="flex justify-between font-bold text-sm border-t border-gray-300 pt-1 mt-1">
@@ -459,7 +477,9 @@ export default function PrintOrdenVentaPage({ params }: { params: Promise<{ id: 
 
       {/* Documento */}
       <div className="print:pt-0 pt-16 bg-white min-h-screen">
-        {formato === 'a4' ? <LayoutA4 orden={orden} /> : <LayoutTicket orden={orden} />}
+        {formato === 'a4'
+          ? <LayoutA4 orden={orden} logoUrl={orden.sucursales?.logo_url} />
+          : <LayoutTicket orden={orden} logoUrl={orden.sucursales?.logo_url} />}
       </div>
 
       <style>{`

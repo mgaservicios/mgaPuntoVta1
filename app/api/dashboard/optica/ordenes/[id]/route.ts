@@ -19,7 +19,9 @@ export async function GET(_: NextRequest, { params }: Ctx) {
     .select(`
       *,
       clientes(nombre, telefono),
+      vendedores(nombre),
       optica_medicos(nombre, matricula),
+      sucursales(nombre, logo_url),
       optica_orden_items(id, tipo, uso, nombre, armazon_propio, articulo_id, variante_id, cantidad, precio_unitario, descuento_pct, subtotal, notas),
       optica_orden_tareas(id, titulo, descripcion, estado, fecha, fecha_fin, laboratorio_nombre, laboratorio_tipo, created_at, updated_at, users!usuario_id(name, email)),
       optica_orden_pagos(id, metodo, monto, concepto, referencia, fecha_pago, created_at)

@@ -2,16 +2,18 @@
 
 import { useEffect } from 'react'
 import { usePathname } from 'next/navigation'
-import { Building2 } from 'lucide-react'
+import { Building2, ShoppingCart, Glasses, ReceiptText, Wrench, Search, Package } from 'lucide-react'
+import Link from 'next/link'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import type { Sucursal } from '@/types/sucursales'
+import type { LucideIcon } from 'lucide-react'
 
 const ROUTE_LABELS: Record<string, string> = {
-  '/dashboard': 'Dashboard',
+  '/dashboard': 'Inicio',
   '/dashboard/ventas': 'Ventas',
-  '/dashboard/ventas/pos': 'Punto de Venta',
+  '/dashboard/ventas/pos': 'Ticket de Venta',
   '/dashboard/articulos': 'Artículos',
   '/dashboard/stock': 'Stock',
   '/dashboard/caja': 'Caja',
@@ -31,7 +33,7 @@ function getPageTitle(pathname: string): string {
   for (const [route, label] of Object.entries(ROUTE_LABELS)) {
     if (pathname.startsWith(route + '/')) return label
   }
-  return 'Dashboard'
+  return 'Inicio'
 }
 
 interface DashboardHeaderProps {
@@ -42,6 +44,7 @@ interface DashboardHeaderProps {
   isAdmin: boolean
   verTodas: boolean
   homeSucursalNombre: string | null
+  empresaNombre: string
 }
 
 export default function DashboardHeader({
@@ -52,11 +55,12 @@ export default function DashboardHeader({
   isAdmin,
   verTodas,
   homeSucursalNombre,
+  empresaNombre,
 }: DashboardHeaderProps) {
   const pathname = usePathname()
   const title = getPageTitle(pathname)
+  const displayTitle = title === 'Inicio' ? (empresaNombre || 'Inicio') : title
 
-  // Sincroniza la cookie con la sucursal mostrada en el header al montar
   useEffect(() => {
     if (activeSucursalId && !verTodas) {
       fetch('/api/dashboard/sucursales/switch', {
@@ -85,7 +89,7 @@ export default function DashboardHeader({
   return (
     <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-6 flex-shrink-0">
       <div className="flex items-center gap-3 min-w-0">
-        <h1 className="text-base font-semibold text-gray-900 shrink-0">{title}</h1>
+        <h1 className="text-base font-semibold text-gray-900 shrink-0">{displayTitle}</h1>
         {homeSucursalNombre && (
           <span className="hidden sm:inline text-xs text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full border border-gray-200 shrink-0">
             Logueado en: <span className="font-medium text-gray-700">{homeSucursalNombre}</span>
@@ -127,5 +131,55 @@ export default function DashboardHeader({
         </div>
       </div>
     </header>
+  )
+}
+
+type QuickAction = { href: string; label: string; Icon: LucideIcon; module?: string }
+
+const QUICK_ACTIONS: QuickAction[] = [
+  { href: '/dashboard/ventas/pos',              label: 'Ticket de Venta',  Icon: ShoppingCart, module: 'ventas'     },
+  { href: '/dashboard/optica/ordenes/nueva',    label: 'Nueva OT',        Icon: Glasses,      module: 'optica'     },
+  { href: '/dashboard/inventario/remitos/nuevo',label: 'Nuevo remito',    Icon: ReceiptText,  module: 'inventario' },
+  { href: '/dashboard/optica/servicios/nueva',  label: 'Nuevo servicio',  Icon: Wrench,       module: 'optica'     },
+  { href: '/dashboard/consultas/stock',         label: 'Stock y precios', Icon: Search,       module: 'inventario' },
+  { href: '/dashboard/inventario/articulos',    label: 'Artículos',       Icon: Package,      module: 'inventario' },
+]
+
+function hexToRgba(hex: string, alpha: number): string {
+  const r = parseInt(hex.slice(1, 3), 16)
+  const g = parseInt(hex.slice(3, 5), 16)
+  const b = parseInt(hex.slice(5, 7), 16)
+  return `rgba(${r},${g},${b},${alpha})`
+}
+
+export function QuickActionsBar({ modules, color }: { modules: string[]; color?: string | null }) {
+  const pathname = usePathname()
+  const visible = QUICK_ACTIONS.filter(a => !a.module || modules.includes(a.module))
+
+  if (visible.length === 0) return null
+
+  const brand = /^#[0-9A-Fa-f]{6}$/.test(color ?? '') ? color! : null
+
+  return (
+    <div className="bg-white border-b border-gray-100 flex items-center gap-1 px-4 py-2 overflow-x-auto flex-shrink-0">
+      <span className="text-xs font-medium text-gray-400 mr-2 shrink-0">Acciones:</span>
+      {visible.map(({ href, label, Icon }) => {
+        const isActive = pathname === href || pathname.startsWith(href + '/')
+        return (
+          <Link
+            key={href}
+            href={href}
+            className="flex items-center gap-2 px-3.5 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors"
+            style={isActive
+              ? { backgroundColor: brand ? hexToRgba(brand, 0.1) : undefined, color: brand ?? undefined }
+              : undefined
+            }
+          >
+            <Icon className="w-4 h-4" style={isActive ? undefined : { color: 'inherit' }} />
+            {label}
+          </Link>
+        )
+      })}
+    </div>
   )
 }

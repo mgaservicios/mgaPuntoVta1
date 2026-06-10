@@ -4,7 +4,7 @@ import { useEffect, useState, use, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
-  ArrowLeft, Plus, Trash2, X, Save, CheckCircle, XCircle, Search, ChevronDown, Printer,
+  ArrowLeft, Plus, Trash2, X, Save, CheckCircle, Search, ChevronDown, Printer, AlertTriangle,
 } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -17,15 +17,18 @@ import {
 import ConfirmDialog from '@/components/dashboard/ConfirmDialog'
 import {
   CONDICION_LABELS, METODO_ORDEN_LABELS,
-  type OrdenVenta, type CondicionPago, type MetodoPagoOrden,
+  type OrdenVenta, type CondicionPago,
 } from '@/types/ordenes'
 import type { Cliente } from '@/types/clientes'
 import type { NotaCredito } from '@/types/notas-credito'
+import type { FormaPago } from '@/types/formas-pago'
+import { TIPOS_CON_REFERENCIA } from '@/types/formas-pago'
 import ClienteSearch from '@/components/dashboard/ClienteSearch'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
 import { useSucursalActiva } from '@/hooks/useSucursalActiva'
+import { useVendedores } from '@/hooks/useVendedores'
 
 // ── Tipos locales ─────────────────────────────────────────────────────────────
 
@@ -59,17 +62,18 @@ interface FormItem {
 }
 
 interface FormPago {
-  metodo: MetodoPagoOrden
+  metodo: string
   monto: string
   referencia: string
   fecha_pago: string
   nota_credito_id?: number
+  forma_pago_id?: number | null
+  cuotas?: number | null
 }
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 
 const CONDICIONES: CondicionPago[] = ['contado', '30_dias', '60_dias', '90_dias', 'cuenta_corriente', 'otro']
-const METODOS: MetodoPagoOrden[] = ['EFECTIVO', 'TRANSFERENCIA', 'TARJETA_DEBITO', 'TARJETA_CREDITO', 'CUENTA_CORRIENTE', 'NOTA_CREDITO', 'CHEQUE', 'OTRO']
 
 const ESTADO_VARIANT = { borrador: 'outline', confirmada: 'default', anulada: 'destructive' } as const
 
@@ -93,10 +97,14 @@ export default function OrdenPage({ params }: { params: Promise<{ id: string }> 
   const { id } = use(params)
   const isNew = id === 'nueva'
   const router = useRouter()
-  const sucursalNombre = useSucursalActiva()
+  const { nombre: sucursalNombre, isHome } = useSucursalActiva()
 
   const [orden, setOrden] = useState<OrdenVenta | null>(null)
   const [loading, setLoading] = useState(!isNew)
+
+  // Vendedor
+  const vendedores = useVendedores()
+  const [vendedorId, setVendedorId] = useState<number | null>(null)
 
   // Listas de precio
   const [listas, setListas] = useState<{ id: number; nombre: string }[]>([])
@@ -112,6 +120,10 @@ export default function OrdenPage({ params }: { params: Promise<{ id: string }> 
   const [descuentoGlobal, setDescuentoGlobal] = useState('0')
   const [pagos, setPagos] = useState<FormPago[]>([])
   const [ncsDisponibles, setNcsDisponibles] = useState<NotaCredito[]>([])
+  const [saldoCC, setSaldoCC] = useState<number | null>(null)
+  const [formasPago, setFormasPago] = useState<FormaPago[]>([])
+  const [recargoPct, setRecargoPct] = useState('0')
+  const [recargoMonto, setRecargoMonto] = useState(0)
 
   // Búsqueda de artículos
   const [q, setQ] = useState('')
@@ -124,15 +136,8 @@ export default function OrdenPage({ params }: { params: Promise<{ id: string }> 
   // Acciones
   const [saving, setSaving] = useState(false)
   const [confirming, setConfirming] = useState(false)
-  const [anulando, setAnulando] = useState(false)
-  const [showAnular, setShowAnular] = useState(false)
   const [showConfirmar, setShowConfirmar] = useState(false)
 
-  // Pago en vista confirmada
-  const [showPagoModal, setShowPagoModal] = useState(false)
-  const [pagoMetodo, setPagoMetodo] = useState('EFECTIVO')
-  const [pagoMonto, setPagoMonto] = useState('')
-  const [savingPago, setSavingPago] = useState(false)
 
   // ── Carga de orden existente ──
 
@@ -142,6 +147,8 @@ export default function OrdenPage({ params }: { params: Promise<{ id: string }> 
     setCondicionPago(o.condicion_pago)
     setObservaciones(o.observaciones ?? '')
     setDescuentoGlobal(String(o.descuento_pct))
+    const rm = Number((o as unknown as { recargo_monto?: number }).recargo_monto ?? 0)
+    setRecargoMonto(rm)
     if (o.clientes) {
       setCliente({ id: o.cliente_id!, nombre: o.clientes.nombre, telefono: o.clientes.telefono ?? null } as Cliente)
     }
@@ -163,6 +170,12 @@ export default function OrdenPage({ params }: { params: Promise<{ id: string }> 
       nota_credito_id: p.nota_credito_id ?? undefined,
     })))
   }
+
+  useEffect(() => {
+    fetch('/api/dashboard/formas-pago').then(r => r.json()).then(data => {
+      setFormasPago(Array.isArray(data) ? data : [])
+    }).catch(() => {})
+  }, [])
 
   useEffect(() => {
     fetch('/api/dashboard/listas-precio')
@@ -190,13 +203,17 @@ export default function OrdenPage({ params }: { params: Promise<{ id: string }> 
       .catch(() => setLoading(false))
   }, [id, isNew]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Cargar NCs cuando cambia el cliente
+  // Cargar NCs y saldo CC cuando cambia el cliente
   useEffect(() => {
-    if (!cliente) { setNcsDisponibles([]); return }
+    if (!cliente) { setNcsDisponibles([]); setSaldoCC(null); return }
     fetch(`/api/dashboard/notas-credito?cliente_id=${cliente.id}&estado=pendiente`)
       .then(r => r.json())
       .then(data => setNcsDisponibles(Array.isArray(data) ? data : []))
       .catch(() => setNcsDisponibles([]))
+    fetch(`/api/dashboard/listados/cobranzas?cliente_id=${cliente.id}`)
+      .then(r => r.json())
+      .then((data: { saldo_actual: number }[]) => setSaldoCC(data[0]?.saldo_actual ?? 0))
+      .catch(() => setSaldoCC(null))
   }, [cliente])
 
   // ── Búsqueda de artículos ──
@@ -270,8 +287,21 @@ export default function OrdenPage({ params }: { params: Promise<{ id: string }> 
   const descPct = parseFloat(descuentoGlobal) || 0
   const descMonto = Math.round(subtotal * (descPct / 100) * 100) / 100
   const total = subtotal - descMonto
+  const totalFinal = Math.round((total + recargoMonto) * 100) / 100
   const totalPagado = pagos.reduce((acc, p) => acc + (parseFloat(p.monto) || 0), 0)
-  const diferenciaPago = Math.max(0, total - totalPagado)
+  const diferenciaPago = Math.max(0, totalFinal - totalPagado)
+
+  function onRecargoPctChangeOV(val: string) {
+    setRecargoPct(val)
+    const pct = Math.max(0, parseFloat(val) || 0)
+    setRecargoMonto(Math.round(total * pct / 100 * 100) / 100)
+  }
+
+  function onRecargoMontoChangeOV(val: string) {
+    const rm = Math.max(0, parseFloat(val) || 0)
+    setRecargoMonto(rm)
+    setRecargoPct(total > 0 ? ((rm / total) * 100).toFixed(2) : '0')
+  }
 
   // ── Construcción de payload ──
 
@@ -280,8 +310,10 @@ export default function OrdenPage({ params }: { params: Promise<{ id: string }> 
       fecha,
       vencimiento: vencimiento || null,
       cliente_id: cliente?.id ?? null,
+      vendedor_id: vendedorId,
       condicion_pago: condicionPago,
       descuento_pct: descPct,
+      recargo_monto: recargoMonto,
       observaciones: observaciones || null,
       items: items.map(i => ({
         articulo_id: i.articulo_id,
@@ -295,10 +327,12 @@ export default function OrdenPage({ params }: { params: Promise<{ id: string }> 
       pagos: pagos
         .filter(p => parseFloat(p.monto) > 0)
         .map(p => ({
-          metodo: p.metodo,
-          monto: parseFloat(p.monto),
-          referencia: p.referencia || null,
-          fecha_pago: p.fecha_pago || null,
+          metodo:        p.metodo,
+          monto:         parseFloat(p.monto),
+          referencia:    p.referencia || null,
+          fecha_pago:    p.fecha_pago || null,
+          forma_pago_id: p.forma_pago_id ?? null,
+          cuotas:        p.cuotas ?? null,
           ...(p.nota_credito_id ? { nota_credito_id: p.nota_credito_id } : {}),
         })),
     }
@@ -354,41 +388,27 @@ export default function OrdenPage({ params }: { params: Promise<{ id: string }> 
     }
   }
 
-  async function handleAnular() {
-    setAnulando(true)
-    const res = await fetch(`/api/dashboard/ordenes/${id}/anular`, { method: 'POST' })
-    setAnulando(false)
-    setShowAnular(false)
-    if (res.ok) {
-      toast.success('Orden anulada')
-      setOrden(prev => prev ? { ...prev, estado: 'anulada' } : prev)
-    } else {
-      const err = await res.json()
-      toast.error(err.error ?? 'Error al anular')
-    }
-  }
 
-  async function handleRegistrarPago() {
-    const monto = parseFloat(pagoMonto)
-    if (isNaN(monto) || monto <= 0) { toast.error('Ingresá un monto válido'); return }
-    setSavingPago(true)
-    const res = await fetch(`/api/dashboard/ordenes/${id}/pago`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ metodo: pagoMetodo, monto }),
-    })
-    setSavingPago(false)
-    if (!res.ok) { const d = await res.json(); toast.error(d.error ?? 'Error'); return }
-    toast.success('Pago registrado')
-    setShowPagoModal(false)
-    // Recargar orden para actualizar pagos
-    const r = await fetch(`/api/dashboard/ordenes/${id}`)
-    if (r.ok) { const d = await r.json(); setOrden(d) }
-  }
 
   // ── Estados de carga ──
 
   if (loading) return <div className="text-gray-400 text-sm">Cargando…</div>
+
+  if (isNew && !isHome) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[50vh] gap-4 text-center">
+        <div className="w-14 h-14 rounded-full bg-amber-100 flex items-center justify-center">
+          <AlertTriangle className="w-7 h-7 text-amber-500" />
+        </div>
+        <div>
+          <p className="font-semibold text-gray-800">No puede crear una orden de venta desde esta sucursal</p>
+          <p className="text-sm text-gray-500 mt-1">
+            Está visualizando otra sucursal. Seleccione su sucursal en el selector para continuar.
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   const isEditable = isNew || orden?.estado === 'borrador'
 
@@ -427,12 +447,6 @@ export default function OrdenPage({ params }: { params: Promise<{ id: string }> 
               <Printer className="w-4 h-4" />
               Imprimir
             </Link>
-            {orden.estado === 'confirmada' && (
-              <Button variant="outline" className="text-red-500 hover:text-red-600"
-                onClick={() => setShowAnular(true)}>
-                <XCircle className="w-4 h-4 mr-2" /> Anular
-              </Button>
-            )}
           </div>
         </div>
 
@@ -506,22 +520,6 @@ export default function OrdenPage({ params }: { params: Promise<{ id: string }> 
           <div className="bg-white rounded-xl border border-gray-200 p-4">
             <div className="flex items-center justify-between mb-3">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Forma de pago</p>
-              {(() => {
-                const totalPagado = pagos.reduce((a, p) => a + p.monto, 0)
-                const saldoPendiente = orden.total - totalPagado
-                return saldoPendiente > 0.005 && orden.estado !== 'anulada' ? (
-                  <button
-                    onClick={() => {
-                      setPagoMonto(saldoPendiente.toFixed(2))
-                      setPagoMetodo('EFECTIVO')
-                      setShowPagoModal(true)
-                    }}
-                    className="flex items-center gap-1 text-xs text-green-700 border border-green-300 bg-green-50 hover:bg-green-100 rounded px-2 py-1"
-                  >
-                    <span>Registrar pago</span>
-                  </button>
-                ) : null
-              })()}
             </div>
             {pagos.length === 0 ? (
               <p className="text-sm text-gray-400">No especificada</p>
@@ -551,6 +549,12 @@ export default function OrdenPage({ params }: { params: Promise<{ id: string }> 
                 <span className="text-red-500">-{formatARS(orden.descuento_monto)}</span>
               </div>
             )}
+            {Number((orden as unknown as { recargo_monto?: number }).recargo_monto ?? 0) > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Recargo</span>
+                <span className="text-amber-600">+{formatARS(Number((orden as unknown as { recargo_monto?: number }).recargo_monto))}</span>
+              </div>
+            )}
             <div className="flex justify-between font-bold text-base border-t border-gray-100 pt-2">
               <span>Total</span>
               <span>{formatARS(orden.total)}</span>
@@ -574,55 +578,6 @@ export default function OrdenPage({ params }: { params: Promise<{ id: string }> 
           </div>
         </div>
 
-        {/* Modal pago */}
-        <Dialog open={showPagoModal} onOpenChange={setShowPagoModal}>
-          <DialogContent className="sm:max-w-sm">
-            <DialogHeader>
-              <DialogTitle>Registrar pago — {orden.numero}</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-3 py-1">
-              <div>
-                <Label className="mb-1.5 block text-sm">Método de pago</Label>
-                <select
-                  className="w-full h-9 text-sm border border-input rounded-md px-2 bg-white"
-                  value={pagoMetodo}
-                  onChange={e => setPagoMetodo(e.target.value)}
-                >
-                  {[
-                    ['EFECTIVO', 'Efectivo'], ['TRANSFERENCIA', 'Transferencia'],
-                    ['TARJETA_DEBITO', 'Tarjeta débito'], ['TARJETA_CREDITO', 'Tarjeta crédito'],
-                    ['CUENTA_CORRIENTE', 'Cuenta corriente'], ['CHEQUE', 'Cheque'], ['OTRO', 'Otro'],
-                  ].map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                </select>
-              </div>
-              <div>
-                <Label className="mb-1.5 block text-sm">Monto</Label>
-                <Input
-                  type="number" min="0" step="0.01" placeholder="0.00"
-                  value={pagoMonto}
-                  onChange={e => setPagoMonto(e.target.value)}
-                  autoFocus
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowPagoModal(false)}>Cancelar</Button>
-              <Button onClick={handleRegistrarPago} disabled={savingPago || !pagoMonto}>
-                {savingPago ? 'Registrando…' : 'Confirmar pago'}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        <ConfirmDialog
-          open={showAnular}
-          title="Anular orden"
-          description="Esta acción anulará la orden y revertirá los movimientos de stock si estaba confirmada. ¿Confirmás?"
-          confirmLabel="Anular"
-          loading={anulando}
-          onConfirm={handleAnular}
-          onCancel={() => setShowAnular(false)}
-        />
       </div>
     )
   }
@@ -676,6 +631,24 @@ export default function OrdenPage({ params }: { params: Promise<{ id: string }> 
               <Label>Cliente</Label>
               <ClienteSearch value={cliente} onChange={setCliente} />
             </div>
+
+            {/* Vendedor */}
+            {isNew && (
+              <div className="col-span-2 space-y-1">
+                <Label>Vendedor</Label>
+                <Select
+                  value={vendedorId?.toString() ?? ''}
+                  onValueChange={v => setVendedorId(Number(v))}
+                >
+                  <SelectTrigger><SelectValue placeholder="Seleccionar vendedor…" /></SelectTrigger>
+                  <SelectContent>
+                    {vendedores.map(v => (
+                      <SelectItem key={v.id} value={v.id.toString()}>{v.nombre}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             {/* Condición de pago */}
             <div className="space-y-1">
@@ -886,9 +859,28 @@ export default function OrdenPage({ params }: { params: Promise<{ id: string }> 
                     <span className="text-red-500">-{formatARS(descMonto)}</span>
                   </div>
                 )}
+                <div className="flex items-center justify-between text-sm gap-2">
+                  <span className="text-gray-500 shrink-0">Recargo (%)</span>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number" min="0" step="0.01"
+                      className="w-14 text-right text-sm border border-gray-200 rounded px-2 py-0.5"
+                      value={recargoPct}
+                      onChange={e => onRecargoPctChangeOV(e.target.value)}
+                    />
+                    <span className="text-gray-400 text-xs">=</span>
+                    <input
+                      type="number" min="0" step="0.01"
+                      className="w-20 text-right text-sm border border-gray-200 rounded px-2 py-0.5"
+                      value={recargoMonto || ''}
+                      onChange={e => onRecargoMontoChangeOV(e.target.value)}
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
                 <div className="flex justify-between font-bold text-base border-t border-gray-200 pt-2">
                   <span>Total</span>
-                  <span>{formatARS(total)}</span>
+                  <span>{formatARS(totalFinal)}</span>
                 </div>
               </div>
             </div>
@@ -901,92 +893,157 @@ export default function OrdenPage({ params }: { params: Promise<{ id: string }> 
             <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Forma de pago</h3>
             <Button
               type="button" variant="outline" size="sm"
-              onClick={() => setPagos(prev => [...prev, { metodo: 'TRANSFERENCIA', monto: diferenciaPago > 0 ? diferenciaPago.toFixed(2) : '', referencia: '', fecha_pago: '' }])}
+              onClick={() => {
+                const primero = formasPago[0]
+                setPagos(prev => [...prev, { metodo: primero?.nombre ?? 'CUENTA_CORRIENTE', monto: diferenciaPago > 0 ? diferenciaPago.toFixed(2) : '', referencia: '', fecha_pago: '', forma_pago_id: primero?.id ?? null, cuotas: null }])
+              }}
             >
               <Plus className="w-3.5 h-3.5 mr-1" /> Agregar
             </Button>
           </div>
 
+          {/* Aviso saldo a favor CC */}
+          {saldoCC !== null && saldoCC < -0.001 && (
+            <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg px-3 py-2 mb-3">
+              <p className="text-sm text-green-800">
+                <span className="font-semibold">Saldo a favor en CC:</span> {formatARS(Math.abs(saldoCC))}
+              </p>
+              <Button
+                type="button" variant="outline" size="sm"
+                className="text-green-700 border-green-300 hover:bg-green-100 h-7 text-xs"
+                onClick={() => {
+                  const credito = Math.abs(saldoCC)
+                  const pendiente = diferenciaPago > 0 ? diferenciaPago : total
+                  const aplicar = Math.min(credito, pendiente)
+                  setPagos(prev => [...prev, { metodo: 'CUENTA_CORRIENTE', monto: aplicar.toFixed(2), referencia: '', fecha_pago: '' }])
+                }}
+              >
+                Aplicar saldo
+              </Button>
+            </div>
+          )}
+
           {pagos.length === 0 ? (
             <p className="text-sm text-gray-400">Sin forma de pago especificada (opcional al crear la orden).</p>
           ) : (
             <div className="space-y-3">
-              {pagos.map((pago, idx) => (
-                <div key={idx} className="space-y-1.5">
-                  <div className="grid grid-cols-[1fr_130px_150px_130px_auto] gap-2 items-center">
-                    <select
-                      className="text-sm border border-gray-200 rounded-md px-2 py-1.5 bg-white"
-                      value={pago.metodo}
-                      onChange={(e) => setPagos(prev => prev.map((p, i) => i === idx ? { ...p, metodo: e.target.value as MetodoPagoOrden, nota_credito_id: undefined } : p))}
-                    >
-                      {METODOS.map(m => <option key={m} value={m}>{METODO_ORDEN_LABELS[m]}</option>)}
-                    </select>
-                    <input
-                      type="number" min="0" step="0.01" placeholder="Monto"
-                      className="text-sm border border-gray-200 rounded-md px-2 py-1.5 text-right"
-                      value={pago.monto}
-                      onChange={(e) => setPagos(prev => prev.map((p, i) => i === idx ? { ...p, monto: e.target.value } : p))}
-                    />
-                    {pago.metodo !== 'NOTA_CREDITO' ? (
-                      <>
-                        <input
-                          type="text" placeholder="Referencia (opcional)"
-                          className="text-sm border border-gray-200 rounded-md px-2 py-1.5"
-                          value={pago.referencia}
-                          onChange={(e) => setPagos(prev => prev.map((p, i) => i === idx ? { ...p, referencia: e.target.value } : p))}
-                        />
-                        <input
-                          type="date" placeholder="Fecha pago"
-                          className="text-sm border border-gray-200 rounded-md px-2 py-1.5"
-                          value={pago.fecha_pago}
-                          onChange={(e) => setPagos(prev => prev.map((p, i) => i === idx ? { ...p, fecha_pago: e.target.value } : p))}
-                        />
-                      </>
-                    ) : (
-                      <div className="col-span-2" />
-                    )}
-                    <button onClick={() => setPagos(prev => prev.filter((_, i) => i !== idx))} className="text-gray-300 hover:text-red-500 p-1">
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                  {pago.metodo === 'NOTA_CREDITO' && (
-                    <div className="ml-0">
-                      {!cliente ? (
-                        <p className="text-xs text-amber-600 bg-amber-50 rounded px-2 py-1">
-                          Seleccioná un cliente para ver sus notas de crédito
-                        </p>
-                      ) : ncsDisponibles.length === 0 ? (
-                        <p className="text-xs text-gray-400 bg-gray-50 rounded px-2 py-1">
-                          El cliente no tiene notas de crédito disponibles
-                        </p>
-                      ) : (
+              {pagos.map((pago, idx) => {
+                const fp = formasPago.find(f => f.nombre === pago.metodo)
+                const mostrarRefFecha = fp ? TIPOS_CON_REFERENCIA.includes(fp.tipo) : false
+                const mostrarCuotas  = fp?.tipo === 'TARJETA_CREDITO' && (fp.formas_pago_cuotas?.length ?? 0) > 0
+                return (
+                  <div key={idx} className="space-y-1.5">
+                    <div className="flex flex-wrap gap-2 items-center">
+                      {/* Método */}
+                      <select
+                        className="text-sm border border-gray-200 rounded-md px-2 py-1.5 bg-white flex-1 min-w-[140px]"
+                        value={pago.metodo}
+                        onChange={(e) => {
+                          const newfp = formasPago.find(f => f.nombre === e.target.value)
+                          setPagos(prev => prev.map((p, i) => i === idx
+                            ? { ...p, metodo: e.target.value, nota_credito_id: undefined, forma_pago_id: newfp?.id ?? null, cuotas: null, referencia: '' }
+                            : p))
+                        }}
+                      >
+                        {formasPago.map(f => <option key={f.id} value={f.nombre}>{f.nombre}</option>)}
+                        <option value="CUENTA_CORRIENTE">Cuenta corriente</option>
+                        <option value="NOTA_CREDITO">Nota de crédito</option>
+                      </select>
+                      {/* Monto */}
+                      <input
+                        type="number" min="0" step="0.01" placeholder="Monto"
+                        className="text-sm border border-gray-200 rounded-md px-2 py-1.5 text-right w-32"
+                        value={pago.monto}
+                        onChange={(e) => setPagos(prev => prev.map((p, i) => i === idx ? { ...p, monto: e.target.value } : p))}
+                      />
+                      {/* Cuotas */}
+                      {mostrarCuotas && (
                         <select
-                          className="w-full text-sm border border-gray-200 rounded-md px-2 py-1.5 bg-white"
-                          value={pago.nota_credito_id ? String(pago.nota_credito_id) : ''}
-                          onChange={(e) => {
-                            const nc = ncsDisponibles.find(n => String(n.id) === e.target.value)
-                            setPagos(prev => prev.map((p, i) => {
-                              if (i !== idx) return p
-                              if (!nc) return { ...p, nota_credito_id: undefined, monto: '' }
-                              const otrosPagados = prev.filter((_, j) => j !== idx).reduce((acc, p2) => acc + (parseFloat(p2.monto) || 0), 0)
-                              const restante = Math.max(0, total - otrosPagados)
-                              const monto = Math.min(nc.monto_disponible, restante)
-                              return { ...p, nota_credito_id: nc.id, monto: monto.toFixed(2) }
-                            }))
+                          className="text-sm border border-gray-200 rounded-md px-2 py-1.5 bg-white"
+                          value={pago.cuotas ?? ''}
+                          onChange={e => {
+                            const cuotaNum = e.target.value ? parseInt(e.target.value) : null
+                            setPagos(prev => prev.map((p, i) => i === idx ? { ...p, cuotas: cuotaNum } : p))
+                            if (cuotaNum && fp) {
+                              const cuota = fp.formas_pago_cuotas?.find(c => c.cantidad_cuotas === cuotaNum)
+                              if (cuota) {
+                                const pct = cuota.recargo_pct
+                                const rm = Math.round(total * pct / 100 * 100) / 100
+                                setRecargoPct(pct.toString())
+                                setRecargoMonto(rm)
+                              }
+                            }
                           }}
                         >
-                          <option value="">Seleccioná una nota de crédito…</option>
-                          {ncsDisponibles.map(nc => (
-                            <option key={nc.id} value={String(nc.id)}>
-                              {nc.numero} — {new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(nc.monto_disponible)} disp.
+                          <option value="">Cuotas</option>
+                          {fp!.formas_pago_cuotas.sort((a, b) => a.cantidad_cuotas - b.cantidad_cuotas).map(c => (
+                            <option key={c.id} value={c.cantidad_cuotas}>
+                              {c.cantidad_cuotas}x {c.recargo_pct > 0 ? `+${c.recargo_pct}%` : 's/rec.'}
                             </option>
                           ))}
                         </select>
                       )}
+                      {/* Referencia */}
+                      {mostrarRefFecha && (
+                        <input
+                          type="text" placeholder="Referencia (opcional)"
+                          className="text-sm border border-gray-200 rounded-md px-2 py-1.5 w-40"
+                          value={pago.referencia}
+                          onChange={(e) => setPagos(prev => prev.map((p, i) => i === idx ? { ...p, referencia: e.target.value } : p))}
+                        />
+                      )}
+                      {/* Fecha */}
+                      {mostrarRefFecha && (
+                        <input
+                          type="date"
+                          className="text-sm border border-gray-200 rounded-md px-2 py-1.5"
+                          value={pago.fecha_pago || new Date().toISOString().slice(0, 10)}
+                          onChange={(e) => setPagos(prev => prev.map((p, i) => i === idx ? { ...p, fecha_pago: e.target.value } : p))}
+                        />
+                      )}
+                      <button onClick={() => setPagos(prev => prev.filter((_, i) => i !== idx))} className="text-gray-300 hover:text-red-500 p-1 ml-auto">
+                        <X className="w-4 h-4" />
+                      </button>
                     </div>
-                  )}
-                </div>
-              ))}
+                    {/* NC selector */}
+                    {pago.metodo === 'NOTA_CREDITO' && (
+                      <div>
+                        {!cliente ? (
+                          <p className="text-xs text-amber-600 bg-amber-50 rounded px-2 py-1">
+                            Seleccioná un cliente para ver sus notas de crédito
+                          </p>
+                        ) : ncsDisponibles.length === 0 ? (
+                          <p className="text-xs text-gray-400 bg-gray-50 rounded px-2 py-1">
+                            El cliente no tiene notas de crédito disponibles
+                          </p>
+                        ) : (
+                          <select
+                            className="w-full text-sm border border-gray-200 rounded-md px-2 py-1.5 bg-white"
+                            value={pago.nota_credito_id ? String(pago.nota_credito_id) : ''}
+                            onChange={(e) => {
+                              const nc = ncsDisponibles.find(n => String(n.id) === e.target.value)
+                              setPagos(prev => prev.map((p, i) => {
+                                if (i !== idx) return p
+                                if (!nc) return { ...p, nota_credito_id: undefined, monto: '' }
+                                const otrosPagados = prev.filter((_, j) => j !== idx).reduce((acc, p2) => acc + (parseFloat(p2.monto) || 0), 0)
+                                const monto = Math.min(nc.monto_disponible, Math.max(0, total - otrosPagados))
+                                return { ...p, nota_credito_id: nc.id, monto: monto.toFixed(2) }
+                              }))
+                            }}
+                          >
+                            <option value="">Seleccioná una nota de crédito…</option>
+                            {ncsDisponibles.map(nc => (
+                              <option key={nc.id} value={String(nc.id)}>
+                                {nc.numero} — {new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(nc.monto_disponible)} disp.
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           )}
         </section>

@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { ArrowLeft, Search, X, Plus } from 'lucide-react'
+import { ArrowLeft, Search, X, Plus, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -19,6 +19,7 @@ import type { Proveedor } from '@/types/proveedores'
 import type { ContraparteTipo, TipoRemito } from '@/types/stock'
 import type { ListaPrecio } from '@/types/precios'
 import { useSucursalActiva } from '@/hooks/useSucursalActiva'
+import { useVendedores } from '@/hooks/useVendedores'
 
 type ArticuloResult = {
   id: number
@@ -48,7 +49,10 @@ type ItemForm = {
 
 export default function NuevoRemitoPage() {
   const router = useRouter()
-  const sucursalNombre = useSucursalActiva()
+  const { nombre: sucursalNombre, isHome } = useSucursalActiva()
+
+  const vendedores = useVendedores()
+  const [vendedorId, setVendedorId] = useState<number | null>(null)
 
   const [tipo, setTipo] = useState<TipoRemito>('entrada')
   const [fecha, setFecha] = useState<string>(new Date().toISOString().slice(0, 10))
@@ -256,6 +260,7 @@ export default function NuevoRemitoPage() {
         contraparte_nombre: contraparteTipo === 'persona' ? contraparteNombre.trim() : null,
         fecha: new Date(fecha + 'T12:00:00').toISOString(),
         observaciones: observaciones || null,
+        vendedor_id: vendedorId,
         items: items.map(i => {
           const costoVal = compraLista ? (Number(i.precios[compraLista.id]) || null) : null
           return {
@@ -279,6 +284,22 @@ export default function NuevoRemitoPage() {
       const err = await res.json()
       toast.error(err.error ?? 'Error al guardar')
     }
+  }
+
+  if (!isHome) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[50vh] gap-4 text-center">
+        <div className="w-14 h-14 rounded-full bg-amber-100 flex items-center justify-center">
+          <AlertTriangle className="w-7 h-7 text-amber-500" />
+        </div>
+        <div>
+          <p className="font-semibold text-gray-800">No puede crear un remito desde esta sucursal</p>
+          <p className="text-sm text-gray-500 mt-1">
+            Está visualizando otra sucursal. Seleccione su sucursal en el selector para continuar.
+          </p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -333,6 +354,19 @@ export default function NuevoRemitoPage() {
                 onChange={e => setFecha(e.target.value)}
                 className="w-40"
               />
+            </div>
+            <div>
+              <Label className="mb-2 block">Vendedor</Label>
+              <Select value={vendedorId?.toString() ?? ''} onValueChange={v => setVendedorId(Number(v))}>
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="Seleccionar…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {vendedores.map(v => (
+                    <SelectItem key={v.id} value={v.id.toString()}>{v.nombre}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </div>

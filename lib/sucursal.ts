@@ -45,3 +45,21 @@ export async function assertHomeSucursal(recordSucursalId: number | null): Promi
   }
   return null
 }
+
+// Returns 403 if the user has switched the selector to a different sucursal than their home.
+// Use in POST (create) and quick-action routes to block operations while viewing another sucursal.
+export async function assertActiveSucursalIsHome(): Promise<NextResponse | null> {
+  const store = await cookies()
+  const homeCookieVal = store.get(SUCURSAL_HOME_COOKIE)?.value
+  if (!homeCookieVal) return null  // old session without home cookie, skip check
+  const homeId = parseInt(homeCookieVal, 10)
+  const activeVal = store.get(SUCURSAL_COOKIE)?.value
+  const activeId = activeVal ? parseInt(activeVal, 10) : homeId
+  if (activeId !== homeId) {
+    return NextResponse.json(
+      { error: 'No puede operar mientras visualiza otra sucursal. Cambie al selector de su sucursal.' },
+      { status: 403 },
+    )
+  }
+  return null
+}

@@ -1,183 +1,178 @@
 'use client'
 
-import { useEffect, useState, useCallback, Fragment } from 'react'
+import { useEffect, useState, useCallback } from 'react'
+import { ChevronDown, ChevronRight, User } from 'lucide-react'
 import { Input } from '@/components/ui/input'
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select'
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from '@/components/ui/table'
+import { Badge } from '@/components/ui/badge'
 import ClienteSearch from '@/components/dashboard/ClienteSearch'
 import type { Cliente } from '@/types/clientes'
-import type { CobranzaRow } from '@/app/api/dashboard/listados/cobranzas/route'
-
-type DayGroup = { fecha: string; rows: CobranzaRow[]; subtotal: number }
+import type { CtaCteCliente, CtaCteMovimiento } from '@/app/api/dashboard/listados/cobranzas/route'
 
 const METODO_LABELS: Record<string, string> = {
-  EFECTIVO: 'Efectivo',
-  TRANSFERENCIA: 'Transferencia',
-  TARJETA_DEBITO: 'Tarjeta débito',
-  TARJETA_CREDITO: 'Tarjeta crédito',
-  CUENTA_CORRIENTE: 'Cuenta corriente',
-  NOTA_CREDITO: 'Nota de crédito',
-  OTRO: 'Otro',
+  EFECTIVO: 'Efectivo', TRANSFERENCIA: 'Transferencia',
+  TARJETA_DEBITO: 'Tarjeta débito', TARJETA_CREDITO: 'Tarjeta crédito',
+  CHEQUE: 'Cheque', OTRO: 'Otro',
 }
 
-const METODOS = ['EFECTIVO', 'TRANSFERENCIA', 'TARJETA_DEBITO', 'TARJETA_CREDITO', 'CUENTA_CORRIENTE', 'NOTA_CREDITO', 'OTRO']
-
-function formatARS(n: number) {
+function ars(n: number) {
   return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(n)
 }
-
-function formatFecha(iso: string) {
+function fDate(iso: string) {
   return new Date(iso + 'T00:00:00').toLocaleDateString('es-AR', {
     day: '2-digit', month: '2-digit', year: 'numeric',
   })
 }
 
-function groupByDay(rows: CobranzaRow[]): DayGroup[] {
-  const map = new Map<string, CobranzaRow[]>()
-  for (const row of rows) {
-    const existing = map.get(row.fecha) ?? []
-    existing.push(row)
-    map.set(row.fecha, existing)
-  }
-  return Array.from(map.entries()).map(([fecha, gRows]) => ({
-    fecha,
-    rows: gRows,
-    subtotal: gRows.reduce((acc, r) => acc + r.importe, 0),
-  }))
+function MovRow({ m }: { m: CtaCteMovimiento }) {
+  const esCargo = m.tipo === 'CARGO'
+  return (
+    <tr className="border-t border-gray-100 hover:bg-gray-50 text-sm">
+      <td className="py-2 px-3 text-gray-500 whitespace-nowrap">{fDate(m.fecha)}</td>
+      <td className="py-2 px-3">
+        <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${esCargo ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>
+          {esCargo ? 'Cargo' : 'Pago'}
+        </span>
+      </td>
+      <td className="py-2 px-3 text-gray-700">
+        {m.descripcion ?? '—'}
+        {!esCargo && m.metodo && (
+          <span className="ml-1.5 text-xs text-gray-400">· {METODO_LABELS[m.metodo] ?? m.metodo}</span>
+        )}
+      </td>
+      <td className={`py-2 px-3 text-right font-mono font-medium ${esCargo ? 'text-red-600' : 'text-green-600'}`}>
+        {esCargo ? '+' : '−'}{ars(m.importe)}
+      </td>
+      <td className={`py-2 px-3 text-right font-mono font-semibold ${m.saldo > 0.001 ? 'text-gray-800' : m.saldo < -0.001 ? 'text-green-600' : 'text-gray-400'}`}>
+        {ars(m.saldo)}
+      </td>
+    </tr>
+  )
 }
 
-export default function ListadoCobranzasPage() {
-  const [rows, setRows] = useState<CobranzaRow[]>([])
-  const [loading, setLoading] = useState(false)
-  const [desde, setDesde] = useState(() => new Date().toISOString().slice(0, 10))
-  const [hasta, setHasta] = useState('')
-  const [clienteSeleccionado, setClienteSeleccionado] = useState<Cliente | null>(null)
-  const [formaPago, setFormaPago] = useState('todos')
-
-  const fetchRows = useCallback(async () => {
-    setLoading(true)
-    const params = new URLSearchParams()
-    if (desde) params.set('desde', desde)
-    if (hasta) params.set('hasta', hasta)
-    if (clienteSeleccionado) params.set('cliente_id', String(clienteSeleccionado.id))
-    if (formaPago !== 'todos') params.set('forma_pago', formaPago)
-    const res = await fetch(`/api/dashboard/listados/cobranzas?${params}`)
-    if (!res.ok) { setRows([]); setLoading(false); return }
-    const data = await res.json()
-    setRows(Array.isArray(data) ? data : [])
-    setLoading(false)
-  }, [desde, hasta, clienteSeleccionado, formaPago])
-
-  useEffect(() => { fetchRows() }, [fetchRows]) // eslint-disable-line react-hooks/set-state-in-effect
-
-  const groups = groupByDay(rows)
-  const totalGeneral = groups.reduce((acc, g) => acc + g.subtotal, 0)
+function ClienteCard({ cliente }: { cliente: CtaCteCliente }) {
+  const [open, setOpen] = useState(false)
+  const aFavor = cliente.saldo_actual < -0.001
+  const alDia  = Math.abs(cliente.saldo_actual) <= 0.001
 
   return (
-    <div>
-      <h2 className="text-lg font-semibold text-gray-800 mb-4">Listado de cobranzas</h2>
+    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      {/* Cabecera del cliente */}
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-gray-50 transition-colors text-left"
+      >
+        <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
+          <User className="w-4 h-4 text-gray-400" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-gray-900 truncate">{cliente.nombre}</p>
+          <p className="text-xs text-gray-400">{cliente.movimientos.length} movimiento{cliente.movimientos.length !== 1 ? 's' : ''}</p>
+        </div>
+        <div className="text-right shrink-0 mr-2">
+          <p className="text-xs text-gray-400 mb-0.5">Saldo</p>
+          <Badge className={
+            alDia  ? 'bg-green-100 text-green-700 border-0' :
+            aFavor ? 'bg-blue-100 text-blue-700 border-0' :
+                     'bg-red-100 text-red-700 border-0'
+          }>
+            {alDia ? 'Al día' : aFavor ? `A favor ${ars(Math.abs(cliente.saldo_actual))}` : ars(cliente.saldo_actual)}
+          </Badge>
+        </div>
+        {open
+          ? <ChevronDown className="w-4 h-4 text-gray-400 shrink-0" />
+          : <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />}
+      </button>
 
-      <div className="flex flex-wrap items-end gap-3 mb-4">
+      {/* Movimientos */}
+      {open && (
+        <div className="border-t border-gray-100 overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50">
+              <tr className="text-xs text-gray-400 uppercase tracking-wide">
+                <th className="text-left py-2 px-3 font-medium">Fecha</th>
+                <th className="text-left py-2 px-3 font-medium">Tipo</th>
+                <th className="text-left py-2 px-3 font-medium">Descripción</th>
+                <th className="text-right py-2 px-3 font-medium">Importe</th>
+                <th className="text-right py-2 px-3 font-medium">Saldo</th>
+              </tr>
+            </thead>
+            <tbody>
+              {cliente.movimientos.map(m => <MovRow key={m.id} m={m} />)}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default function CtaCteClientesPage() {
+  const [clientes, setClientes]   = useState<CtaCteCliente[]>([])
+  const [loading, setLoading]     = useState(false)
+  const [desde, setDesde]         = useState('')
+  const [hasta, setHasta]         = useState('')
+  const [clienteFiltro, setClienteFiltro] = useState<Cliente | null>(null)
+
+  const fetch_ = useCallback(async () => {
+    setLoading(true)
+    const params = new URLSearchParams()
+    if (desde)        params.set('desde', desde)
+    if (hasta)        params.set('hasta', hasta)
+    if (clienteFiltro) params.set('cliente_id', String(clienteFiltro.id))
+    const res = await fetch(`/api/dashboard/listados/cobranzas?${params}`)
+    if (res.ok) setClientes(await res.json())
+    else setClientes([])
+    setLoading(false)
+  }, [desde, hasta, clienteFiltro])
+
+  useEffect(() => { fetch_() }, [fetch_])
+
+  const totalSaldo = clientes.reduce((s, c) => s + c.saldo_actual, 0)
+  const conSaldo   = clientes.filter(c => c.saldo_actual > 0.001).length
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-end justify-between">
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900">Estado de Cuenta Corriente</h2>
+          <p className="text-sm text-gray-400">Clientes</p>
+        </div>
+        {!loading && clientes.length > 0 && (
+          <div className="text-right">
+            <p className="text-xs text-gray-400">{conSaldo} cliente{conSaldo !== 1 ? 's' : ''} con saldo</p>
+            <p className="text-base font-bold text-gray-900">Total: {ars(totalSaldo)}</p>
+          </div>
+        )}
+      </div>
+
+      {/* Filtros */}
+      <div className="flex flex-wrap items-end gap-3">
         <div>
           <label className="block text-xs font-medium text-gray-500 mb-1">Desde</label>
-          <Input
-            type="date"
-            className="w-40"
-            value={desde}
-            onChange={(e) => setDesde(e.target.value)}
-          />
+          <Input type="date" className="w-40" value={desde} onChange={e => setDesde(e.target.value)} />
         </div>
         <div>
           <label className="block text-xs font-medium text-gray-500 mb-1">Hasta</label>
-          <Input
-            type="date"
-            className="w-40"
-            value={hasta}
-            onChange={(e) => setHasta(e.target.value)}
-          />
+          <Input type="date" className="w-40" value={hasta} onChange={e => setHasta(e.target.value)} />
         </div>
         <div>
           <label className="block text-xs font-medium text-gray-500 mb-1">Cliente</label>
-          <div className="w-60">
-            <ClienteSearch value={clienteSeleccionado} onChange={setClienteSeleccionado} />
+          <div className="w-64">
+            <ClienteSearch value={clienteFiltro} onChange={setClienteFiltro} />
           </div>
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Forma de pago</label>
-          <Select value={formaPago} onValueChange={(v) => { if (v) setFormaPago(v) }}>
-            <SelectTrigger>
-              <SelectValue>
-                {formaPago === 'todos' ? 'Todos' : METODO_LABELS[formaPago] ?? formaPago}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos</SelectItem>
-              {METODOS.map(m => (
-                <SelectItem key={m} value={m}>{METODO_LABELS[m]}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Forma de pago</TableHead>
-              <TableHead>Comprobante</TableHead>
-              <TableHead>Cliente</TableHead>
-              <TableHead className="text-right w-32">Importe</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={4} className="text-center py-8 text-gray-400">Cargando…</TableCell>
-              </TableRow>
-            ) : groups.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={4} className="text-center py-8 text-gray-400">Sin cobranzas en el período</TableCell>
-              </TableRow>
-            ) : groups.map(group => (
-              <Fragment key={group.fecha}>
-                <TableRow className="bg-gray-50 border-t-2 border-gray-200">
-                  <TableCell colSpan={2} className="font-semibold text-sm">
-                    {formatFecha(group.fecha)}
-                  </TableCell>
-                  <TableCell className="text-xs text-gray-500">
-                    {group.rows.length} cobros
-                  </TableCell>
-                  <TableCell className={`text-right font-semibold ${group.subtotal < 0 ? 'text-red-600' : ''}`}>
-                    {formatARS(group.subtotal)}
-                  </TableCell>
-                </TableRow>
-                {group.rows
-                  .slice()
-                  .sort((a, b) => a.forma_pago.localeCompare(b.forma_pago))
-                  .map((row, i) => (
-                  <TableRow key={i}>
-                    <TableCell>{METODO_LABELS[row.forma_pago] ?? row.forma_pago}</TableCell>
-                    <TableCell className="font-mono text-sm">{row.ticket}</TableCell>
-                    <TableCell>{row.cliente ?? <span className="text-gray-400">Consumidor final</span>}</TableCell>
-                    <TableCell className={`text-right ${row.importe < 0 ? 'text-red-600' : ''}`}>{formatARS(row.importe)}</TableCell>
-                  </TableRow>
-                ))}
-              </Fragment>
-            ))}
-            {groups.length > 0 && (
-              <TableRow className="bg-gray-100 font-semibold">
-                <TableCell colSpan={3} className="text-sm">Total general</TableCell>
-                <TableCell className={`text-right ${totalGeneral < 0 ? 'text-red-600' : ''}`}>{formatARS(totalGeneral)}</TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
+      {/* Listado */}
+      {loading ? (
+        <div className="text-center py-12 text-gray-400 text-sm">Cargando…</div>
+      ) : clientes.length === 0 ? (
+        <div className="text-center py-12 text-gray-400 text-sm">Sin movimientos en cuenta corriente</div>
+      ) : (
+        <div className="space-y-3">
+          {clientes.map(c => <ClienteCard key={c.cliente_id} cliente={c} />)}
+        </div>
+      )}
     </div>
   )
 }

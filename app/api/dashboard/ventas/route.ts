@@ -2,7 +2,7 @@
 import { auth } from '@/lib/auth'
 import { getTenantClient } from '@/services/supabase-tenant'
 import { adjustArticuloStock, syncArticuloStock } from '@/services/stock'
-import { getActiveSucursalId, getHomeSucursalId, getSucursalFilter } from '@/lib/sucursal'
+import { getActiveSucursalId, getHomeSucursalId, getSucursalFilter, assertActiveSucursalIsHome } from '@/lib/sucursal'
 
 // GET — historial de ventas
 export async function GET(req: NextRequest) {
@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
 
   let q = supabase
     .from('ventas')
-    .select('id, numero, fecha, estado, subtotal, descuento_pct, descuento_monto, total, sucursal_id, cliente_id, clientes(nombre), users!vendedor_id(name, email)')
+    .select('id, numero, fecha, estado, subtotal, descuento_pct, descuento_monto, total, sucursal_id, cliente_id, clientes(nombre), vendedores(nombre)')
     .order('fecha', { ascending: false })
     .order('created_at', { ascending: false })
     .limit(verTodas ? 500 : 200)
@@ -53,6 +53,9 @@ export async function POST(req: NextRequest) {
   const sucursalId = await getHomeSucursalId()
   if (!sucursalId) return NextResponse.json({ error: 'sin_sucursal_activa' }, { status: 403 })
 
+  const guardCreate = await assertActiveSucursalIsHome()
+  if (guardCreate) return guardCreate
+
   const body = await req.json()
 
   const items: {
@@ -63,7 +66,7 @@ export async function POST(req: NextRequest) {
     descuento_pct: number
   }[] = body.items ?? []
 
-  const pagos: { metodo: string; monto: number; referencia?: string; nota_credito_id?: number }[] = body.pagos ?? []
+  const pagos: { metodo: string; monto: number; referencia?: string; nota_credito_id?: number; forma_pago_id?: number; cuotas?: number; fecha_pago?: string }[] = body.pagos ?? []
 
   if (items.length === 0) return NextResponse.json({ error: 'La venta no tiene ítems' }, { status: 400 })
   if (pagos.length === 0) return NextResponse.json({ error: 'La venta no tiene pagos' }, { status: 400 })
@@ -100,12 +103,13 @@ export async function POST(req: NextRequest) {
 
   // Totales
   const descuento_pct = parseFloat(body.descuento_pct ?? '0') || 0
+  const recargo_monto = Math.max(0, parseFloat(body.recargo_monto ?? '0') || 0)
   const subtotal = items.reduce((acc, item) => {
     const lineSubtotal = item.cantidad * item.precio_unitario * (1 - (item.descuento_pct ?? 0) / 100)
     return acc + lineSubtotal
   }, 0)
   const descuento_monto = Math.round(subtotal * (descuento_pct / 100) * 100) / 100
-  const total = Math.round((subtotal - descuento_monto) * 100) / 100
+  const total = Math.round((subtotal - descuento_monto + recargo_monto) * 100) / 100
 
   const totalPagado = pagos.reduce((acc, p) => acc + p.monto, 0)
   if (Math.round(totalPagado * 100) < Math.round(total * 100))
@@ -146,12 +150,13 @@ export async function POST(req: NextRequest) {
       numero,
       fecha: body.fecha ?? new Date().toISOString().slice(0, 10),
       cliente_id: body.cliente_id ?? null,
-      vendedor_id: session.user.id,
+      vendedor_id: body.vendedor_id ?? null,
       caja_sesion_id: cajaSesion.id,
       sucursal_id: sucursalId,
       subtotal,
       descuento_pct,
       descuento_monto,
+      recargo_monto,
       total,
       observaciones: body.observaciones || null,
     })
@@ -186,16 +191,24 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: itemsError.message }, { status: 500 })
   }
 
-  // Insertar pagos
-  const pagosPayload = pagos.map(p => ({
-    venta_id: venta.id,
-    metodo: p.metodo,
-    monto: p.monto,
-    referencia: p.referencia || null,
-    ...(p.nota_credito_id != null ? { nota_credito_id: p.nota_credito_id } : {}),
-  }))
-
-  const { error: pagosError } = await supabase.from('venta_pagos').insert(pagosPayload)
+  // Insertar pagos + CARGO CC de forma atómica
+  const { error: pagosError } = await supabase.rpc('registrar_pagos_venta', {
+    p_venta_id:    venta.id,
+    p_cliente_id:  body.cliente_id ?? null,
+    p_fecha:       body.fecha ?? new Date().toISOString().slice(0, 10),
+    p_numero:      numero,
+    p_sucursal_id: sucursalId,
+    p_usuario_id:  session.user.id,
+    p_pagos:       pagos.map(p => ({
+      metodo:          p.metodo,
+      monto:           p.monto,
+      referencia:      p.referencia || null,
+      nota_credito_id: p.nota_credito_id ?? null,
+      forma_pago_id:   p.forma_pago_id ?? null,
+      cuotas:          p.cuotas ?? null,
+      fecha_pago:      p.fecha_pago || null,
+    })),
+  })
   if (pagosError) {
     await supabase.from('ventas').delete().eq('id', venta.id)
     return NextResponse.json({ error: pagosError.message }, { status: 500 })
@@ -256,20 +269,6 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Cobranza para cuenta corriente
-  const pagoCC = pagos.find(p => p.metodo === 'CUENTA_CORRIENTE')
-  if (pagoCC && body.cliente_id) {
-    await supabase.from('cobranzas').insert({
-      cliente_id: body.cliente_id,
-      venta_id: venta.id,
-      tipo: 'CARGO',
-      monto: pagoCC.monto,
-      fecha: body.fecha ?? new Date().toISOString().slice(0, 10),
-      descripcion: `Venta ${numero}`,
-      usuario_id: session.user.id,
-    })
-  }
-
   // Movimientos de caja para métodos que no son cuenta corriente
   const METODO_LABELS: Record<string, string> = {
     EFECTIVO: 'Efectivo',
@@ -279,7 +278,7 @@ export async function POST(req: NextRequest) {
     CHEQUE: 'Cheque',
     OTRO: 'Otro',
   }
-  const pagosNoCc = pagos.filter(p => p.metodo !== 'CUENTA_CORRIENTE')
+  const pagosNoCc = pagos.filter(p => p.metodo !== 'CUENTA_CORRIENTE' && p.metodo !== 'NOTA_CREDITO')
   for (const p of pagosNoCc) {
     await supabase.from('caja_movimientos').insert({
       sesion_id: cajaSesion.id,

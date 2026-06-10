@@ -1,6 +1,7 @@
 -- Función para resetear todos los datos operativos de un tenant.
 -- Conserva: users, user_sucursales, sucursales, roles, role_permissions,
---            unidades_medida, atributo_tipos
+--            unidades_medida, atributo_tipos,
+--            formas_pago, formas_pago_cuotas, listas_precio, categorias
 -- Solo service_role puede ejecutarla.
 -- Usa SQL dinámico para ignorar tablas que aún no existen en el tenant.
 
@@ -33,12 +34,10 @@ DECLARE
     'remitos',
     'articulo_stock',
     'precios',
-    'listas_precio',
     'variante_atributos',
     'articulo_variantes',
     'articulos',
     'subcategorias',
-    'categorias',
     'marcas',
     'proveedores',
     'clientes'
@@ -46,11 +45,6 @@ DECLARE
   v_existing text[] := '{}';
   v_table text;
 BEGIN
-  -- Romper auto-referencia de listas_precio antes del TRUNCATE
-  IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'listas_precio') THEN
-    UPDATE public.listas_precio SET lista_base_id = NULL WHERE lista_base_id IS NOT NULL;
-  END IF;
-
   -- Filtrar solo las tablas que existen en este tenant
   FOREACH v_table IN ARRAY v_tables LOOP
     IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = v_table) THEN
@@ -61,22 +55,6 @@ BEGIN
   -- Ejecutar TRUNCATE dinámico solo con las tablas existentes
   IF array_length(v_existing, 1) > 0 THEN
     EXECUTE 'TRUNCATE TABLE ' || array_to_string(v_existing, ', ') || ' RESTART IDENTITY CASCADE';
-  END IF;
-
-  -- Re-insertar listas de precio por defecto
-  IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'listas_precio') THEN
-    INSERT INTO public.listas_precio (nombre, tipo, categoria)
-      VALUES ('Compra', 'manual', 'costo');
-
-    INSERT INTO public.listas_precio (nombre, tipo, categoria, lista_base_id, porcentaje)
-      VALUES (
-        'Venta Público', 'calculada', 'venta',
-        (SELECT id FROM public.listas_precio WHERE nombre = 'Compra'),
-        30
-      );
-
-    INSERT INTO public.listas_precio (nombre, tipo, categoria)
-      VALUES ('Venta Mayorista', 'manual', 'venta');
   END IF;
 END;
 $$;
