@@ -212,4 +212,5 @@ npm run lint     # ESLint
 npx tsc --noEmit # Chequeo de tipos sin compilar
 ```
 #   m g a _ p o s _ v 1  
+ #   m g a _ p o s _ v 1  
  
