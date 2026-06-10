@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
     if (!map.has(row.cliente_id)) {
       map.set(row.cliente_id, {
         cliente_id: row.cliente_id,
-        nombre: (row.clientes as { nombre: string } | null)?.nombre ?? `Cliente #${row.cliente_id}`,
+        nombre: (row.clientes as unknown as { nombre: string } | null)?.nombre ?? `Cliente #${row.cliente_id}`,
         saldo_actual: 0,
         movimientos: [],
       })

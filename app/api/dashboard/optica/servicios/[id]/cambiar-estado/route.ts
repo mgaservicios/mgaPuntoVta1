@@ -70,13 +70,14 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       .single()
 
     if (servicio) {
+      const sucursalId = await getHomeSucursalId()
+      if (!sucursalId) return NextResponse.json({ error: 'sin_sucursal_activa' }, { status: 403 })
+
       const pagos = servicio.optica_servicio_pagos ?? []
       const pagado = pagos.reduce((a: number, p: { monto: number }) => a + Number(p.monto), 0)
       const saldo = Math.round((servicio.total - pagado) * 100) / 100
 
       if (saldo > 0.005) {
-        const sucursalId = await getHomeSucursalId()
-        if (!sucursalId) return NextResponse.json({ error: 'sin_sucursal_activa' }, { status: 403 })
 
         let { data: caja } = await supabase
           .from('caja_sesiones')

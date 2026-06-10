@@ -368,7 +368,7 @@ export default function CobranzasPage() {
 
             <div className="space-y-1">
               <Label>Método de cobro</Label>
-              <Select value={metodo} onValueChange={setMetodo}>
+              <Select value={metodo} onValueChange={(v) => v !== null && setMetodo(v)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="EFECTIVO">Efectivo</SelectItem>

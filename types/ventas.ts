@@ -42,6 +42,7 @@ export interface Venta {
   clientes?: { nombre: string } | null
   vendedores?: { nombre: string } | null
   sucursales?: { nombre: string; logo_url: string | null } | null
+  users?: { name: string | null; email: string } | null
   venta_items?: VentaItem[]
   venta_pagos?: VentaPago[]
 }
