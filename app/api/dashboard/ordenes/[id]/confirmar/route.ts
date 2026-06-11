@@ -52,7 +52,7 @@ export async function POST(_: NextRequest, { params }: Ctx) {
 
   // Validar stock antes de descontar (solo si la sucursal controla stock)
   const stockValidErr = await validarStockSuficiente(
-    items.map(i => ({ articulo_id: i.articulo_id, variante_id: i.variante_id ?? null, cantidad: i.cantidad })),
+    items.map((i: { articulo_id: number; variante_id: number | null; cantidad: number }) => ({ articulo_id: i.articulo_id, variante_id: i.variante_id ?? null, cantidad: i.cantidad })),
     sucursalId,
     supabase,
   )
