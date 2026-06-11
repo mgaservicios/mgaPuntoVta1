@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
+import { requirePermission } from '@/lib/require-permission'
 import { getTenantClient } from '@/services/supabase-tenant'
 import { assertHomeSucursal } from '@/lib/sucursal'
 
@@ -23,8 +24,8 @@ export async function GET(_: NextRequest, { params }: Ctx) {
 }
 
 export async function PUT(req: NextRequest, { params }: Ctx) {
-  const session = await auth()
-  if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+  const session = await requirePermission('ventas.ordenes.editar')
+  if (!session) return NextResponse.json({ error: 'Sin permiso' }, { status: 403 })
   const supabase = await getTenantClient(session)
 
   const { id } = await params

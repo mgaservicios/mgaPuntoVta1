@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
+import { requirePermission } from '@/lib/require-permission'
 import { getTenantClient } from '@/services/supabase-tenant'
 
 type Ctx = { params: Promise<{ id: string; tareaId: string }> }
@@ -20,8 +21,8 @@ async function derivarEstadoServicio(
 }
 
 export async function PUT(req: NextRequest, { params }: Ctx) {
-  const session = await auth()
-  if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+  const session = await requirePermission('optica.servicios.editar')
+  if (!session) return NextResponse.json({ error: 'Sin permiso' }, { status: 403 })
   const supabase = await getTenantClient(session)
 
   const { id, tareaId } = await params
@@ -73,8 +74,8 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
 }
 
 export async function DELETE(_: NextRequest, { params }: Ctx) {
-  const session = await auth()
-  if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+  const session = await requirePermission('optica.servicios.editar')
+  if (!session) return NextResponse.json({ error: 'Sin permiso' }, { status: 403 })
   const supabase = await getTenantClient(session)
 
   const { id, tareaId } = await params

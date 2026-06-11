@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
+import { requirePermission } from '@/lib/require-permission'
 import { getTenantClient } from '@/services/supabase-tenant'
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = await auth()
-  if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+  const session = await requirePermission('admin.formas_pago.editar')
+  if (!session) return NextResponse.json({ error: 'Sin permiso' }, { status: 403 })
   const supabase = await getTenantClient(session)
   const { id } = await params
   const body = await req.json()
@@ -27,8 +28,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = await auth()
-  if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+  const session = await requirePermission('admin.formas_pago.eliminar')
+  if (!session) return NextResponse.json({ error: 'Sin permiso' }, { status: 403 })
   const supabase = await getTenantClient(session)
   const { id } = await params
 

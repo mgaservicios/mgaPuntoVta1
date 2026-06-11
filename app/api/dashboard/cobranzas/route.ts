@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
+import { requirePermission } from '@/lib/require-permission'
 import { getTenantClient } from '@/services/supabase-tenant'
 import { getHomeSucursalId } from '@/lib/sucursal'
 
@@ -30,8 +31,8 @@ export async function GET(req: NextRequest) {
 
 // POST — registrar un cobro (PAGO) contra el saldo de un cliente
 export async function POST(req: NextRequest) {
-  const session = await auth()
-  if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+  const session = await requirePermission('caja.cobranzas.ver')
+  if (!session) return NextResponse.json({ error: 'Sin permiso' }, { status: 403 })
   const supabase = await getTenantClient(session)
 
   const body = await req.json()

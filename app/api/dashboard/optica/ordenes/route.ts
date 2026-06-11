@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
+import { requirePermission } from '@/lib/require-permission'
 import { getTenantClient } from '@/services/supabase-tenant'
 import { getHomeSucursalId, getSucursalFilter, assertActiveSucursalIsHome } from '@/lib/sucursal'
 
@@ -52,8 +53,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await auth()
-  if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+  const session = await requirePermission('optica.ordenes.crear')
+  if (!session) return NextResponse.json({ error: 'Sin permiso' }, { status: 403 })
   const supabase = await getTenantClient(session)
 
   const sucursalId = await getHomeSucursalId()
