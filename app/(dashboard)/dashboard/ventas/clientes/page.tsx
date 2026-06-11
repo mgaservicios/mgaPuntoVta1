@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { Plus, Search, Eye, Pencil, PowerOff } from 'lucide-react'
+import { Plus, Search, Eye, Pencil, PowerOff, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -11,6 +11,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
 import ConfirmDialog from '@/components/dashboard/ConfirmDialog'
+import ImportarClientesModal from '@/components/dashboard/ImportarClientesModal'
 import { usePermissions } from '@/components/PermissionsProvider'
 import type { Cliente } from '@/types/clientes'
 
@@ -26,6 +27,7 @@ export default function ClientesPage() {
   const [q, setQ] = useState('')
   const [confirmId, setConfirmId] = useState<number | null>(null)
   const [desactivando, setDesactivando] = useState(false)
+  const [modalImportar, setModalImportar] = useState(false)
   const { can } = usePermissions()
 
   const fetchClientes = useCallback(async () => {
@@ -70,10 +72,16 @@ export default function ClientesPage() {
           />
         </div>
         {can('ventas.clientes.crear') && (
-          <Link href="/dashboard/ventas/clientes/nuevo" className={buttonVariants()}>
-            <Plus className="w-4 h-4 mr-2" />
-            Nuevo cliente
-          </Link>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setModalImportar(true)}>
+              <Upload className="w-4 h-4 mr-2" />
+              Importar CSV
+            </Button>
+            <Link href="/dashboard/ventas/clientes/nuevo" className={buttonVariants()}>
+              <Plus className="w-4 h-4 mr-2" />
+              Nuevo cliente
+            </Link>
+          </div>
         )}
       </div>
 
@@ -158,6 +166,12 @@ export default function ClientesPage() {
         loading={desactivando}
         onConfirm={handleDesactivar}
         onCancel={() => setConfirmId(null)}
+      />
+
+      <ImportarClientesModal
+        open={modalImportar}
+        onClose={() => setModalImportar(false)}
+        onImportado={fetchClientes}
       />
     </div>
   )
