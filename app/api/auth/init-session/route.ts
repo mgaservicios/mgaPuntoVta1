@@ -39,14 +39,25 @@ export async function GET(req: NextRequest) {
 
   if (!sucursalId) {
     if (isAdmin) {
-      const { data } = await supabase
+      // Preferir sucursal 1 como default; si no existe o está inactiva, tomar la primera por nombre
+      const { data: suc1 } = await supabase
         .from('sucursales')
         .select('id')
+        .eq('id', 1)
         .eq('activo', true)
-        .order('nombre')
-        .limit(1)
         .single()
-      sucursalId = (data?.id as number) ?? null
+      if (suc1) {
+        sucursalId = suc1.id as number
+      } else {
+        const { data } = await supabase
+          .from('sucursales')
+          .select('id')
+          .eq('activo', true)
+          .order('nombre')
+          .limit(1)
+          .single()
+        sucursalId = (data?.id as number) ?? null
+      }
     } else {
       const { data } = await supabase
         .from('user_sucursales')

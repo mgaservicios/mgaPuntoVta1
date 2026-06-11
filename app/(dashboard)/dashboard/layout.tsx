@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { cookies, headers } from 'next/headers'
 import Sidebar from '@/components/dashboard/Sidebar'
 import DashboardHeader, { QuickActionsBar } from '@/components/dashboard/Header'
+import { PermissionsProvider } from '@/components/PermissionsProvider'
 import { getTenantClient } from '@/services/supabase-tenant'
 import { SUCURSAL_COOKIE, SUCURSAL_HOME_COOKIE, VER_TODAS_COOKIE } from '@/lib/sucursal'
 import { ROUTE_TO_PERM } from '@/lib/perm-groups'
@@ -146,7 +147,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
         />
         <QuickActionsBar modules={session.user.modules ?? []} color={brandColor} userPermissions={permMap} />
         <main className="flex-1 overflow-y-auto p-6 lg:p-8">
-          {children}
+          <PermissionsProvider permissions={permMap}>
+            {children}
+          </PermissionsProvider>
         </main>
       </div>
     </div>

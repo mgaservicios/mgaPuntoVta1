@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
   const supabase = await getTenantClient(session)
 
   const body = await req.json()
-  const { nombre, cuit, telefono, email, direccion, localidad, notas } = body
+  const { nombre, cuit, telefono, email, direccion, localidad, provincia, cod_postal, contacto, tipo_iva, notas } = body
 
   if (!nombre?.trim()) {
     return NextResponse.json({ error: 'El nombre es obligatorio' }, { status: 400 })
@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
 
   const { data, error } = await supabase
     .from('proveedores')
-    .insert({ nombre: nombre.trim(), cuit, telefono, email, direccion, localidad, notas })
+    .insert({ nombre: nombre.trim(), cuit, telefono, email, direccion, localidad, provincia, cod_postal, contacto, tipo_iva, notas })
     .select()
     .single()
 

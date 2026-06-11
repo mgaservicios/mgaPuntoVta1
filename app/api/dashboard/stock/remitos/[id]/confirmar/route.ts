@@ -125,8 +125,14 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     .update({ estado: 'confirmado', updated_at: new Date().toISOString() })
     .eq('id', id)
 
-  // ── 4. Si es Salida hacia otra Sucursal → crear remito Entrada en destino ──
-  if (remito.tipo === 'salida' && remito.contraparte_tipo === 'sucursal' && remito.contraparte_sucursal_id) {
+  // ── 4. Si es Salida hacia OTRA Sucursal (distinta) → crear remito Entrada en destino ──
+  // Si origen y destino son la misma sucursal, es una salida local — no hay remito de entrada.
+  if (
+    remito.tipo === 'salida' &&
+    remito.contraparte_tipo === 'sucursal' &&
+    remito.contraparte_sucursal_id &&
+    remito.contraparte_sucursal_id !== remito.sucursal_id
+  ) {
     const destSucursalId = remito.contraparte_sucursal_id
 
     // Número correlativo para el remito de entrada

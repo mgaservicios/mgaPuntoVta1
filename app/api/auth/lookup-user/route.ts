@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
       .from('sucursales')
       .select('id, nombre')
       .eq('activo', true)
-      .order('nombre')
+      .order('id')
     sucursales = (data ?? []) as SucursalRow[]
   } else {
     const { data } = await supabase

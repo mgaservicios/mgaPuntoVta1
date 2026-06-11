@@ -67,7 +67,8 @@ export default function SignInPage() {
         isAdmin: data.isAdmin,
         sucursales: data.sucursales,
       })
-      setSelectedSucursalId(data.sucursales[0]?.id ?? null)
+      const defaultSuc = data.sucursales.find((s: SucursalOption) => s.id === 1) ?? data.sucursales[0]
+      setSelectedSucursalId(defaultSuc?.id ?? null)
     } catch {
       setLookup({ status: 'idle' })
     }

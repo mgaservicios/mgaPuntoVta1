@@ -27,7 +27,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
   const { id } = await params
   const body = await req.json()
-  const { nombre, cuit, telefono, email, direccion, localidad, notas, activo } = body
+  const { nombre, cuit, telefono, email, direccion, localidad, provincia, cod_postal, contacto, tipo_iva, notas, activo } = body
 
   if (!nombre?.trim()) {
     return NextResponse.json({ error: 'El nombre es obligatorio' }, { status: 400 })
@@ -35,7 +35,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
   const { data, error } = await supabase
     .from('proveedores')
-    .update({ nombre: nombre.trim(), cuit, telefono, email, direccion, localidad, notas, activo, updated_at: new Date().toISOString() })
+    .update({ nombre: nombre.trim(), cuit, telefono, email, direccion, localidad, provincia, cod_postal, contacto, tipo_iva, notas, activo, updated_at: new Date().toISOString() })
     .eq('id', id)
     .select()
     .single()
