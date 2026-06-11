@@ -3,7 +3,6 @@ import { getTenantClient } from '@/services/supabase-tenant'
 import { getHomeSucursalId, assertActiveSucursalIsHome } from '@/lib/sucursal'
 import { requirePermission } from '@/lib/require-permission'
 
-const PROVEEDOR_STOCK_INICIAL = 2
 const ITEMS_POR_REMITO = 50
 const PARALLEL = 10
 
@@ -26,13 +25,18 @@ export async function POST(req: NextRequest) {
 
   // Batch-lookup articulo_ids
   const codigos = [...new Set(rows.map(r => r.artCodigo?.trim()).filter(Boolean))]
-  const { data: articulos, error: artErr } = await supabase
-    .from('articulos')
-    .select('id, codigo')
-    .in('codigo', codigos)
-  if (artErr) return NextResponse.json({ error: artErr.message }, { status: 500 })
 
-  const codigoToId = Object.fromEntries((articulos ?? []).map(a => [a.codigo, a.id]))
+  const codigoToId: Record<string, number> = {}
+  const LOOKUP_BATCH = 500
+  for (let i = 0; i < codigos.length; i += LOOKUP_BATCH) {
+    const chunk = codigos.slice(i, i + LOOKUP_BATCH)
+    const { data: articulos, error: artErr } = await supabase
+      .from('articulos')
+      .select('id, codigo')
+      .in('codigo', chunk)
+    if (artErr) return NextResponse.json({ error: artErr.message }, { status: 500 })
+    for (const a of articulos ?? []) codigoToId[String(a.codigo)] = a.id
+  }
 
   // Build valid items
   const items: { articuloId: number; codigo: string; stock: number }[] = []
@@ -66,17 +70,19 @@ export async function POST(req: NextRequest) {
         tipo: 'entrada',
         sucursal_id: sucursalId,
         contraparte_tipo: 'proveedor',
-        contraparte_proveedor_id: PROVEEDOR_STOCK_INICIAL,
+        contraparte_proveedor_id: 2,
+        contraparte_nombre: 'Stock Inicial',
         fecha: new Date().toISOString(),
         observaciones: 'Importación stock inicial óptica',
-        estado: 'confirmado',
+        estado: 'borrador',
         created_by: session.user.id,
       })
       .select('id')
       .single()
 
     if (errRemito || !remito) {
-      for (const it of batch) errors.push({ codigo: it.codigo, error: errRemito?.message ?? 'Error creando remito' })
+      const msg = errRemito?.message ?? 'Error creando remito'
+      for (const it of batch) errors.push({ codigo: it.codigo, error: msg })
       continue
     }
 
@@ -151,6 +157,8 @@ export async function POST(req: NextRequest) {
         )
       )
     }
+
+    await supabase.from('remitos').update({ estado: 'confirmado' }).eq('id', remito.id)
 
     okCount += batch.length
   }

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { getTenantClient } from '@/services/supabase-tenant'
-import { adjustArticuloStock, syncArticuloStock } from '@/services/stock'
+import { adjustArticuloStock, syncArticuloStock, validarStockSuficiente } from '@/services/stock'
 import { assertHomeSucursal } from '@/lib/sucursal'
 
 type Ctx = { params: Promise<{ id: string }> }
@@ -100,6 +100,23 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
     }
 
     const articuloIds = new Set<number>()
+
+    // Validar stock para remito de salida: solo los ítems donde sale más stock (cantDiff > 0)
+    if (remito.tipo === 'salida') {
+      const itemsAValidar: { articulo_id: number; variante_id: number | null; cantidad: number }[] = []
+      for (const [key, oi] of oldMap) {
+        const ni = newMap.get(key)
+        const cantDiff = (ni?.cantidad ?? 0) - oi.cantidad
+        if (cantDiff > 0) itemsAValidar.push({ articulo_id: oi.articulo_id, variante_id: oi.variante_id, cantidad: cantDiff })
+      }
+      for (const [key, ni] of newMap) {
+        if (!oldMap.has(key)) itemsAValidar.push({ articulo_id: ni.articulo_id, variante_id: ni.variante_id, cantidad: ni.cantidad })
+      }
+      if (itemsAValidar.length > 0) {
+        const stockValidErr = await validarStockSuficiente(itemsAValidar, remito.sucursal_id, supabase)
+        if (stockValidErr) return NextResponse.json({ error: stockValidErr }, { status: 400 })
+      }
+    }
 
     // Ítems modificados (cantidad distinta) o eliminados (no están en newMap)
     for (const [key, oi] of oldMap) {

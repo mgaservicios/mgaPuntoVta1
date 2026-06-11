@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getTenantClient } from '@/services/supabase-tenant'
-import { adjustArticuloStock, syncArticuloStock } from '@/services/stock'
+import { adjustArticuloStock, syncArticuloStock, validarStockSuficiente } from '@/services/stock'
 import { getHomeSucursalId, assertHomeSucursal } from '@/lib/sucursal'
 import { METODO_ORDEN_LABELS } from '@/types/ordenes'
 import { requirePermission } from '@/lib/require-permission'
@@ -49,6 +49,14 @@ export async function POST(_: NextRequest, { params }: Ctx) {
   // Sucursal: usar la guardada en la orden; fallback a la activa (para órdenes históricas sin sucursal_id)
   const sucursalId = orden.sucursal_id ?? await getHomeSucursalId()
   if (!sucursalId) return NextResponse.json({ error: 'sin_sucursal_activa' }, { status: 403 })
+
+  // Validar stock antes de descontar (solo si la sucursal controla stock)
+  const stockValidErr = await validarStockSuficiente(
+    items.map(i => ({ articulo_id: i.articulo_id, variante_id: i.variante_id ?? null, cantidad: i.cantidad })),
+    sucursalId,
+    supabase,
+  )
+  if (stockValidErr) return NextResponse.json({ error: stockValidErr }, { status: 400 })
 
   // Descontar stock por sucursal + registrar movimiento
   const articuloIdsSet = new Set<number>()

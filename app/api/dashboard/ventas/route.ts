@@ -1,7 +1,7 @@
 ﻿import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { getTenantClient } from '@/services/supabase-tenant'
-import { adjustArticuloStock, syncArticuloStock } from '@/services/stock'
+import { adjustArticuloStock, syncArticuloStock, validarStockSuficiente } from '@/services/stock'
 import { getActiveSucursalId, getHomeSucursalId, getSucursalFilter, assertActiveSucursalIsHome } from '@/lib/sucursal'
 
 // GET — historial de ventas
@@ -212,6 +212,17 @@ export async function POST(req: NextRequest) {
   if (pagosError) {
     await supabase.from('ventas').delete().eq('id', venta.id)
     return NextResponse.json({ error: pagosError.message }, { status: 500 })
+  }
+
+  // Validar stock antes de descontar (solo si la sucursal controla stock)
+  const stockValidErr = await validarStockSuficiente(
+    items.filter(i => i.cantidad > 0).map(i => ({ articulo_id: i.articulo_id, variante_id: i.variante_id ?? null, cantidad: i.cantidad })),
+    sucursalId,
+    supabase,
+  )
+  if (stockValidErr) {
+    await supabase.from('ventas').delete().eq('id', venta.id)
+    return NextResponse.json({ error: stockValidErr }, { status: 400 })
   }
 
   // Actualizar stock por sucursal + movimientos

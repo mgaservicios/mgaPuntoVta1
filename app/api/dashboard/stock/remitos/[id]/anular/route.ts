@@ -56,7 +56,7 @@ export async function POST(_: NextRequest, { params }: Ctx) {
   if (remito.tipo === 'salida' && remito.contraparte_tipo === 'sucursal' && remito.contraparte_sucursal_id) {
     const { data: remitoEntrada } = await supabase
       .from('remitos')
-      .select(`id, sucursal_id, estado, remito_items(articulo_id, variante_id, cantidad)`)
+      .select(`id, numero, sucursal_id, estado, remito_items(articulo_id, variante_id, cantidad)`)
       .eq('remito_origen_id', remito.id)
       .eq('tipo', 'entrada')
       .maybeSingle()
@@ -70,7 +70,7 @@ export async function POST(_: NextRequest, { params }: Ctx) {
           item.articulo_id,
           item.variante_id ?? null,
           remitoEntrada.sucursal_id,
-          -item.cantidad, // reversa de entrada
+          -item.cantidad,
           supabase,
         )
         if (err) return NextResponse.json({
@@ -79,6 +79,14 @@ export async function POST(_: NextRequest, { params }: Ctx) {
         })
         articuloIdsDestino.add(item.articulo_id)
       }
+
+      // Eliminar los movimientos_stock que generó la confirmación del remito de entrada
+      await supabase
+        .from('movimientos_stock')
+        .delete()
+        .eq('sucursal_id', remitoEntrada.sucursal_id)
+        .eq('tipo', 'entrada')
+        .eq('referencia', remitoEntrada.numero)
 
       for (const aid of articuloIdsDestino) await syncArticuloStock(aid, supabase)
 

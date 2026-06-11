@@ -179,12 +179,39 @@ export async function GET(req: NextRequest) {
   let enriched: EnrichedRow[]
 
   if (q?.trim()) {
-    const { data, error } = await supabase.rpc('buscar_articulos', {
-      p_query: q.trim(),
-      p_limit: 50,
-    })
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    enriched = await enrichVariantes(data ?? []) as EnrichedRow[]
+    const term = q.trim()
+    const SELECT_Q = `id, codigo, nombre, tipo_articulo, precio_venta, stock_actual, activo, imagen_url,
+      categorias(id, nombre), subcategorias(id, nombre), marcas(id, nombre),
+      articulo_variantes(${VARIANTES_SELECT})`
+
+    // 1. Exacto en codigo o codigo_barras
+    let byCodeQ = supabase
+      .from('articulos')
+      .select(SELECT_Q)
+      .or(`codigo.ilike.${term},codigo_barras.ilike.${term}`)
+      .order('nombre')
+      .limit(50)
+    if (soloActivos) byCodeQ = byCodeQ.eq('activo', true)
+
+    const { data: byCode, error: errCode } = await byCodeQ
+    if (errCode) return NextResponse.json({ error: errCode.message }, { status: 500 })
+
+    if ((byCode ?? []).length > 0) {
+      enriched = (byCode ?? []) as EnrichedRow[]
+    } else {
+      // 2. Parcial en codigo o nombre
+      let byPartialQ = supabase
+        .from('articulos')
+        .select(SELECT_Q)
+        .or(`codigo.ilike.%${term}%,nombre.ilike.%${term}%`)
+        .order('nombre')
+        .limit(50)
+      if (soloActivos) byPartialQ = byPartialQ.eq('activo', true)
+
+      const { data: byPartial, error: errPartial } = await byPartialQ
+      if (errPartial) return NextResponse.json({ error: errPartial.message }, { status: 500 })
+      enriched = (byPartial ?? []) as EnrichedRow[]
+    }
   } else {
     let query = supabase
       .from('articulos')

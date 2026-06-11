@@ -416,10 +416,11 @@ create table if not exists public.sucursales (
   direccion  text,
   telefono   text,
   activo     boolean not null default true,
-  logo_url   text,                        -- URL pública en Supabase Storage (bucket 'sucursales')
-  color      text,                        -- Color de marca en hex (#RRGGBB), usado en sidebar y UI
-  created_at timestamptz default now(),
-  updated_at timestamptz default now()
+  logo_url        text,                        -- URL pública en Supabase Storage (bucket 'sucursales')
+  color           text,                        -- Color de marca en hex (#RRGGBB), usado en sidebar y UI
+  controla_stock  boolean not null default false,
+  created_at      timestamptz default now(),
+  updated_at      timestamptz default now()
 );
 
 create table if not exists public.user_sucursales (
@@ -604,16 +605,28 @@ language sql stable as $$
   from public.articulos a
   where a.activo = true
     and (
-      a.nombre       ilike '%' || p_query || '%'
-      or a.codigo    ilike '%' || p_query || '%'
-      or a.codigo_barras ilike '%' || p_query || '%'
-      or similarity(a.nombre, p_query) > 0.3
+      a.codigo           ilike p_query
+      or a.codigo_barras ilike p_query
+      or (
+        not exists (
+          select 1 from public.articulos a2
+          where a2.activo = true
+            and (a2.codigo ilike p_query or a2.codigo_barras ilike p_query)
+        )
+        and (
+          a.codigo  ilike '%' || p_query || '%'
+          or a.nombre ilike '%' || p_query || '%'
+        )
+      )
     )
-  order by greatest(
-    similarity(a.nombre, p_query),
-    case when a.codigo        ilike '%' || p_query || '%' then 0.9 else 0 end,
-    case when a.codigo_barras = p_query then 1.0 else 0 end
-  ) desc
+  order by
+    case
+      when a.codigo        ilike p_query               then 0
+      when a.codigo_barras ilike p_query               then 1
+      when a.codigo        ilike '%' || p_query || '%' then 2
+      else 3
+    end,
+    a.nombre
   limit p_limit;
 $$;
 

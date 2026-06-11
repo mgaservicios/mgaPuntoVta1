@@ -52,6 +52,49 @@ export async function adjustArticuloStock(
 }
 
 /**
+ * Verifica que haya stock suficiente para todos los items antes de un movimiento de salida.
+ * Si la sucursal no tiene controla_stock activo, retorna null sin validar.
+ * Retorna null si todo está OK, o un mensaje de error con los artículos con stock insuficiente.
+ */
+export async function validarStockSuficiente(
+  items: { articulo_id: number; variante_id: number | null; cantidad: number }[],
+  sucursal_id: number,
+  supabase: SupabaseClient,
+): Promise<string | null> {
+  const { data: sucursal } = await supabase
+    .from('sucursales')
+    .select('controla_stock')
+    .eq('id', sucursal_id)
+    .single()
+
+  if (!sucursal?.controla_stock) return null
+
+  const faltantes: string[] = []
+
+  for (const item of items) {
+    const vid = item.variante_id ?? null
+    let q = supabase
+      .from('articulo_stock')
+      .select('stock_actual')
+      .eq('articulo_id', item.articulo_id)
+      .eq('sucursal_id', sucursal_id)
+    q = vid === null ? q.is('variante_id', null) : q.eq('variante_id', vid)
+
+    const { data } = await q.maybeSingle()
+    const disponible = Number(data?.stock_actual ?? 0)
+
+    if (disponible < item.cantidad) {
+      faltantes.push(`artículo ${item.articulo_id}${vid ? ` var.${vid}` : ''} (disponible: ${disponible}, requerido: ${item.cantidad})`)
+    }
+  }
+
+  if (faltantes.length > 0) {
+    return `Stock insuficiente: ${faltantes.join(', ')}`
+  }
+  return null
+}
+
+/**
  * Recalcula los campos de display globales sumando desde articulo_stock.
  * - articulo_variantes.stock_actual = suma de articulo_stock para esa variante (todas las sucursales)
  * - articulos.stock_actual = suma total del artículo (todas las sucursales y variantes)

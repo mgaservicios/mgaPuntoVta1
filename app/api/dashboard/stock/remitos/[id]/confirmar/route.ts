@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getTenantClient } from '@/services/supabase-tenant'
-import { adjustArticuloStock, syncArticuloStock } from '@/services/stock'
+import { adjustArticuloStock, syncArticuloStock, validarStockSuficiente } from '@/services/stock'
 import { registrarPrecio } from '@/services/precios'
 import { requirePermission } from '@/lib/require-permission'
 import { assertHomeSucursal } from '@/lib/sucursal'
@@ -42,6 +42,17 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   if (items.length === 0) return NextResponse.json({ error: 'El remito no tiene ítems' }, { status: 400 })
 
   // ── 1. Ajustar stock en la sucursal origen ────────────────────────────────
+
+  // Validar stock solo para remitos de salida
+  if (remito.tipo === 'salida') {
+    const stockValidErr = await validarStockSuficiente(
+      items.map(i => ({ articulo_id: i.articulo_id, variante_id: i.variante_id ?? null, cantidad: i.cantidad })),
+      remito.sucursal_id,
+      supabase,
+    )
+    if (stockValidErr) return NextResponse.json({ error: stockValidErr }, { status: 400 })
+  }
+
   const delta = remito.tipo === 'entrada' ? 1 : -1
   const articuloIds = new Set<number>()
 

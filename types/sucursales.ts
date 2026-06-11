@@ -5,4 +5,5 @@ export interface Sucursal {
   activo: boolean
   logo_url: string | null
   color: string | null
+  controla_stock: boolean
 }
