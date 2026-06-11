@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { Eye, Printer, Plus, CreditCard, Trash2, Pencil } from 'lucide-react'
+import { usePermissions } from '@/components/PermissionsProvider'
 import { buttonVariants, Button } from '@/components/ui/button'
 import { useSelectedSucursal } from '@/hooks/useSelectedSucursal'
 import { Badge } from '@/components/ui/badge'
@@ -78,6 +79,7 @@ function FiltrosFecha({ desde, setDesde, hasta, setHasta }: {
 // ── Tab Ventas POS ────────────────────────────────────────────────────────────
 
 function VentasPOSTab({ canWrite }: { canWrite: boolean }) {
+  const { can } = usePermissions()
   const [ventas, setVentas] = useState<VentaRow[]>([])
   const [loading, setLoading] = useState(true)
   const [estado, setEstado] = useState('todos')
@@ -115,7 +117,7 @@ function VentasPOSTab({ canWrite }: { canWrite: boolean }) {
           </Select>
         </div>
         <FiltrosFecha desde={desde} setDesde={setDesde} hasta={hasta} setHasta={setHasta} />
-        {canWrite && (
+        {canWrite && can('ventas.pos.cobrar') && (
           <div className="ml-auto">
             <Link href="/dashboard/ventas/pos" className={buttonVariants()}>
               Ir al POS
@@ -187,6 +189,7 @@ function VentasPOSTab({ canWrite }: { canWrite: boolean }) {
 // ── Tab Órdenes de venta ──────────────────────────────────────────────────────
 
 function OrdenesTab({ isAdmin, canWrite }: { isAdmin: boolean; canWrite: boolean }) {
+  const { can } = usePermissions()
   const [ordenes, setOrdenes] = useState<OrdenRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -277,7 +280,7 @@ function OrdenesTab({ isAdmin, canWrite }: { isAdmin: boolean; canWrite: boolean
           </Select>
         </div>
         <FiltrosFecha desde={desde} setDesde={setDesde} hasta={hasta} setHasta={setHasta} />
-        {canWrite && (
+        {canWrite && can('ventas.ordenes.crear') && (
           <div className="ml-auto">
             <Link href="/dashboard/ventas/ordenes/nueva" className={buttonVariants()}>
               <Plus className="w-4 h-4 mr-2" />
@@ -341,7 +344,7 @@ function OrdenesTab({ isAdmin, canWrite }: { isAdmin: boolean; canWrite: boolean
                     return saldo > 0.005 && o.estado !== 'anulada' ? (
                       <div className="flex items-center justify-end gap-1">
                         <span className="text-red-600 font-medium text-sm">{formatARS(saldo)}</span>
-                        {canWrite && (
+                        {canWrite && can('ventas.ordenes.confirmar') && (
                           <button onClick={() => abrirPago(o)} title="Registrar pago" className="p-1 rounded text-green-600 hover:bg-green-50">
                             <CreditCard className="w-3.5 h-3.5" />
                           </button>
@@ -363,7 +366,7 @@ function OrdenesTab({ isAdmin, canWrite }: { isAdmin: boolean; canWrite: boolean
                     <Link href={`/dashboard/ventas/ordenes/${o.id}`} title="Ver detalle" className={buttonVariants({ variant: 'ghost', size: 'icon' })}>
                       <Eye className="w-4 h-4" />
                     </Link>
-                    {canWrite && (
+                    {canWrite && can('ventas.ordenes.editar') && (
                       <Link href={`/dashboard/ventas/ordenes/${o.id}`} title="Editar" className={buttonVariants({ variant: 'ghost', size: 'icon' })}>
                         <Pencil className="w-4 h-4" />
                       </Link>

@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Plus, Search, Pencil, PowerOff, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, buttonVariants } from '@/components/ui/button'
+import { usePermissions } from '@/components/PermissionsProvider'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -14,6 +15,7 @@ import ConfirmDialog from '@/components/dashboard/ConfirmDialog'
 import type { Proveedor } from '@/types/proveedores'
 
 export default function ProveedoresClient({ isAdmin }: { isAdmin: boolean }) {
+  const { can } = usePermissions()
   const [proveedores, setProveedores] = useState<Proveedor[]>([])
   const [loading, setLoading] = useState(true)
   const [q, setQ] = useState('')
@@ -68,10 +70,12 @@ export default function ProveedoresClient({ isAdmin }: { isAdmin: boolean }) {
               Importar CSV
             </Link>
           )}
-          <Link href="/dashboard/inventario/proveedores/nuevo" className={buttonVariants()}>
-            <Plus className="w-4 h-4 mr-2" />
-            Nuevo proveedor
-          </Link>
+          {can('inventario.proveedores.crear') && (
+            <Link href="/dashboard/inventario/proveedores/nuevo" className={buttonVariants()}>
+              <Plus className="w-4 h-4 mr-2" />
+              Nuevo proveedor
+            </Link>
+          )}
         </div>
       </div>
 
@@ -114,13 +118,15 @@ export default function ProveedoresClient({ isAdmin }: { isAdmin: boolean }) {
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1 justify-end">
-                      <Link
-                        href={`/dashboard/inventario/proveedores/${p.id}`}
-                        className={buttonVariants({ variant: 'ghost', size: 'icon' })}
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </Link>
-                      {p.activo && (
+                      {can('inventario.proveedores.editar') && (
+                        <Link
+                          href={`/dashboard/inventario/proveedores/${p.id}`}
+                          className={buttonVariants({ variant: 'ghost', size: 'icon' })}
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </Link>
+                      )}
+                      {p.activo && can('inventario.proveedores.desactivar') && (
                         <Button
                           variant="ghost"
                           size="icon"

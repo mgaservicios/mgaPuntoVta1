@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Plus, Search, Pencil, PowerOff, Layers } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, buttonVariants } from '@/components/ui/button'
+import { usePermissions } from '@/components/PermissionsProvider'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -72,6 +73,7 @@ function stockClass(stock: number, isActive: boolean): string {
 }
 
 export default function ArticulosPage() {
+  const { can } = usePermissions()
   const [articulos, setArticulos] = useState<ArticuloRow[]>([])
   const [sucursales, setSucursales] = useState<SucursalCol[]>([])
   const [listas, setListas] = useState<ListaCol[]>([])
@@ -189,10 +191,12 @@ export default function ArticulosPage() {
             Con stock
           </label>
         </div>
-        <Link href="/dashboard/inventario/articulos/nuevo" className={buttonVariants()}>
-          <Plus className="w-4 h-4 mr-2" />
-          Nuevo artículo
-        </Link>
+        {can('inventario.articulos.crear') && (
+          <Link href="/dashboard/inventario/articulos/nuevo" className={buttonVariants()}>
+            <Plus className="w-4 h-4 mr-2" />
+            Nuevo artículo
+          </Link>
+        )}
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
@@ -310,13 +314,15 @@ export default function ArticulosPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1 justify-end">
-                        <Link
-                          href={`/dashboard/inventario/articulos/${a.id}`}
-                          className={buttonVariants({ variant: 'ghost', size: 'icon' })}
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </Link>
-                        {a.activo && (
+                        {can('inventario.articulos.editar') && (
+                          <Link
+                            href={`/dashboard/inventario/articulos/${a.id}`}
+                            className={buttonVariants({ variant: 'ghost', size: 'icon' })}
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </Link>
+                        )}
+                        {a.activo && can('inventario.articulos.desactivar') && (
                           <Button
                             variant="ghost"
                             size="icon"

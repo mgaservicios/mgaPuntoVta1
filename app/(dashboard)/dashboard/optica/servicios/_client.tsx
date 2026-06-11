@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { Plus, Search, RefreshCw, CreditCard, Eye, Pencil, Trash2, Printer, CheckCircle2, PackageCheck } from 'lucide-react'
 import { useSelectedSucursal } from '@/hooks/useSelectedSucursal'
+import { usePermissions } from '@/components/PermissionsProvider'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -181,6 +182,7 @@ function ServicioViewDialog({ servicio, onClose, canEdit }: { servicio: OpticaSe
 export default function OpticaServiciosClient({ isAdmin }: { isAdmin: boolean }) {
   const { isHome } = useSelectedSucursal()
   const canWrite = isHome !== false
+  const { can } = usePermissions()
   const [servicios, setServicios] = useState<ServicioRow[]>([])
   const [loading, setLoading]     = useState(true)
   const [q, setQ]                 = useState('')
@@ -304,7 +306,7 @@ export default function OpticaServiciosClient({ isAdmin }: { isAdmin: boolean })
           <h1 className="text-xl font-semibold text-gray-900">Servicios óptica</h1>
           <p className="text-sm text-gray-500">{servicios.length} resultado{servicios.length !== 1 ? 's' : ''}</p>
         </div>
-        {canWrite && (
+        {canWrite && can('optica.servicios.crear') && (
           <Link href="/dashboard/optica/servicios/nueva">
             <Button className="gap-2">
               <Plus className="w-4 h-4" />
@@ -424,7 +426,7 @@ export default function OpticaServiciosClient({ isAdmin }: { isAdmin: boolean })
                         >
                           <Printer className="w-4 h-4" />
                         </button>
-                        {canWrite && (
+                        {canWrite && can('optica.servicios.editar') && (
                           <Link
                             href={`/dashboard/optica/servicios/${s.id}`}
                             title="Editar"
@@ -433,7 +435,7 @@ export default function OpticaServiciosClient({ isAdmin }: { isAdmin: boolean })
                             <Pencil className="w-4 h-4" />
                           </Link>
                         )}
-                        {canWrite && ['pendiente', 'en_proceso'].includes(s.estado) && (
+                        {canWrite && can('optica.servicios.editar') && ['pendiente', 'en_proceso'].includes(s.estado) && (
                           <button
                             onClick={() => handleCambiarEstado(s, 'terminado')}
                             title="Marcar como terminado"
@@ -443,7 +445,7 @@ export default function OpticaServiciosClient({ isAdmin }: { isAdmin: boolean })
                             <CheckCircle2 className="w-4 h-4" />
                           </button>
                         )}
-                        {canWrite && s.estado === 'terminado' && (
+                        {canWrite && can('optica.servicios.editar') && s.estado === 'terminado' && (
                           <button
                             onClick={() => handleCambiarEstado(s, 'entregado')}
                             title="Marcar como entregado"
@@ -453,7 +455,7 @@ export default function OpticaServiciosClient({ isAdmin }: { isAdmin: boolean })
                             <PackageCheck className="w-4 h-4" />
                           </button>
                         )}
-                        {canWrite && saldo > 0.005 && !['anulado', 'entregado'].includes(s.estado) && (
+                        {canWrite && can('optica.servicios.editar') && saldo > 0.005 && !['anulado', 'entregado'].includes(s.estado) && (
                           <button
                             onClick={() => abrirPago(s)}
                             title="Registrar pago"

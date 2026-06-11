@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Plus, Pencil, Trash2, Search, X, Check } from 'lucide-react'
 import { toast } from 'sonner'
+import { usePermissions } from '@/components/PermissionsProvider'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -18,6 +19,7 @@ interface MedicoForm {
 const EMPTY_FORM: MedicoForm = { nombre: '', matricula: '', telefono: '' }
 
 export default function MedicosPage() {
+  const { can } = usePermissions()
   const [medicos, setMedicos] = useState<OpticaMedico[]>([])
   const [loading, setLoading] = useState(true)
   const [q, setQ] = useState('')
@@ -111,10 +113,12 @@ export default function MedicosPage() {
           <h1 className="text-xl font-semibold text-gray-900">Médicos</h1>
           <p className="text-sm text-gray-500">{medicos.length} médico{medicos.length !== 1 ? 's' : ''}</p>
         </div>
-        <Button className="gap-2" onClick={openNew}>
-          <Plus className="w-4 h-4" />
-          Nuevo médico
-        </Button>
+        {can('optica.medicos.crear') && (
+          <Button className="gap-2" onClick={openNew}>
+            <Plus className="w-4 h-4" />
+            Nuevo médico
+          </Button>
+        )}
       </div>
 
       {/* Filtro */}
@@ -203,17 +207,21 @@ export default function MedicosPage() {
                   <td className="py-3 pr-4 text-gray-600">{m.telefono ?? '—'}</td>
                   <td className="py-3 text-right">
                     <div className="flex items-center justify-end gap-1">
-                      <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => openEdit(m)}>
-                        <Pencil className="w-3.5 h-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 px-2 text-red-500 hover:bg-red-50"
-                        onClick={() => setConfirmDelete(m.id)}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
+                      {can('optica.medicos.editar') && (
+                        <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => openEdit(m)}>
+                          <Pencil className="w-3.5 h-3.5" />
+                        </Button>
+                      )}
+                      {can('optica.medicos.eliminar') && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-red-500 hover:bg-red-50"
+                          onClick={() => setConfirmDelete(m.id)}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      )}
                     </div>
                   </td>
                 </tr>

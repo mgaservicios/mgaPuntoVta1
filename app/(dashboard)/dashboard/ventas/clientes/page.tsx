@@ -11,6 +11,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
 import ConfirmDialog from '@/components/dashboard/ConfirmDialog'
+import { usePermissions } from '@/components/PermissionsProvider'
 import type { Cliente } from '@/types/clientes'
 
 const TIPO_LABEL: Record<string, string> = {
@@ -25,6 +26,7 @@ export default function ClientesPage() {
   const [q, setQ] = useState('')
   const [confirmId, setConfirmId] = useState<number | null>(null)
   const [desactivando, setDesactivando] = useState(false)
+  const { can } = usePermissions()
 
   const fetchClientes = useCallback(async () => {
     setLoading(true)
@@ -67,10 +69,12 @@ export default function ClientesPage() {
             onChange={(e) => setQ(e.target.value)}
           />
         </div>
-        <Link href="/dashboard/ventas/clientes/nuevo" className={buttonVariants()}>
-          <Plus className="w-4 h-4 mr-2" />
-          Nuevo cliente
-        </Link>
+        {can('ventas.clientes.crear') && (
+          <Link href="/dashboard/ventas/clientes/nuevo" className={buttonVariants()}>
+            <Plus className="w-4 h-4 mr-2" />
+            Nuevo cliente
+          </Link>
+        )}
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -112,13 +116,15 @@ export default function ClientesPage() {
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1 justify-end">
-                      <Link
-                        href={`/dashboard/ventas/clientes/${c.id}`}
-                        className={buttonVariants({ variant: 'ghost', size: 'icon' })}
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </Link>
-                      {c.activo && (
+                      {can('ventas.clientes.editar') && (
+                        <Link
+                          href={`/dashboard/ventas/clientes/${c.id}`}
+                          className={buttonVariants({ variant: 'ghost', size: 'icon' })}
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </Link>
+                      )}
+                      {c.activo && can('ventas.clientes.desactivar') && (
                         <Button
                           variant="ghost"
                           size="icon"

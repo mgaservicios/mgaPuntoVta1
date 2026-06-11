@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { Plus, Eye, Pencil, Check, Trash2 } from 'lucide-react'
 import { useSelectedSucursal } from '@/hooks/useSelectedSucursal'
+import { usePermissions } from '@/components/PermissionsProvider'
 import { buttonVariants, Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -27,6 +28,7 @@ const CONTRAPARTE_LABELS: Record<string, string> = { sucursal: 'Sucursal', prove
 export default function RemitosClient({ isAdmin }: { isAdmin: boolean }) {
   const { isHome } = useSelectedSucursal()
   const canWrite = isHome !== false
+  const { can } = usePermissions()
   const [remitos, setRemitos] = useState<RemitoRow[]>([])
   const [loading, setLoading] = useState(true)
   const [tipo, setTipo] = useState('todos')
@@ -84,7 +86,7 @@ export default function RemitosClient({ isAdmin }: { isAdmin: boolean }) {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-lg font-semibold text-gray-800">Stock — Remitos</h2>
-        {canWrite && (
+        {canWrite && can('inventario.remitos.crear') && (
           <Link href="/dashboard/inventario/remitos/nuevo" className={buttonVariants()}>
             <Plus className="w-4 h-4 mr-2" />
             Nuevo remito
@@ -171,7 +173,7 @@ export default function RemitosClient({ isAdmin }: { isAdmin: boolean }) {
                       <Eye className="w-3.5 h-3.5 mr-1" />
                       Ver
                     </Link>
-                    {canWrite && (
+                    {canWrite && can('inventario.remitos.crear') && (
                       <Link
                         href={`/dashboard/inventario/remitos/${r.id}${r.estado !== 'anulado' ? '/editar' : ''}`}
                         className={buttonVariants({ variant: 'ghost', size: 'sm' })}
@@ -180,7 +182,7 @@ export default function RemitosClient({ isAdmin }: { isAdmin: boolean }) {
                         Modificar
                       </Link>
                     )}
-                    {canWrite && r.estado === 'borrador' && (
+                    {canWrite && can('inventario.remitos.confirmar') && r.estado === 'borrador' && (
                       <Button
                         variant="ghost"
                         size="sm"

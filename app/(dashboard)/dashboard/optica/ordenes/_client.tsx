@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { Plus, Search, RefreshCw, CreditCard, Eye, Pencil, Trash2, Printer, CheckCircle2, PackageCheck } from 'lucide-react'
 import { useSelectedSucursal } from '@/hooks/useSelectedSucursal'
+import { usePermissions } from '@/components/PermissionsProvider'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -281,6 +282,7 @@ function OrdenViewDialog({ orden, onClose, canEdit }: { orden: OpticaOrden | nul
 export default function OpticaOrdenesClient({ isAdmin }: { isAdmin: boolean }) {
   const { isHome } = useSelectedSucursal()
   const canWrite = isHome !== false
+  const { can } = usePermissions()
   const [ordenes, setOrdenes] = useState<OrdenRow[]>([])
   const [loading, setLoading] = useState(true)
   const [q, setQ] = useState('')
@@ -406,7 +408,7 @@ export default function OpticaOrdenesClient({ isAdmin }: { isAdmin: boolean }) {
           <h1 className="text-xl font-semibold text-gray-900">Órdenes de trabajo óptica</h1>
           <p className="text-sm text-gray-500">{ordenes.length} resultado{ordenes.length !== 1 ? 's' : ''}</p>
         </div>
-        {canWrite && (
+        {canWrite && can('optica.ordenes.crear') && (
           <Link href="/dashboard/optica/ordenes/nueva">
             <Button className="gap-2">
               <Plus className="w-4 h-4" />
@@ -535,7 +537,7 @@ export default function OpticaOrdenesClient({ isAdmin }: { isAdmin: boolean }) {
                         >
                           <Printer className="w-4 h-4" />
                         </button>
-                        {canWrite && (
+                        {canWrite && can('optica.ordenes.editar') && (
                           <Link
                             href={`/dashboard/optica/ordenes/${orden.id}`}
                             title="Editar"
@@ -544,7 +546,7 @@ export default function OpticaOrdenesClient({ isAdmin }: { isAdmin: boolean }) {
                             <Pencil className="w-4 h-4" />
                           </Link>
                         )}
-                        {canWrite && ['pendiente', 'en_proceso', 'en_laboratorio'].includes(orden.estado) && (
+                        {canWrite && can('optica.ordenes.cambiar-estado') && ['pendiente', 'en_proceso', 'en_laboratorio'].includes(orden.estado) && (
                           <button
                             onClick={() => handleCambiarEstado(orden, 'terminado')}
                             title="Marcar como terminada"
@@ -554,7 +556,7 @@ export default function OpticaOrdenesClient({ isAdmin }: { isAdmin: boolean }) {
                             <CheckCircle2 className="w-4 h-4" />
                           </button>
                         )}
-                        {canWrite && orden.estado === 'terminado' && (
+                        {canWrite && can('optica.ordenes.cambiar-estado') && orden.estado === 'terminado' && (
                           <button
                             onClick={() => handleCambiarEstado(orden, 'entregado')}
                             title="Marcar como entregada"
@@ -564,7 +566,7 @@ export default function OpticaOrdenesClient({ isAdmin }: { isAdmin: boolean }) {
                             <PackageCheck className="w-4 h-4" />
                           </button>
                         )}
-                        {canWrite && saldo > 0.005 && !['anulado', 'entregado'].includes(orden.estado) && (
+                        {canWrite && can('optica.ordenes.pagar') && saldo > 0.005 && !['anulado', 'entregado'].includes(orden.estado) && (
                           <button
                             onClick={() => abrirPago(orden)}
                             title="Registrar pago"

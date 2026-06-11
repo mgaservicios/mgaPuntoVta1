@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { Plus, Eye } from 'lucide-react'
+import { usePermissions } from '@/components/PermissionsProvider'
 import { buttonVariants } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -28,6 +29,7 @@ function formatMonto(n: number) {
 }
 
 export default function NotasCreditoPage() {
+  const { can } = usePermissions()
   const [items, setItems] = useState<NCRow[]>([])
   const [loading, setLoading] = useState(true)
   const [estado, setEstado] = useState('todos')
@@ -60,10 +62,12 @@ export default function NotasCreditoPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-lg font-semibold text-gray-800">Notas de crédito</h2>
-        <Link href="/dashboard/ventas/notas-credito/nueva" className={buttonVariants()}>
-          <Plus className="w-4 h-4 mr-2" />
-          Nueva nota de crédito
-        </Link>
+        {can('ventas.notas-credito.crear') && (
+          <Link href="/dashboard/ventas/notas-credito/nueva" className={buttonVariants()}>
+            <Plus className="w-4 h-4 mr-2" />
+            Nueva nota de crédito
+          </Link>
+        )}
       </div>
 
       <div className="flex gap-3 mb-4">
