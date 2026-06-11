@@ -27,13 +27,21 @@ export async function GET(req: NextRequest) {
         .single()
       if (data) sucursalId = data.id as number
     } else {
-      const { data } = await supabase
+      const { data: us } = await supabase
         .from('user_sucursales')
         .select('sucursal_id')
         .eq('user_id', session.user.id)
         .eq('sucursal_id', desiredId)
         .single()
-      if (data) sucursalId = data.sucursal_id as number
+      if (us) {
+        const { data: suc } = await supabase
+          .from('sucursales')
+          .select('id')
+          .eq('id', desiredId)
+          .eq('activo', true)
+          .single()
+        if (suc) sucursalId = suc.id as number
+      }
     }
   }
 
@@ -59,24 +67,35 @@ export async function GET(req: NextRequest) {
         sucursalId = (data?.id as number) ?? null
       }
     } else {
-      const { data } = await supabase
+      // Get user's sucursal IDs, then pick the first active one — must match the activo=true
+      // filter applied in DashboardLayout.getSucursales() to avoid a redirect loop.
+      const { data: rows } = await supabase
         .from('user_sucursales')
         .select('sucursal_id')
         .eq('user_id', session.user.id)
-        .limit(1)
-        .single()
-      sucursalId = (data?.sucursal_id as number) ?? null
+      const ids = (rows ?? []).map((r: { sucursal_id: number }) => r.sucursal_id)
+      if (ids.length > 0) {
+        const { data } = await supabase
+          .from('sucursales')
+          .select('id')
+          .in('id', ids)
+          .eq('activo', true)
+          .order('nombre')
+          .limit(1)
+          .single()
+        sucursalId = (data?.id as number) ?? null
+      }
     }
   }
 
   // No sucursal available for this user — force sign-out
   if (!sucursalId) {
     const res = NextResponse.redirect(new URL('/auth/signin?error=SinSucursal', req.url))
-    // Clear NextAuth JWT session cookies (both HTTP and HTTPS variants)
-    res.cookies.delete('authjs.session-token')
-    res.cookies.delete('__Secure-authjs.session-token')
-    res.cookies.delete('authjs.csrf-token')
-    res.cookies.delete('__Host-authjs.csrf-token')
+    // Clear NextAuth JWT session cookies — name matches the custom name in lib/auth.ts
+    res.cookies.delete('next-auth.session-token')
+    res.cookies.delete('__Secure-next-auth.session-token')
+    res.cookies.delete('next-auth.csrf-token')
+    res.cookies.delete('__Host-next-auth.csrf-token')
     res.cookies.delete(SUCURSAL_COOKIE)
     return res
   }

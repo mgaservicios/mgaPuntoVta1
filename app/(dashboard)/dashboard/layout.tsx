@@ -7,6 +7,7 @@ import { PermissionsProvider } from '@/components/PermissionsProvider'
 import { getTenantClient } from '@/services/supabase-tenant'
 import { SUCURSAL_COOKIE, SUCURSAL_HOME_COOKIE, VER_TODAS_COOKIE } from '@/lib/sucursal'
 import { ROUTE_TO_PERM } from '@/lib/perm-groups'
+import { SessionGuard } from '@/components/SessionGuard'
 import type { Sucursal } from '@/types/sucursales'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
@@ -63,6 +64,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const verTodas = isAdmin && cookieStore.get(VER_TODAS_COOKIE)?.value === '1'
 
   if (!isValidCookie && !verTodas) {
+    // If there are no active sucursales for this user, init-session would also find nothing and
+    // set a stale cookie → infinite loop. Sign out instead so the user sees a clear error.
+    if (sucursales.length === 0) redirect('/auth/reauth')
     redirect('/api/auth/init-session')
   }
 
@@ -147,6 +151,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         />
         <QuickActionsBar modules={session.user.modules ?? []} color={brandColor} userPermissions={permMap} />
         <main className="flex-1 overflow-y-auto p-6 lg:p-8">
+          <SessionGuard />
           <PermissionsProvider permissions={permMap}>
             {children}
           </PermissionsProvider>

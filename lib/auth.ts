@@ -89,7 +89,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
 
-  session: { strategy: 'jwt' },
+  session: {
+    strategy: 'jwt',
+    maxAge: 12 * 60 * 60, // 12 horas — garantiza re-login aunque el navegador conserve la cookie
+  },
   pages: { signIn: '/auth/signin' },
   cookies: {
     sessionToken: {
