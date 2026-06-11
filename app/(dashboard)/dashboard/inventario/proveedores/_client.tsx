@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { Plus, Search, Pencil, PowerOff, Upload } from 'lucide-react'
+import { Plus, Search, Eye, Pencil, PowerOff, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { usePermissions } from '@/components/PermissionsProvider'
@@ -118,9 +118,17 @@ export default function ProveedoresClient({ isAdmin }: { isAdmin: boolean }) {
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1 justify-end">
+                      <Link
+                        href={`/dashboard/inventario/proveedores/${p.id}`}
+                        title="Ver detalle"
+                        className={buttonVariants({ variant: 'ghost', size: 'icon' })}
+                      >
+                        <Eye className="w-4 h-4" />
+                      </Link>
                       {can('inventario.proveedores.editar') && (
                         <Link
                           href={`/dashboard/inventario/proveedores/${p.id}`}
+                          title="Editar"
                           className={buttonVariants({ variant: 'ghost', size: 'icon' })}
                         >
                           <Pencil className="w-4 h-4" />

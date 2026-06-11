@@ -191,35 +191,30 @@ export default function OrdenesClient({ isAdmin }: { isAdmin: boolean }) {
               <TableHead className="w-28">N°</TableHead>
               <TableHead className="w-28">Fecha</TableHead>
               <TableHead>Cliente</TableHead>
-              <TableHead className="w-36">Condición</TableHead>
-              <TableHead className="w-28">Vencimiento</TableHead>
               <TableHead className="text-right w-32">Total</TableHead>
               <TableHead className="text-right w-28">Saldo</TableHead>
               <TableHead className="w-28">Estado</TableHead>
-              <TableHead className="w-12"></TableHead>
+              <TableHead className="w-32"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-gray-400">Cargando…</TableCell>
+                <TableCell colSpan={7} className="text-center py-8 text-gray-400">Cargando…</TableCell>
               </TableRow>
             ) : ordenes.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-gray-400">Sin órdenes</TableCell>
+                <TableCell colSpan={7} className="text-center py-8 text-gray-400">Sin órdenes</TableCell>
               </TableRow>
             ) : ordenes.map(o => (
               <TableRow key={o.id} className={o.estado === 'anulada' ? 'opacity-50' : ''}>
                 <TableCell className="font-mono font-medium text-sm">{o.numero}</TableCell>
                 <TableCell className="text-gray-600 text-sm">{formatFecha(o.fecha)}</TableCell>
                 <TableCell className="text-sm text-gray-700">
-                  {o.clientes?.nombre ?? <span className="text-gray-400">Consumidor final</span>}
-                </TableCell>
-                <TableCell className="text-sm text-gray-600">
-                  {CONDICION_LABELS[o.condicion_pago as CondicionPago]}
-                </TableCell>
-                <TableCell className="text-sm text-gray-500">
-                  {o.vencimiento ? formatFecha(o.vencimiento) : '—'}
+                  <div className="truncate max-w-[180px]">
+                    {o.clientes?.nombre ?? <span className="text-gray-400">Consumidor final</span>}
+                  </div>
+                  <div className="text-xs text-gray-400">{CONDICION_LABELS[o.condicion_pago as CondicionPago]}</div>
                 </TableCell>
                 <TableCell className="text-right font-medium">{formatARS(o.total)}</TableCell>
                 <TableCell className="text-right">

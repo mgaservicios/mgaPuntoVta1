@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { Plus, Search, Pencil, PowerOff } from 'lucide-react'
+import { Plus, Search, Eye, Pencil, PowerOff } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -116,6 +116,13 @@ export default function ClientesPage() {
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1 justify-end">
+                      <Link
+                        href={`/dashboard/ventas/clientes/${c.id}`}
+                        title="Ver detalle"
+                        className={buttonVariants({ variant: 'ghost', size: 'icon' })}
+                      >
+                        <Eye className="w-4 h-4" />
+                      </Link>
                       {can('ventas.clientes.editar') && (
                         <Link
                           href={`/dashboard/ventas/clientes/${c.id}`}

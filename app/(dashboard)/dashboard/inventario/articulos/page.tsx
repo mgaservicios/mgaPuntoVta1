@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { Plus, Search, Pencil, PowerOff, Layers } from 'lucide-react'
+import { Plus, Search, Eye, Pencil, PowerOff, Layers } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { usePermissions } from '@/components/PermissionsProvider'
@@ -150,23 +150,22 @@ export default function ArticulosPage() {
     setConfirmId(null)
   }
 
-  const activeSucursalId = sucursales.find(s => s.is_active)?.id ?? null
+  const colCount = 7
+  const activeSuc = sucursales.find(s => s.is_active) ?? null
+  const mainLista = listas[0] ?? null
 
   // When no search text: API already filtered by stock server-side.
   // When search text is active: filter client-side from RPC results.
-  const articulosFiltrados = soloConStock && activeSucursalId && q.trim()
+  const articulosFiltrados = soloConStock && activeSuc && q.trim()
     ? articulos.filter(a => {
         if (a.tipo_articulo === 'con_variantes') {
           return (a.articulo_variantes ?? []).some(v =>
-            (v.stock_sucursales?.find(s => s.sucursal_id === activeSucursalId)?.stock_actual ?? 0) > 0
+            (v.stock_sucursales?.find(s => s.sucursal_id === activeSuc.id)?.stock_actual ?? 0) > 0
           )
         }
-        return (a.stock_sucursales?.find(s => s.sucursal_id === activeSucursalId)?.stock_actual ?? 0) > 0
+        return (a.stock_sucursales?.find(s => s.sucursal_id === activeSuc.id)?.stock_actual ?? 0) > 0
       })
     : articulos
-
-  // Total columns: 6 fixed + listas + sucursales (min 1 each if no data yet)
-  const colCount = 6 + Math.max(listas.length, 1) + Math.max(sucursales.length, 1)
 
   return (
     <div>
@@ -199,47 +198,21 @@ export default function ArticulosPage() {
         )}
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Nombre / Variante</TableHead>
-              <TableHead>Código / SKU</TableHead>
-              <TableHead>Tipo</TableHead>
-              <TableHead>Categoría</TableHead>
-
-              {/* Dynamic price columns — one per lista (max 3) */}
-              {listas.length === 0 ? (
-                <TableHead className="text-right">Precio</TableHead>
-              ) : (
-                listas.map((l) => (
-                  <TableHead key={l.id} className="text-right whitespace-nowrap">
-                    {l.nombre}
-                  </TableHead>
-                ))
-              )}
-
-              {/* Dynamic stock columns — one per sucursal */}
-              {sucursales.length === 0 ? (
-                <TableHead className="text-right">Stock</TableHead>
-              ) : (
-                sucursales.map((s) => (
-                  <TableHead
-                    key={s.id}
-                    className={`text-right whitespace-nowrap ${s.is_active ? 'text-indigo-700 font-semibold' : 'text-gray-400 font-normal'}`}
-                  >
-                    {s.nombre}
-                    {s.is_active && (
-                      <span className="block text-[10px] font-normal text-indigo-400 leading-none mt-0.5">
-                        activa
-                      </span>
-                    )}
-                  </TableHead>
-                ))
-              )}
-
-              <TableHead>Estado</TableHead>
-              <TableHead className="w-24"></TableHead>
+              <TableHead className="w-28">Código / SKU</TableHead>
+              <TableHead className="w-24">Categoría</TableHead>
+              <TableHead className="text-right w-32">
+                {mainLista ? mainLista.nombre : 'Precio'}
+              </TableHead>
+              <TableHead className="text-right w-24">
+                {activeSuc ? `Stock ${activeSuc.nombre}` : 'Stock'}
+              </TableHead>
+              <TableHead className="w-20">Estado</TableHead>
+              <TableHead className="w-20"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -261,51 +234,35 @@ export default function ArticulosPage() {
                   <TableRow key={`art-${a.id}`} className={!a.activo ? 'opacity-50' : ''}>
                     <TableCell className="font-medium">{a.nombre}</TableCell>
                     <TableCell className="text-gray-500 font-mono text-xs">{a.codigo ?? '—'}</TableCell>
-                    <TableCell>
-                      {a.tipo_articulo === 'con_variantes' ? (
-                        <span className="flex items-center gap-1 text-purple-700 text-xs font-medium">
+                    <TableCell className="text-gray-500 text-sm truncate max-w-[96px]">
+                      <div>{a.categorias?.nombre ?? '—'}</div>
+                      {a.tipo_articulo === 'con_variantes' && (
+                        <span className="flex items-center gap-1 text-purple-600 text-xs font-medium mt-0.5">
                           <Layers className="w-3 h-3" /> Con variantes
                         </span>
-                      ) : (
-                        <span className="text-gray-500 text-xs">Simple</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-gray-500 text-sm">
-                      {a.categorias?.nombre ?? '—'}
+                    {/* Single price column */}
+                    <TableCell className="text-right tabular-nums">
+                      {a.tipo_articulo === 'con_variantes'
+                        ? <span className="text-gray-300">—</span>
+                        : formatPrecio(mainLista
+                            ? (a.precios_vigentes?.find(p => p.lista_id === mainLista.id)?.precio ?? null)
+                            : null)
+                      }
                     </TableCell>
-                    {/* Price per lista */}
-                    {listas.length === 0 ? (
-                      <TableCell className="text-right text-gray-400">—</TableCell>
-                    ) : (
-                      listas.map((l) => {
-                        if (a.tipo_articulo === 'con_variantes') {
-                          return <TableCell key={l.id} className="text-right text-gray-300">—</TableCell>
-                        }
-                        const pv = a.precios_vigentes?.find((p) => p.lista_id === l.id)
-                        return (
-                          <TableCell key={l.id} className="text-right tabular-nums font-medium">
-                            {formatPrecio(pv?.precio ?? null)}
-                          </TableCell>
-                        )
-                      })
-                    )}
-
-                    {/* Stock per sucursal */}
-                    {sucursales.length === 0 ? (
-                      <TableCell className="text-right text-gray-400">—</TableCell>
-                    ) : (
-                      sucursales.map((s) => {
-                        if (a.tipo_articulo === 'con_variantes') {
-                          return <TableCell key={s.id} className="text-right text-gray-300">—</TableCell>
-                        }
-                        const stock = a.stock_sucursales?.find((e) => e.sucursal_id === s.id)?.stock_actual ?? 0
-                        return (
-                          <TableCell key={s.id} className={`text-right tabular-nums ${stockClass(stock, s.is_active)}`}>
-                            {stock}
-                          </TableCell>
-                        )
-                      })
-                    )}
+                    {/* Single stock column (active sucursal) */}
+                    <TableCell className="text-right tabular-nums">
+                      {a.tipo_articulo === 'con_variantes'
+                        ? <span className="text-gray-300">—</span>
+                        : (() => {
+                            const stock = activeSuc
+                              ? (a.stock_sucursales?.find(e => e.sucursal_id === activeSuc.id)?.stock_actual ?? 0)
+                              : 0
+                            return <span className={stockClass(stock, !!activeSuc)}>{stock}</span>
+                          })()
+                      }
+                    </TableCell>
 
                     <TableCell>
                       <Badge variant={a.activo ? 'default' : 'secondary'}>
@@ -314,9 +271,17 @@ export default function ArticulosPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1 justify-end">
+                        <Link
+                          href={`/dashboard/inventario/articulos/${a.id}`}
+                          title="Ver / Editar"
+                          className={buttonVariants({ variant: 'ghost', size: 'icon' })}
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Link>
                         {can('inventario.articulos.editar') && (
                           <Link
                             href={`/dashboard/inventario/articulos/${a.id}`}
+                            title="Editar"
                             className={buttonVariants({ variant: 'ghost', size: 'icon' })}
                           >
                             <Pencil className="w-4 h-4" />
@@ -346,35 +311,22 @@ export default function ArticulosPage() {
                       </TableCell>
                       <TableCell className="py-2 text-gray-400 font-mono text-xs">{v.sku ?? '—'}</TableCell>
                       <TableCell className="py-2 text-gray-400 text-xs">Variante</TableCell>
-                      <TableCell className="py-2" />
-
-                      {/* Variant price per lista */}
-                      {listas.length === 0 ? (
-                        <TableCell className="py-2 text-right text-gray-300">—</TableCell>
-                      ) : (
-                        listas.map((l) => {
-                          const pv = v.precios_vigentes?.find((p) => p.lista_id === l.id)
-                          return (
-                            <TableCell key={l.id} className={`py-2 text-right tabular-nums text-sm ${pv?.heredado ? 'text-gray-400' : 'font-medium'}`}>
-                              {formatPrecio(pv?.precio ?? null)}
-                            </TableCell>
-                          )
-                        })
-                      )}
-
-                      {/* Variant stock per sucursal */}
-                      {sucursales.length === 0 ? (
-                        <TableCell className="py-2 text-right text-gray-400">—</TableCell>
-                      ) : (
-                        sucursales.map((s) => {
-                          const stock = v.stock_sucursales?.find((e) => e.sucursal_id === s.id)?.stock_actual ?? 0
-                          return (
-                            <TableCell key={s.id} className={`py-2 text-right tabular-nums ${stockClass(stock, s.is_active)}`}>
-                              {stock}
-                            </TableCell>
-                          )
-                        })
-                      )}
+                      {/* Variant price */}
+                      <TableCell className="py-2 text-right tabular-nums text-sm">
+                        {(() => {
+                          const pv = mainLista ? v.precios_vigentes?.find(p => p.lista_id === mainLista.id) : null
+                          return <span className={pv?.heredado ? 'text-gray-400' : 'font-medium'}>{formatPrecio(pv?.precio ?? null)}</span>
+                        })()}
+                      </TableCell>
+                      {/* Variant stock (active sucursal) */}
+                      <TableCell className="py-2 text-right tabular-nums">
+                        {(() => {
+                          const stock = activeSuc
+                            ? (v.stock_sucursales?.find(e => e.sucursal_id === activeSuc.id)?.stock_actual ?? 0)
+                            : 0
+                          return <span className={stockClass(stock, !!activeSuc)}>{stock}</span>
+                        })()}
+                      </TableCell>
 
                       <TableCell className="py-2">
                         <Badge variant={v.activo ? 'default' : 'secondary'} className="text-xs">
