@@ -61,6 +61,7 @@ export default function NuevoRemitoPage() {
   const [contraparteSucursalId, setContraparteSucursalId] = useState<string>('')
   const [selectedProveedor, setSelectedProveedor] = useState<Proveedor | null>(null)
   const [proveedorError, setProveedorError] = useState(false)
+  const [sucursalError, setSucursalError] = useState(false)
   const [contraparteNombre, setContraparteNombre] = useState('')
   const [nroExterno, setNroExterno] = useState('')
   const [observaciones, setObservaciones] = useState('')
@@ -209,7 +210,9 @@ export default function NuevoRemitoPage() {
     if (items.length === 0) { toast.error('Agregá al menos un ítem'); return }
 
     if (contraparteTipo === 'sucursal' && !contraparteSucursalId) {
-      toast.error('Seleccioná la sucursal de origen/destino'); return
+      toast.error('Seleccioná la sucursal de origen/destino')
+      setSucursalError(true)
+      return
     }
     if (contraparteTipo === 'proveedor' && !selectedProveedor) {
       setProveedorError(true)
@@ -361,7 +364,7 @@ export default function NuevoRemitoPage() {
             <div className="flex gap-2 flex-1">
               <Select
                 value={contraparteTipo}
-                onValueChange={(v) => { if (v) setContraparteTipo(v as ContraparteTipo) }}
+                onValueChange={(v) => { if (v) { setContraparteTipo(v as ContraparteTipo); setSucursalError(false); setProveedorError(false) } }}
               >
                 <SelectTrigger className="w-32 h-8 text-sm">
                   <SelectValue />
@@ -383,10 +386,10 @@ export default function NuevoRemitoPage() {
               {contraparteTipo === 'sucursal' && (
                 <Select
                   value={contraparteSucursalId}
-                  onValueChange={(v) => { if (v) setContraparteSucursalId(v) }}
+                  onValueChange={(v) => { if (v) { setContraparteSucursalId(v); setSucursalError(false) } }}
                 >
-                  <SelectTrigger className="flex-1 h-8 text-sm">
-                    <SelectValue placeholder="Seleccioná sucursal">
+                  <SelectTrigger className={`flex-1 h-8 text-sm${sucursalError ? ' border-red-400 ring-1 ring-red-300' : ''}`}>
+                    <SelectValue placeholder="Seleccioná sucursal…">
                       {sucursales.find(s => String(s.id) === contraparteSucursalId)?.nombre}
                     </SelectValue>
                   </SelectTrigger>
