@@ -60,6 +60,7 @@ export default function NuevoRemitoPage() {
   const [contraparteTipo, setContraparteTipo] = useState<ContraparteTipo>('proveedor')
   const [contraparteSucursalId, setContraparteSucursalId] = useState<string>('')
   const [selectedProveedor, setSelectedProveedor] = useState<Proveedor | null>(null)
+  const [proveedorError, setProveedorError] = useState(false)
   const [contraparteNombre, setContraparteNombre] = useState('')
   const [nroExterno, setNroExterno] = useState('')
   const [observaciones, setObservaciones] = useState('')
@@ -211,6 +212,7 @@ export default function NuevoRemitoPage() {
       toast.error('Seleccioná la sucursal de origen/destino'); return
     }
     if (contraparteTipo === 'proveedor' && !selectedProveedor) {
+      setProveedorError(true)
       toast.error('Seleccioná el proveedor'); return
     }
     if (contraparteTipo === 'persona' && !contraparteNombre.trim()) {
@@ -371,7 +373,12 @@ export default function NuevoRemitoPage() {
                 </SelectContent>
               </Select>
               {contraparteTipo === 'proveedor' && (
-                <ProveedorSearch value={selectedProveedor} onChange={setSelectedProveedor} />
+                <ProveedorSearch
+                  value={selectedProveedor}
+                  onChange={(p) => { setSelectedProveedor(p); if (p) setProveedorError(false) }}
+                  error={proveedorError}
+                  required
+                />
               )}
               {contraparteTipo === 'sucursal' && (
                 <Select

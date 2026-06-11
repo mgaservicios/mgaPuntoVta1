@@ -14,9 +14,13 @@ import type { Proveedor } from '@/types/proveedores'
 export default function ProveedorSearch({
   value,
   onChange,
+  error,
+  required,
 }: {
   value: Proveedor | null
   onChange: (p: Proveedor | null) => void
+  error?: boolean
+  required?: boolean
 }) {
   const [q, setQ] = useState('')
   const [results, setResults] = useState<Proveedor[]>([])
@@ -85,16 +89,19 @@ export default function ProveedorSearch({
     )
   }
 
+  const hasInvalidText = q.trim() !== '' && !value
+  const showError = error || hasInvalidText
+
   return (
     <>
       <div className="relative flex-1 min-w-0">
         <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+          <Search className={`absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 ${showError ? 'text-red-400' : 'text-gray-400'}`} />
           <Input
-            className="pl-8 pr-8 h-8 text-sm"
-            placeholder="Buscar proveedor…"
+            className={`pl-8 pr-8 h-8 text-sm ${showError ? 'border-red-400 focus-visible:ring-red-300' : ''}`}
+            placeholder={required ? 'Buscar proveedor… (requerido)' : 'Buscar proveedor…'}
             value={q}
-            onChange={(e) => search(e.target.value)}
+            onChange={(e) => { search(e.target.value); setOpen(true) }}
             onFocus={() => setOpen(true)}
             onBlur={() => setTimeout(() => setOpen(false), 150)}
           />

@@ -98,6 +98,7 @@ export default function OpticaOrdenPage({ params }: { params: Promise<{ id: stri
   const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10))
   const [fechaPrometida, setFechaPrometida] = useState('')
   const [cliente, setCliente] = useState<Cliente | null>(null)
+  const [clienteError, setClienteError] = useState(false)
   const [medico, setMedico] = useState<OpticaMedico | null>(null)
   const [medicoNombre, setMedicoNombre] = useState('')
   const [recetaUrl, setRecetaUrl] = useState('')
@@ -372,6 +373,7 @@ export default function OpticaOrdenPage({ params }: { params: Promise<{ id: stri
 
     if (!cliente) {
       toast.error('Debe seleccionar un cliente')
+      setClienteError(true)
       setSaving(false)
       return
     }
@@ -695,7 +697,12 @@ export default function OpticaOrdenPage({ params }: { params: Promise<{ id: stri
                 <div className="flex-1 min-w-0">
                   {disabledEdit
                     ? <p className="text-sm text-gray-700 pt-1.5">{cliente?.nombre ?? '—'}</p>
-                    : <ClienteSearch value={cliente} onChange={setCliente} />
+                    : <ClienteSearch
+                        value={cliente}
+                        onChange={(c) => { setCliente(c); if (c) setClienteError(false) }}
+                        error={clienteError}
+                        required
+                      />
                   }
                 </div>
               </div>

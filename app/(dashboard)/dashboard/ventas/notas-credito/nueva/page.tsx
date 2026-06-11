@@ -16,6 +16,7 @@ export default function NuevaNotaCreditoPage() {
   const router = useRouter()
   const vendedores = useVendedores()
   const [cliente, setCliente] = useState<Cliente | null>(null)
+  const [clienteError, setClienteError] = useState(false)
   const [vendedorId, setVendedorId] = useState<number | null>(null)
   const [monto, setMonto] = useState('')
   const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10))
@@ -24,7 +25,7 @@ export default function NuevaNotaCreditoPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!cliente) { toast.error('Seleccioná un cliente'); return }
+    if (!cliente) { toast.error('Seleccioná un cliente'); setClienteError(true); return }
     const montoNum = parseFloat(monto)
     if (!montoNum || montoNum <= 0) { toast.error('El monto debe ser mayor a 0'); return }
 
@@ -57,7 +58,12 @@ export default function NuevaNotaCreditoPage() {
       <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
         <div className="space-y-1.5">
           <Label>Cliente <span className="text-red-500">*</span></Label>
-          <ClienteSearch value={cliente} onChange={setCliente} />
+          <ClienteSearch
+            value={cliente}
+            onChange={(c) => { setCliente(c); if (c) setClienteError(false) }}
+            error={clienteError}
+            required
+          />
         </div>
 
         <div className="space-y-1.5">

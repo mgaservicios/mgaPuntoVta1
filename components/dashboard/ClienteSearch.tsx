@@ -17,9 +17,13 @@ import type { Cliente, ClienteTipo } from '@/types/clientes'
 export default function ClienteSearch({
   value,
   onChange,
+  error,
+  required,
 }: {
   value: Cliente | null
   onChange: (c: Cliente | null) => void
+  error?: boolean
+  required?: boolean
 }) {
   const [q, setQ] = useState('')
   const [results, setResults] = useState<Cliente[]>([])
@@ -102,16 +106,19 @@ export default function ClienteSearch({
     )
   }
 
+  const hasInvalidText = q.trim() !== '' && !value
+  const showError = error || hasInvalidText
+
   return (
     <>
       <div className="relative">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+          <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 ${showError ? 'text-red-400' : 'text-gray-400'}`} />
           <Input
-            className="pl-8 pr-8"
-            placeholder="Buscar cliente…"
+            className={`pl-8 pr-8 ${showError ? 'border-red-400 focus-visible:ring-red-300' : ''}`}
+            placeholder={required ? 'Buscar cliente… (requerido)' : 'Buscar cliente…'}
             value={q}
-            onChange={(e) => setQ(e.target.value)}
+            onChange={(e) => { setQ(e.target.value); setOpen(true) }}
             onFocus={() => setOpen(true)}
             onBlur={() => setTimeout(() => setOpen(false), 150)}
           />
