@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { Plus, Eye, Pencil, CreditCard, Trash2, Printer } from 'lucide-react'
 import { useSelectedSucursal } from '@/hooks/useSelectedSucursal'
+import { usePermissions } from '@/components/PermissionsProvider'
 import { toast } from 'sonner'
 import { buttonVariants, Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -54,6 +55,7 @@ function formatFecha(iso: string) {
 export default function OrdenesClient({ isAdmin }: { isAdmin: boolean }) {
   const { isHome } = useSelectedSucursal()
   const canWrite = isHome !== false
+  const { can } = usePermissions()
   const [ordenes, setOrdenes] = useState<OrdenRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -141,7 +143,7 @@ export default function OrdenesClient({ isAdmin }: { isAdmin: boolean }) {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-lg font-semibold text-gray-800">Órdenes de venta</h2>
-        {canWrite && (
+        {canWrite && can('ventas.ordenes.crear') && (
           <Link href="/dashboard/ventas/ordenes/nueva" className={buttonVariants()}>
             <Plus className="w-4 h-4 mr-2" />
             Nueva orden
@@ -227,7 +229,7 @@ export default function OrdenesClient({ isAdmin }: { isAdmin: boolean }) {
                     return saldo > 0.005 && o.estado !== 'anulada' ? (
                       <div className="flex items-center justify-end gap-1">
                         <span className="text-red-600 font-medium text-sm">{formatARS(saldo)}</span>
-                        {canWrite && (
+                        {canWrite && can('ventas.ordenes.confirmar') && (
                           <button
                             onClick={() => abrirPago(o)}
                             title="Registrar pago"
@@ -262,7 +264,7 @@ export default function OrdenesClient({ isAdmin }: { isAdmin: boolean }) {
                     >
                       <Eye className="w-4 h-4" />
                     </Link>
-                    {canWrite && (
+                    {canWrite && can('ventas.ordenes.editar') && (
                       <Link
                         href={`/dashboard/ventas/ordenes/${o.id}`}
                         title="Editar"
