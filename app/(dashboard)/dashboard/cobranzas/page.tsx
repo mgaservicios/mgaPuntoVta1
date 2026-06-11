@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
+import { usePermissions } from '@/components/PermissionsProvider'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
@@ -104,6 +105,7 @@ function buildRows(raw: CobranzaRaw[]): ClienteRow[] {
 }
 
 export default function CobranzasPage() {
+  const { can } = usePermissions()
   const [rows, setRows] = useState<ClienteRow[]>([])
   const [loading, setLoading] = useState(true)
   const [q, setQ] = useState('')
@@ -261,7 +263,7 @@ export default function CobranzasPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      {row.saldo > 0.001 && (
+                      {row.saldo > 0.001 && can('caja.cobranzas.ver') && (
                         <Button size="sm" variant="outline" onClick={() => openCobro(row.cliente_id)}>
                           Cobrar
                         </Button>

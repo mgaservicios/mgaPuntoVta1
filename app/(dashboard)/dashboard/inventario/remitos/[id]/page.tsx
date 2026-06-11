@@ -7,6 +7,7 @@ import { ArrowLeft, CheckCircle, XCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import ConfirmDialog from '@/components/dashboard/ConfirmDialog'
+import { usePermissions } from '@/components/PermissionsProvider'
 import type { Remito } from '@/types/stock'
 
 type RemitoDetail = Remito & { sucursal_nombre: string; contraparte_display: string }
@@ -18,6 +19,7 @@ const CONTRAPARTE_LABELS: Record<string, string> = { sucursal: 'Sucursal', prove
 export default function RemitoDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const router = useRouter()
+  const { can } = usePermissions()
   const [remito, setRemito] = useState<RemitoDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [confirming, setConfirming] = useState(false)
@@ -103,13 +105,13 @@ export default function RemitoDetailPage({ params }: { params: Promise<{ id: str
         </div>
 
         <div className="flex gap-2">
-          {remito.estado === 'borrador' && (
+          {remito.estado === 'borrador' && can('inventario.remitos.confirmar') && (
             <Button onClick={handleConfirmar} disabled={confirming}>
               <CheckCircle className="w-4 h-4 mr-2" />
               {confirming ? 'Confirmando…' : 'Confirmar'}
             </Button>
           )}
-          {remito.estado === 'confirmado' && (
+          {remito.estado === 'confirmado' && can('inventario.remitos.anular') && (
             <Button variant="outline" className="text-red-500 hover:text-red-600" onClick={() => setShowAnularDialog(true)}>
               <XCircle className="w-4 h-4 mr-2" />
               Anular
