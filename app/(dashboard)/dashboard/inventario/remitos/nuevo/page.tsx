@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { ArrowLeft, Search, X, Plus, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, Search, X, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -20,6 +20,7 @@ import type { ContraparteTipo, TipoRemito } from '@/types/stock'
 import type { ListaPrecio } from '@/types/precios'
 import { useSucursalActiva } from '@/hooks/useSucursalActiva'
 import { useVendedores } from '@/hooks/useVendedores'
+import ProveedorSearch from '@/components/dashboard/ProveedorSearch'
 
 type ArticuloResult = {
   id: number
@@ -58,7 +59,7 @@ export default function NuevoRemitoPage() {
   const [fecha, setFecha] = useState<string>(new Date().toISOString().slice(0, 10))
   const [contraparteTipo, setContraparteTipo] = useState<ContraparteTipo>('proveedor')
   const [contraparteSucursalId, setContraparteSucursalId] = useState<string>('')
-  const [contraparteProveedorId, setContraparteProveedorId] = useState<string>('')
+  const [selectedProveedor, setSelectedProveedor] = useState<Proveedor | null>(null)
   const [contraparteNombre, setContraparteNombre] = useState('')
   const [nroExterno, setNroExterno] = useState('')
   const [observaciones, setObservaciones] = useState('')
@@ -71,7 +72,6 @@ export default function NuevoRemitoPage() {
   const [confirmingNew, setConfirmingNew] = useState(false)
 
   const [sucursales, setSucursales] = useState<Sucursal[]>([])
-  const [proveedores, setProveedores] = useState<Proveedor[]>([])
   const [listasTodas, setListasTodas] = useState<ListaPrecio[]>([])
 
   // Lista de costo (Compra) — su ID va al campo costo_unitario del remito
@@ -79,34 +79,6 @@ export default function NuevoRemitoPage() {
     () => listasTodas.find(l => l.categoria === 'costo' && l.tipo === 'manual'),
     [listasTodas]
   )
-
-  const [showNuevoProveedor, setShowNuevoProveedor] = useState(false)
-  const [nuevoProvNombre, setNuevoProvNombre] = useState('')
-  const [nuevoProvCuit, setNuevoProvCuit] = useState('')
-  const [nuevoProvTel, setNuevoProvTel] = useState('')
-  const [savingProv, setSavingProv] = useState(false)
-
-  async function handleCrearProveedor() {
-    if (!nuevoProvNombre.trim()) return
-    setSavingProv(true)
-    const res = await fetch('/api/dashboard/proveedores', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nombre: nuevoProvNombre.trim(), cuit: nuevoProvCuit || null, telefono: nuevoProvTel || null }),
-    })
-    setSavingProv(false)
-    if (res.ok) {
-      const nuevo: Proveedor = await res.json()
-      setProveedores(prev => [...prev, nuevo].sort((a, b) => a.nombre.localeCompare(b.nombre)))
-      setContraparteProveedorId(String(nuevo.id))
-      setShowNuevoProveedor(false)
-      setNuevoProvNombre(''); setNuevoProvCuit(''); setNuevoProvTel('')
-      toast.success('Proveedor creado')
-    } else {
-      const err = await res.json()
-      toast.error(err.error ?? 'Error al crear proveedor')
-    }
-  }
 
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<ArticuloResult[]>([])
@@ -116,7 +88,6 @@ export default function NuevoRemitoPage() {
 
   useEffect(() => {
     fetch('/api/dashboard/sucursales').then(r => r.json()).then(d => setSucursales(Array.isArray(d) ? d : []))
-    fetch('/api/dashboard/proveedores').then(r => r.json()).then(d => setProveedores(Array.isArray(d) ? d : []))
     fetch('/api/dashboard/listas-precio').then(r => r.json()).then(d => setListasTodas(Array.isArray(d) ? d.filter((l: ListaPrecio) => l.activo) : []))
   }, [])
 
@@ -239,7 +210,7 @@ export default function NuevoRemitoPage() {
     if (contraparteTipo === 'sucursal' && !contraparteSucursalId) {
       toast.error('Seleccioná la sucursal de origen/destino'); return
     }
-    if (contraparteTipo === 'proveedor' && !contraparteProveedorId) {
+    if (contraparteTipo === 'proveedor' && !selectedProveedor) {
       toast.error('Seleccioná el proveedor'); return
     }
     if (contraparteTipo === 'persona' && !contraparteNombre.trim()) {
@@ -258,7 +229,7 @@ export default function NuevoRemitoPage() {
         tipo,
         contraparte_tipo: contraparteTipo,
         contraparte_sucursal_id: contraparteTipo === 'sucursal' ? Number(contraparteSucursalId) : null,
-        contraparte_proveedor_id: contraparteTipo === 'proveedor' ? Number(contraparteProveedorId) : null,
+        contraparte_proveedor_id: contraparteTipo === 'proveedor' ? selectedProveedor?.id ?? null : null,
         contraparte_nombre: contraparteTipo === 'persona' ? contraparteNombre.trim() : null,
         fecha: new Date(fecha + 'T12:00:00').toISOString(),
         observaciones: observaciones || null,
@@ -400,26 +371,7 @@ export default function NuevoRemitoPage() {
                 </SelectContent>
               </Select>
               {contraparteTipo === 'proveedor' && (
-                <>
-                  <Select
-                    value={contraparteProveedorId}
-                    onValueChange={(v) => { if (v) setContraparteProveedorId(v) }}
-                  >
-                    <SelectTrigger className="flex-1 h-8 text-sm">
-                      <SelectValue placeholder="Seleccioná proveedor">
-                        {proveedores.find(p => String(p.id) === contraparteProveedorId)?.nombre}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {proveedores.map(p => (
-                        <SelectItem key={p.id} value={String(p.id)}>{p.nombre}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button type="button" variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={() => setShowNuevoProveedor(true)} title="Nuevo proveedor">
-                    <Plus className="w-3.5 h-3.5" />
-                  </Button>
-                </>
+                <ProveedorSearch value={selectedProveedor} onChange={setSelectedProveedor} />
               )}
               {contraparteTipo === 'sucursal' && (
                 <Select
@@ -675,31 +627,6 @@ export default function NuevoRemitoPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showNuevoProveedor} onOpenChange={(v) => !v && setShowNuevoProveedor(false)}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Nuevo proveedor</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <div className="space-y-1">
-              <Label>Nombre *</Label>
-              <Input autoFocus value={nuevoProvNombre} onChange={e => setNuevoProvNombre(e.target.value)} placeholder="Nombre del proveedor" />
-            </div>
-            <div className="space-y-1">
-              <Label>CUIT</Label>
-              <Input value={nuevoProvCuit} onChange={e => setNuevoProvCuit(e.target.value)} placeholder="Opcional" />
-            </div>
-            <div className="space-y-1">
-              <Label>Teléfono</Label>
-              <Input value={nuevoProvTel} onChange={e => setNuevoProvTel(e.target.value)} placeholder="Opcional" />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowNuevoProveedor(false)}>Cancelar</Button>
-            <Button onClick={handleCrearProveedor} disabled={savingProv || !nuevoProvNombre.trim()}>
-              {savingProv ? 'Guardando…' : 'Crear'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
