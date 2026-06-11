@@ -8,10 +8,12 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import ConfirmDialog from '@/components/dashboard/ConfirmDialog'
+import { usePermissions } from '@/components/PermissionsProvider'
 
 type Atributo = { id: number; nombre: string; activo: boolean }
 
 export default function AtributosPage() {
+  const { can } = usePermissions()
   const [atributos, setAtributos] = useState<Atributo[]>([])
   const [loading, setLoading] = useState(true)
   const [nueva, setNueva] = useState('')
@@ -85,14 +87,16 @@ export default function AtributosPage() {
         <h2 className="text-lg font-semibold text-gray-800">Atributos de variantes</h2>
       </div>
 
-      <div className="flex gap-2 mb-6">
-        <Input placeholder="Nuevo atributo (ej: Color, Talle)…" value={nueva}
-          onChange={(e) => setNueva(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleCrear()} className="max-w-sm" />
-        <Button onClick={handleCrear} disabled={creando || !nueva.trim()}>
-          <Plus className="w-4 h-4 mr-2" />Agregar
-        </Button>
-      </div>
+      {can('altas.atributos.crear') && (
+        <div className="flex gap-2 mb-6">
+          <Input placeholder="Nuevo atributo (ej: Color, Talle)…" value={nueva}
+            onChange={(e) => setNueva(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleCrear()} className="max-w-sm" />
+          <Button onClick={handleCrear} disabled={creando || !nueva.trim()}>
+            <Plus className="w-4 h-4 mr-2" />Agregar
+          </Button>
+        </div>
+      )}
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <Table>
@@ -126,8 +130,8 @@ export default function AtributosPage() {
                 <TableCell><Badge variant={a.activo ? 'default' : 'secondary'}>{a.activo ? 'Activo' : 'Inactivo'}</Badge></TableCell>
                 <TableCell>
                   <div className="flex gap-1 justify-end">
-                    <Button size="icon" variant="ghost" onClick={() => { setEditId(a.id); setEditNombre(a.nombre) }}><Pencil className="w-4 h-4" /></Button>
-                    <Button size="icon" variant="ghost" className="text-red-500 hover:text-red-600" onClick={() => setConfirmId(a.id)}><X className="w-4 h-4" /></Button>
+                    {can('altas.atributos.editar') && <Button size="icon" variant="ghost" onClick={() => { setEditId(a.id); setEditNombre(a.nombre) }}><Pencil className="w-4 h-4" /></Button>}
+                    {can('altas.atributos.eliminar') && <Button size="icon" variant="ghost" className="text-red-500 hover:text-red-600" onClick={() => setConfirmId(a.id)}><X className="w-4 h-4" /></Button>}
                   </div>
                 </TableCell>
               </TableRow>

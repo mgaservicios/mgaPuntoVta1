@@ -8,10 +8,12 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import ConfirmDialog from '@/components/dashboard/ConfirmDialog'
+import { usePermissions } from '@/components/PermissionsProvider'
 
 type Marca = { id: number; nombre: string; activo: boolean }
 
 export default function MarcasPage() {
+  const { can } = usePermissions()
   const [marcas, setMarcas] = useState<Marca[]>([])
   const [loading, setLoading] = useState(true)
   const [nueva, setNueva] = useState('')
@@ -85,19 +87,21 @@ export default function MarcasPage() {
         <h2 className="text-lg font-semibold text-gray-800">Marcas</h2>
       </div>
 
-      <div className="flex gap-2 mb-6">
-        <Input
-          placeholder="Nueva marca…"
-          value={nueva}
-          onChange={(e) => setNueva(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleCrear()}
-          className="max-w-sm"
-        />
-        <Button onClick={handleCrear} disabled={creando || !nueva.trim()}>
-          <Plus className="w-4 h-4 mr-2" />
-          Agregar
-        </Button>
-      </div>
+      {can('altas.marcas.crear') && (
+        <div className="flex gap-2 mb-6">
+          <Input
+            placeholder="Nueva marca…"
+            value={nueva}
+            onChange={(e) => setNueva(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleCrear()}
+            className="max-w-sm"
+          />
+          <Button onClick={handleCrear} disabled={creando || !nueva.trim()}>
+            <Plus className="w-4 h-4 mr-2" />
+            Agregar
+          </Button>
+        </div>
+      )}
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <Table>
@@ -135,8 +139,8 @@ export default function MarcasPage() {
                 <TableCell><Badge variant={m.activo ? 'default' : 'secondary'}>{m.activo ? 'Activo' : 'Inactivo'}</Badge></TableCell>
                 <TableCell>
                   <div className="flex gap-1 justify-end">
-                    <Button size="icon" variant="ghost" onClick={() => { setEditId(m.id); setEditNombre(m.nombre) }}><Pencil className="w-4 h-4" /></Button>
-                    <Button size="icon" variant="ghost" className="text-red-500 hover:text-red-600" onClick={() => setConfirmId(m.id)}><X className="w-4 h-4" /></Button>
+                    {can('altas.marcas.editar') && <Button size="icon" variant="ghost" onClick={() => { setEditId(m.id); setEditNombre(m.nombre) }}><Pencil className="w-4 h-4" /></Button>}
+                    {can('altas.marcas.eliminar') && <Button size="icon" variant="ghost" className="text-red-500 hover:text-red-600" onClick={() => setConfirmId(m.id)}><X className="w-4 h-4" /></Button>}
                   </div>
                 </TableCell>
               </TableRow>

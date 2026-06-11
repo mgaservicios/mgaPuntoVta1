@@ -9,11 +9,13 @@ import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import ConfirmDialog from '@/components/dashboard/ConfirmDialog'
+import { usePermissions } from '@/components/PermissionsProvider'
 
 type Categoria = { id: number; nombre: string }
 type Subcategoria = { id: number; nombre: string; activo: boolean; categoria_id: number; categorias: { nombre: string } | null }
 
 export default function SubcategoriasPage() {
+  const { can } = usePermissions()
   const [categorias, setCategorias] = useState<Categoria[]>([])
   const [subcategorias, setSubcategorias] = useState<Subcategoria[]>([])
   const [loading, setLoading] = useState(true)
@@ -99,19 +101,21 @@ export default function SubcategoriasPage() {
         <h2 className="text-lg font-semibold text-gray-800">Subcategorías</h2>
       </div>
 
-      <div className="flex gap-2 mb-4 flex-wrap">
-        <Input placeholder="Nueva subcategoría…" value={nueva} onChange={(e) => setNueva(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleCrear()} className="max-w-xs" />
-        <Select value={nuevaCatId ?? ''} onValueChange={(v) => setNuevaCatId(v)}>
-          <SelectTrigger className="w-48"><SelectValue placeholder="Categoría…" /></SelectTrigger>
-          <SelectContent>
-            {categorias.map((c) => <SelectItem key={c.id} value={String(c.id)}>{c.nombre}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Button onClick={handleCrear} disabled={creando || !nueva.trim() || !nuevaCatId}>
-          <Plus className="w-4 h-4 mr-2" />Agregar
-        </Button>
-      </div>
+      {can('altas.subcategorias.crear') && (
+        <div className="flex gap-2 mb-4 flex-wrap">
+          <Input placeholder="Nueva subcategoría…" value={nueva} onChange={(e) => setNueva(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleCrear()} className="max-w-xs" />
+          <Select value={nuevaCatId ?? ''} onValueChange={(v) => setNuevaCatId(v)}>
+            <SelectTrigger className="w-48"><SelectValue placeholder="Categoría…" /></SelectTrigger>
+            <SelectContent>
+              {categorias.map((c) => <SelectItem key={c.id} value={String(c.id)}>{c.nombre}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Button onClick={handleCrear} disabled={creando || !nueva.trim() || !nuevaCatId}>
+            <Plus className="w-4 h-4 mr-2" />Agregar
+          </Button>
+        </div>
+      )}
 
       <div className="mb-4 w-56">
         <Select value={filtroCat} onValueChange={(v) => setFiltroCat(v ?? 'todas')}>
@@ -157,8 +161,8 @@ export default function SubcategoriasPage() {
                 <TableCell><Badge variant={s.activo ? 'default' : 'secondary'}>{s.activo ? 'Activo' : 'Inactivo'}</Badge></TableCell>
                 <TableCell>
                   <div className="flex gap-1 justify-end">
-                    <Button size="icon" variant="ghost" onClick={() => { setEditId(s.id); setEditNombre(s.nombre) }}><Pencil className="w-4 h-4" /></Button>
-                    <Button size="icon" variant="ghost" className="text-red-500 hover:text-red-600" onClick={() => setConfirmId(s.id)}><X className="w-4 h-4" /></Button>
+                    {can('altas.subcategorias.editar') && <Button size="icon" variant="ghost" onClick={() => { setEditId(s.id); setEditNombre(s.nombre) }}><Pencil className="w-4 h-4" /></Button>}
+                    {can('altas.subcategorias.eliminar') && <Button size="icon" variant="ghost" className="text-red-500 hover:text-red-600" onClick={() => setConfirmId(s.id)}><X className="w-4 h-4" /></Button>}
                   </div>
                 </TableCell>
               </TableRow>
