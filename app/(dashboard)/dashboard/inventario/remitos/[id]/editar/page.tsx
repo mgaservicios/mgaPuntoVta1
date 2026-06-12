@@ -208,11 +208,11 @@ export default function EditarRemitoPage({ params }: { params: Promise<{ id: str
   return (
     <div className="max-w-3xl">
       <button
-        onClick={() => router.push(`/dashboard/inventario/remitos/${id}`)}
+        onClick={() => router.push('/dashboard/inventario/remitos')}
         className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 mb-6"
       >
         <ArrowLeft className="w-4 h-4" />
-        Volver al detalle
+        Volver
       </button>
 
       {/* Header */}
@@ -362,7 +362,7 @@ export default function EditarRemitoPage({ params }: { params: Promise<{ id: str
 
         {/* Actions */}
         <div className="flex justify-end gap-3 pb-6">
-          <Button variant="outline" onClick={() => router.push(`/dashboard/inventario/remitos/${id}`)}>
+          <Button variant="outline" onClick={() => router.push('/dashboard/inventario/remitos')}>
             Cancelar
           </Button>
           <Button onClick={handleSave} disabled={saving}>

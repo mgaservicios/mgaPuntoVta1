@@ -237,8 +237,8 @@ export default function Sidebar({ userName, userRole, userModules, userPermissio
           <Image
             src="/logos/logo blanco.png"
             alt="MGA Informática"
-            width={140}
-            height={56}
+            width={190}
+            height={76}
             className="object-contain"
             priority
           />
