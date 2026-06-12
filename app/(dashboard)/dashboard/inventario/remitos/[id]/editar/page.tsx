@@ -312,10 +312,10 @@ export default function EditarRemitoPage({ params }: { params: Promise<{ id: str
                     </div>
                     <input
                       type="number"
-                      min="0.01"
-                      step="0.01"
+                      min="1"
+                      step="1"
                       value={item.cantidad}
-                      onChange={e => updateItem(item._key, { cantidad: parseFloat(e.target.value) || 1 })}
+                      onChange={e => updateItem(item._key, { cantidad: parseInt(e.target.value, 10) || 1 })}
                       className="w-full text-center border border-gray-200 rounded px-1.5 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
                     />
                     <button

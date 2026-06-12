@@ -106,9 +106,11 @@ export default function SignInPage() {
       ? `/api/auth/init-session?sucursal_id=${selectedSucursalId}`
       : '/api/auth/init-session'
 
-    // Mark this as an active browser session — SessionGuard checks this on every
-    // dashboard load and signs out if missing (e.g. browser was closed and reopened).
+    // Mark this as an active browser session — SessionGuard uses both keys:
+    // sessionStorage (cleared on browser close) + localStorage (persists, signals
+    // that the user has explicitly logged in with this feature active).
     sessionStorage.setItem('session_active', '1')
+    localStorage.setItem('has_logged_in', '1')
 
     // Full navigation so the Set-Cookie from the route handler is applied before /dashboard renders
     window.location.href = initUrl

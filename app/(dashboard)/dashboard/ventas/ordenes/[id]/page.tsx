@@ -795,7 +795,7 @@ export default function OrdenPage({ params }: { params: Promise<{ id: string }> 
                         </td>
                         <td className="px-3 py-2.5">
                           <input
-                            type="number" min="0.001" step="1"
+                            type="number" min="1" step="1"
                             className="w-full text-center text-sm border border-gray-200 rounded px-2 py-1"
                             value={item.cantidad}
                             onChange={(e) => updateItem(item.key, 'cantidad', e.target.value)}

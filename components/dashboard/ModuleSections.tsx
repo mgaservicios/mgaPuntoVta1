@@ -130,7 +130,7 @@ const MODULE_SECTIONS: ModuleSection[] = [
       { label: 'Órdenes de trabajo', href: '/dashboard/optica/ordenes',              Icon: ClipboardList, description: 'Armado de lentes',          permKey: 'optica.ordenes.ver'       },
       { label: 'Servicios',          href: '/dashboard/optica/servicios',            Icon: Wrench,        description: 'Reparaciones y controles',  permKey: 'optica.servicios.ver'     },
       { label: 'Médicos',            href: '/dashboard/optica/medicos',              Icon: Stethoscope,   description: 'Profesionales derivantes',  permKey: 'optica.medicos.ver'       },
-      { label: 'Importar óptica',    href: '/dashboard/inventario/importar-optica', Icon: FileUp,        description: 'Carga masiva de artículos', permKey: 'inventario.articulos.ver' },
+      { label: 'Importar óptica',    href: '/dashboard/inventario/importar-optica', Icon: FileUp,        description: 'Carga masiva de artículos', permKey: 'optica.ordenes.ver' },
     ],
   },
   {
