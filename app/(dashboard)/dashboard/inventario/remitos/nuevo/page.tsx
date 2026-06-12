@@ -75,6 +75,7 @@ export default function NuevoRemitoPage() {
 
   const [sucursales, setSucursales] = useState<Sucursal[]>([])
   const [listasTodas, setListasTodas] = useState<ListaPrecio[]>([])
+  const [cantidadesDecimales, setCantidadesDecimales] = useState(false)
 
   // Lista de costo (Compra) — su ID va al campo costo_unitario del remito
   const compraLista = useMemo(
@@ -91,6 +92,7 @@ export default function NuevoRemitoPage() {
   useEffect(() => {
     fetch('/api/dashboard/sucursales').then(r => r.json()).then(d => setSucursales(Array.isArray(d) ? d : []))
     fetch('/api/dashboard/listas-precio').then(r => r.json()).then(d => setListasTodas(Array.isArray(d) ? d.filter((l: ListaPrecio) => l.activo) : []))
+    fetch('/api/dashboard/admin/parametros').then(r => r.json()).then(p => setCantidadesDecimales(p['cantidades_decimales'] === 'true')).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -504,9 +506,9 @@ export default function NuevoRemitoPage() {
                     <input
                       type="number"
                       min="1"
-                      step="1"
+                      step={cantidadesDecimales ? '0.001' : '1'}
                       value={item.cantidad}
-                      onChange={e => updateItem(item._key, { cantidad: parseInt(e.target.value, 10) || 1 })}
+                      onChange={e => updateItem(item._key, { cantidad: cantidadesDecimales ? parseFloat(e.target.value) || 1 : parseInt(e.target.value, 10) || 1 })}
                       className="w-16 shrink-0 text-center border border-gray-200 rounded px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
                     />
 

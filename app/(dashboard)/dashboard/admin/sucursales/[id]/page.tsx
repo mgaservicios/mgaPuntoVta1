@@ -11,11 +11,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 
 const schema = z.object({
-  nombre:         z.string().min(1, 'El nombre es obligatorio'),
-  direccion:      z.string().optional(),
-  activo:         z.boolean(),
-  color:          z.string().optional(),
-  controla_stock: z.boolean(),
+  nombre:    z.string().min(1, 'El nombre es obligatorio'),
+  direccion: z.string().optional(),
+  activo:    z.boolean(),
+  color:     z.string().optional(),
 })
 type FormValues = z.infer<typeof schema>
 
@@ -31,7 +30,7 @@ export default function SucursalFormPage({ params }: { params: Promise<{ id: str
 
   const { register, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { activo: true, color: '#0D1525', controla_stock: false },
+    defaultValues: { activo: true, color: '#0D1525' },
   })
 
   useEffect(() => {
@@ -40,11 +39,10 @@ export default function SucursalFormPage({ params }: { params: Promise<{ id: str
       .then((r) => r.json())
       .then((data) => {
         reset({
-          nombre:         data.nombre,
-          direccion:      data.direccion ?? '',
-          activo:         data.activo,
-          color:          data.color ?? '#0D1525',
-          controla_stock: data.controla_stock ?? false,
+          nombre:    data.nombre,
+          direccion: data.direccion ?? '',
+          activo:    data.activo,
+          color:     data.color ?? '#0D1525',
         })
         setLogoUrl(data.logo_url ?? null)
       })
@@ -216,18 +214,6 @@ export default function SucursalFormPage({ params }: { params: Promise<{ id: str
               </Button>
             )}
           </div>
-        </div>
-
-        {/* Controla stock */}
-        <div className="flex items-center gap-2 pt-1">
-          <input
-            type="checkbox"
-            id="controla_stock"
-            checked={watch('controla_stock')}
-            onChange={(e) => setValue('controla_stock', e.target.checked)}
-            className="w-4 h-4 rounded border-gray-300 text-blue-600"
-          />
-          <label htmlFor="controla_stock" className="text-sm cursor-pointer">Controla stock (impide movimientos con stock negativo)</label>
         </div>
 
         {/* Activo */}

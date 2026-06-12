@@ -158,7 +158,8 @@ const navGroups: NavGroup[] = [
       { label: 'Permisos',        href: '/dashboard/admin/permisos',     Icon: Lock,      permKey: 'admin.permisos.ver' },
       { label: 'Listas de precio', href: '/dashboard/admin/listas-precio', Icon: Tag,       permKey: 'admin.listas_precio.ver' },
       { label: 'Vendedores',       href: '/dashboard/admin/vendedores',    Icon: UserCheck, permKey: 'admin.vendedores.ver' },
-      { label: 'Formas de pago',   href: '/dashboard/admin/formas-pago',   Icon: CreditCard, permKey: 'admin.formas_pago.ver' },
+      { label: 'Formas de pago',   href: '/dashboard/admin/formas-pago',   Icon: CreditCard,        permKey: 'admin.formas_pago.ver'  },
+      { label: 'Parámetros',        href: '/dashboard/admin/parametros',    Icon: SlidersHorizontal, permKey: 'admin.parametros.ver'   },
     ],
   },
 ]
@@ -249,13 +250,13 @@ export default function Sidebar({ userName, userRole, userModules, userPermissio
         <Link
           href="/dashboard"
           className={cn(
-            'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+            'flex items-center gap-3 px-3 py-2 rounded-lg text-base font-bold transition-colors',
             pathname === '/dashboard'
               ? 'bg-white/20 text-white shadow-sm'
               : 'text-white/60 hover:bg-white/8 hover:text-white'
           )}
         >
-          <LayoutDashboard className="w-4 h-4 flex-shrink-0" />
+          <LayoutDashboard className="w-5 h-5 flex-shrink-0" />
           Inicio
         </Link>
 

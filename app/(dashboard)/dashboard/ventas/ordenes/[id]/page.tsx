@@ -81,6 +81,16 @@ function formatARS(n: number) {
   return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(n)
 }
 
+async function fetchPrecioLista(articuloId: number, listaId: number, varianteId: number | null): Promise<number | null> {
+  try {
+    const url = `/api/dashboard/articulos/${articuloId}/precios${varianteId ? `?variante_id=${varianteId}` : ''}`
+    const res = await fetch(url)
+    const data = await res.json()
+    const pv = (data.vigentes ?? []).find((p: { lista_precio_id: number; precio_calculado?: number; precio: number }) => p.lista_precio_id === listaId)
+    return pv ? (pv.precio_calculado ?? pv.precio) : null
+  } catch { return null }
+}
+
 function formatFecha(iso: string) {
   return new Date(iso + 'T00:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
@@ -109,6 +119,10 @@ export default function OrdenPage({ params }: { params: Promise<{ id: string }> 
   // Listas de precio
   const [listas, setListas] = useState<{ id: number; nombre: string }[]>([])
   const [listaId, setListaId] = useState<number | null>(null)
+  const listaIdInitialized = useRef(false)
+
+  // Parámetros del sistema
+  const [cantidadesDecimales, setCantidadesDecimales] = useState(false)
 
   // Form state
   const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10))
@@ -178,16 +192,32 @@ export default function OrdenPage({ params }: { params: Promise<{ id: string }> 
   }, [])
 
   useEffect(() => {
-    fetch('/api/dashboard/listas-precio')
-      .then(r => r.json())
-      .then(data => {
-        const venta = (Array.isArray(data) ? data : []).filter((l: { categoria: string; activo: boolean }) => l.categoria === 'venta' && l.activo)
-        setListas(venta)
-        const def = venta.find((l: { nombre: string }) => /p[uú]blic/i.test(l.nombre)) ?? venta[0]
-        if (def) setListaId(def.id)
-      })
-      .catch(() => {})
+    Promise.all([
+      fetch('/api/dashboard/listas-precio').then(r => r.json()),
+      fetch('/api/dashboard/admin/parametros').then(r => r.json()),
+    ]).then(([data, params]) => {
+      const venta = (Array.isArray(data) ? data : []).filter((l: { categoria: string; activo: boolean }) => l.categoria === 'venta' && l.activo)
+      setListas(venta)
+      const defId = params['lista_precio_defecto_id'] ? Number(params['lista_precio_defecto_id']) : null
+      const def = (defId ? venta.find((l: { id: number }) => l.id === defId) : null) ?? venta[0]
+      if (def) setListaId(def.id)
+      setCantidadesDecimales(params['cantidades_decimales'] === 'true')
+    }).catch(() => {})
   }, [])
+
+  // Actualizar precio_unitario de items ya cargados cuando cambia la lista
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!listaIdInitialized.current) { listaIdInitialized.current = true; return }
+    if (!listaId || items.length === 0) return
+    const snapshot = items
+    Promise.all(snapshot.map(item => fetchPrecioLista(item.articulo_id, listaId, item.variante_id)))
+      .then(precios => {
+        setItems(prev => prev.map((item, i) =>
+          precios[i] != null ? { ...item, precio_unitario: precios[i]! } : item
+        ))
+      })
+  }, [listaId])
 
   useEffect(() => {
     if (isNew) return
@@ -276,7 +306,9 @@ export default function OrdenPage({ params }: { params: Promise<{ id: string }> 
   }
 
   function updateItem(key: string, field: keyof FormItem, raw: string) {
-    const val = field === 'cantidad' ? parseInt(raw, 10) : parseFloat(raw)
+    const val = field === 'cantidad'
+      ? (cantidadesDecimales ? parseFloat(raw) : parseInt(raw, 10))
+      : parseFloat(raw)
     setItems(prev => prev.map(i => i.key === key ? { ...i, [field]: isNaN(val) ? 0 : val } : i))
   }
 
@@ -797,7 +829,7 @@ export default function OrdenPage({ params }: { params: Promise<{ id: string }> 
                         </td>
                         <td className="px-3 py-2.5">
                           <input
-                            type="number" step="1"
+                            type="number" step={cantidadesDecimales ? '0.001' : '1'}
                             className="w-full text-center text-sm border border-gray-200 rounded px-2 py-1"
                             value={item.cantidad}
                             onChange={(e) => updateItem(item.key, 'cantidad', e.target.value)}

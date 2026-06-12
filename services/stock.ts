@@ -61,13 +61,13 @@ export async function validarStockSuficiente(
   sucursal_id: number,
   supabase: SupabaseClient,
 ): Promise<string | null> {
-  const { data: sucursal } = await supabase
-    .from('sucursales')
-    .select('controla_stock')
-    .eq('id', sucursal_id)
+  const { data: param } = await supabase
+    .from('parametros')
+    .select('valor')
+    .eq('clave', 'controla_stock')
     .single()
 
-  if (!sucursal?.controla_stock) return null
+  if (param?.valor !== 'true') return null
 
   const faltantes: string[] = []
 

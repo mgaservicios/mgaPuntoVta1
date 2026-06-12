@@ -196,6 +196,10 @@ export const PERM_MODULES: PermMod[] = [
         { id: 'admin.formas_pago.editar',   label: 'Editar forma de pago' },
         { id: 'admin.formas_pago.eliminar', label: 'Eliminar forma de pago' },
       ]},
+      { id: 'admin.parametros', label: 'Parámetros', ops: [
+        { id: 'admin.parametros.ver',    label: 'Ver parámetros' },
+        { id: 'admin.parametros.editar', label: 'Editar parámetros' },
+      ]},
     ],
   },
 ]
@@ -237,6 +241,7 @@ export const ROUTE_TO_PERM: [string, string][] = [
   ['/dashboard/admin/listas-precio',          'admin.listas_precio.ver'],
   ['/dashboard/admin/vendedores',             'admin.vendedores.ver'],
   ['/dashboard/admin/formas-pago',            'admin.formas_pago.ver'],
+  ['/dashboard/admin/parametros',             'admin.parametros.ver'],
   ['/dashboard/recibos',                      'caja.cobranzas.ver'],
   ['/dashboard/inventario/actualizar-precios','inventario.articulos.ver'],
 ]

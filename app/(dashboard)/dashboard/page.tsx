@@ -133,6 +133,21 @@ export default async function DashboardPage() {
     saldoCobrar = ars(Math.max(0, saldoCC + saldoOT + saldoOrds))
   }
 
+  const isAdmin = session?.user.role === 'Administrador'
+  const modules = session?.user.modules ?? []
+
+  // null permMap = admin, ve todo; si tiene al menos un permiso activo del grupo, muestra las cards
+  const hasAnyPerm = (prefix: string) =>
+    !permMap || Object.entries(permMap).some(([k, v]) => k.startsWith(prefix + '.') && v === true)
+
+  const showVentas      = hasAnyPerm('ventas')
+  const showTrabajos    = hasAnyPerm('optica')
+  const showStockBajo   = hasAnyPerm('inventario')
+  const showCaja        = hasAnyPerm('caja')
+  const showSaldoCobrar = showVentas || showTrabajos || showCaja
+
+  const anyCard = showVentas || showTrabajos || showStockBajo || showCaja || showSaldoCobrar
+
   return (
     <div>
       <h2 className="text-2xl font-bold text-gray-900 mb-1">
@@ -142,15 +157,17 @@ export default async function DashboardPage() {
         Panel de control — MGA Pto. Venta
       </p>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-        <MetricCard label="Ventas hoy" value={ventasHoy} />
-        <MetricCard label="Trabajos hoy" value={trabajosHoy} />
-        <MetricCard label="Artículos en stock bajo" value={stockBajo} />
-        <CajaCard total={cajaTotal} ingresos={cajaIngresos} egresos={cajaEgresos} />
-        <MetricCard label="Saldo a cobrar" value={saldoCobrar} />
-      </div>
+      {anyCard && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 mb-8">
+          {showVentas     && <MetricCard label="Ventas hoy" value={ventasHoy} />}
+          {showTrabajos   && <MetricCard label="Trabajos hoy" value={trabajosHoy} />}
+          {showStockBajo  && <MetricCard label="Artículos en stock bajo" value={stockBajo} />}
+          {showCaja       && <CajaCard total={cajaTotal} ingresos={cajaIngresos} egresos={cajaEgresos} />}
+          {showSaldoCobrar && <MetricCard label="Saldo a cobrar" value={saldoCobrar} />}
+        </div>
+      )}
 
-      <ModuleSections modules={session?.user.modules ?? []} isAdmin={session?.user.role === 'Administrador'} userPermissions={permMap} />
+      <ModuleSections modules={modules} isAdmin={isAdmin} userPermissions={permMap} />
     </div>
   )
 }

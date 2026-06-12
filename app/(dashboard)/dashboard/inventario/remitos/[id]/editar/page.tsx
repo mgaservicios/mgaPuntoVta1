@@ -52,6 +52,11 @@ export default function EditarRemitoPage({ params }: { params: Promise<{ id: str
   const [showResults, setShowResults] = useState(false)
   const searchRef = useRef<HTMLDivElement>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const [cantidadesDecimales, setCantidadesDecimales] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/dashboard/admin/parametros').then(r => r.json()).then(p => setCantidadesDecimales(p['cantidades_decimales'] === 'true')).catch(() => {})
+  }, [])
 
   useEffect(() => {
     fetch(`/api/dashboard/stock/remitos/${id}`)
@@ -313,9 +318,9 @@ export default function EditarRemitoPage({ params }: { params: Promise<{ id: str
                     <input
                       type="number"
                       min="1"
-                      step="1"
+                      step={cantidadesDecimales ? '0.001' : '1'}
                       value={item.cantidad}
-                      onChange={e => updateItem(item._key, { cantidad: parseInt(e.target.value, 10) || 1 })}
+                      onChange={e => updateItem(item._key, { cantidad: cantidadesDecimales ? parseFloat(e.target.value) || 1 : parseInt(e.target.value, 10) || 1 })}
                       className="w-full text-center border border-gray-200 rounded px-1.5 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
                     />
                     <button

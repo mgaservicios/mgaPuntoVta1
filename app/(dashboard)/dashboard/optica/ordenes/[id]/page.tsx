@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, use, useCallback } from 'react'
+import { useEffect, useState, use, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
@@ -82,6 +82,18 @@ const TAREA_BADGE: Record<EstadoTarea, string> = {
 const lbl = 'w-32 shrink-0 text-right text-xs text-gray-500 leading-none pt-[9px]'
 const lbl2 = 'w-32 shrink-0 text-right text-xs text-gray-500 leading-none'
 
+// ── Helpers de precio ──────────────────────────────────────────────────────────
+
+async function fetchPrecioLista(articuloId: number, listaId: number, varianteId: number | null): Promise<number | null> {
+  try {
+    const url = `/api/dashboard/articulos/${articuloId}/precios${varianteId ? `?variante_id=${varianteId}` : ''}`
+    const res = await fetch(url)
+    const data = await res.json()
+    const pv = (data.vigentes ?? []).find((p: { lista_precio_id: number; precio_calculado?: number; precio: number }) => p.lista_precio_id === listaId)
+    return pv ? (pv.precio_calculado ?? pv.precio) : null
+  } catch { return null }
+}
+
 // ── Componente principal ────────────────────────────────────────────────────────
 
 export default function OpticaOrdenPage({ params }: { params: Promise<{ id: string }> }) {
@@ -117,6 +129,7 @@ export default function OpticaOrdenPage({ params }: { params: Promise<{ id: stri
 
   const [listas, setListas] = useState<{ id: number; nombre: string }[]>([])
   const [listaId, setListaId] = useState<number | null>(null)
+  const listaIdInitialized = useRef(false)
 
   const [items, setItems] = useState<FormItem[]>([])
   const [costoTrabajo, setCostoTrabajo] = useState('0')
@@ -255,16 +268,33 @@ export default function OpticaOrdenPage({ params }: { params: Promise<{ id: stri
   // ── Cargar listas de precio ───────────────────────────────────────────────────
 
   useEffect(() => {
-    fetch('/api/dashboard/listas-precio')
-      .then(r => r.json())
-      .then(data => {
-        const venta = (Array.isArray(data) ? data : []).filter((l: { categoria: string; activo: boolean }) => l.categoria === 'venta' && l.activo)
-        setListas(venta)
-        const def = venta.find((l: { nombre: string }) => /p[uú]blic/i.test(l.nombre)) ?? venta[0]
-        if (def) setListaId(def.id)
-      })
-      .catch(() => {/* sin listas disponibles */})
+    Promise.all([
+      fetch('/api/dashboard/listas-precio').then(r => r.json()),
+      fetch('/api/dashboard/admin/parametros').then(r => r.json()),
+    ]).then(([data, params]) => {
+      const venta = (Array.isArray(data) ? data : []).filter((l: { categoria: string; activo: boolean }) => l.categoria === 'venta' && l.activo)
+      setListas(venta)
+      const defId = params['lista_precio_defecto_id'] ? Number(params['lista_precio_defecto_id']) : null
+      const def = (defId ? venta.find((l: { id: number }) => l.id === defId) : null) ?? venta[0]
+      if (def) setListaId(def.id)
+    }).catch(() => {})
   }, [])
+
+  // ── Actualizar precios al cambiar lista ───────────────────────────────────────
+
+  useEffect(() => {
+    if (!listaIdInitialized.current) { listaIdInitialized.current = true; return }
+    if (!listaId || items.length === 0) return
+    const withArticulo = items.filter(i => i.articulo_id !== null)
+    if (withArticulo.length === 0) return
+    Promise.all(withArticulo.map(item => fetchPrecioLista(item.articulo_id!, listaId, item.variante_id)))
+      .then(precios => {
+        setItems(prev => prev.map(item => {
+          const idx = withArticulo.findIndex(i => i.key === item.key)
+          return idx !== -1 && precios[idx] != null ? { ...item, precio_unitario: precios[idx]! } : item
+        }))
+      })
+  }, [listaId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Cálculos ──────────────────────────────────────────────────────────────────
 

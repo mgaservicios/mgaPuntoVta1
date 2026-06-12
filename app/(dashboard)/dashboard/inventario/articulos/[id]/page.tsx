@@ -99,6 +99,7 @@ export default function ArticuloFormPage({ params }: { params: Promise<{ id: str
   const [variantesPrecios, setVariantesPrecios] = useState<Record<number, PrecioVigente[]>>({})
   const [listasTodas, setListasTodas] = useState<ListaPrecio[]>([])
   const [pendingPrecios, setPendingPrecios] = useState<Record<number, string>>({})
+  const [manejaVariantes, setManejaVariantes] = useState(true)
 
   const [stockSucursales, setStockSucursales] = useState<{
     sucursal_id: number
@@ -139,16 +140,17 @@ export default function ArticuloFormPage({ params }: { params: Promise<{ id: str
   }, [id, isNew])
 
   const loadCatalogos = useCallback(async () => {
-    const [resCat, resMar, resProv, resAtrib, resUnd, resListas] = await Promise.all([
+    const [resCat, resMar, resProv, resAtrib, resUnd, resListas, resParams] = await Promise.all([
       fetch('/api/dashboard/categorias'),
       fetch('/api/dashboard/marcas'),
       fetch('/api/dashboard/proveedores'),
       fetch('/api/dashboard/atributo-tipos'),
       fetch('/api/dashboard/unidades-medida'),
       fetch('/api/dashboard/listas-precio'),
+      fetch('/api/dashboard/admin/parametros'),
     ])
-    const [cats, mars, provs, atribs, unds, listas] = await Promise.all([
-      resCat.json(), resMar.json(), resProv.json(), resAtrib.json(), resUnd.json(), resListas.json(),
+    const [cats, mars, provs, atribs, unds, listas, params] = await Promise.all([
+      resCat.json(), resMar.json(), resProv.json(), resAtrib.json(), resUnd.json(), resListas.json(), resParams.json(),
     ])
     setCategorias(Array.isArray(cats) ? cats : [])
     setMarcas(Array.isArray(mars) ? mars : [])
@@ -156,6 +158,7 @@ export default function ArticuloFormPage({ params }: { params: Promise<{ id: str
     setAtributoTipos(Array.isArray(atribs) ? atribs : [])
     setUnidades(Array.isArray(unds) ? unds : [])
     setListasTodas((Array.isArray(listas) ? listas : []).filter((l: { activo: boolean }) => l.activo) as ListaPrecio[])
+    setManejaVariantes(params['maneja_variantes'] !== 'false')
     return { unds: unds as UnidadMedida[], cats: cats as Categoria[] }
   }, [])
 
@@ -478,7 +481,9 @@ export default function ArticuloFormPage({ params }: { params: Promise<{ id: str
                   <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="simple">Simple</SelectItem>
-                    <SelectItem value="con_variantes">Con variantes</SelectItem>
+                    {(manejaVariantes || !isNew) && (
+                      <SelectItem value="con_variantes">Con variantes</SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
               </div>

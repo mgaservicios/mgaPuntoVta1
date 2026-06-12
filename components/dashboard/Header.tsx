@@ -2,8 +2,9 @@
 
 import { useEffect } from 'react'
 import { usePathname } from 'next/navigation'
-import { Building2, ShoppingCart, Glasses, ReceiptText, Wrench, Search, Package } from 'lucide-react'
+import { Building2, ShoppingCart, Glasses, ReceiptText, Wrench, Search, Package, LogOut } from 'lucide-react'
 import Link from 'next/link'
+import { signOut } from 'next-auth/react'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
@@ -128,6 +129,13 @@ export default function DashboardHeader({
         <div className="text-right hidden sm:block">
           <p className="text-sm font-medium text-gray-900 leading-none">{userName}</p>
           <p className="text-xs text-gray-400 mt-0.5">{userRole}</p>
+          <button
+            onClick={() => signOut({ callbackUrl: '/auth/signin' })}
+            className="flex items-center gap-1 mt-1 ml-auto text-xs text-gray-400 hover:text-red-500 transition-colors"
+          >
+            <LogOut className="w-3 h-3" />
+            Cerrar sesión
+          </button>
         </div>
       </div>
     </header>

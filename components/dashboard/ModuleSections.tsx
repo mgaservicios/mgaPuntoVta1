@@ -145,7 +145,8 @@ const MODULE_SECTIONS: ModuleSection[] = [
       { label: 'Permisos',         href: '/dashboard/admin/permisos',      Icon: Lock,       description: 'Control de acceso',   permKey: 'admin.permisos.ver'     },
       { label: 'Listas de precio', href: '/dashboard/admin/listas-precio', Icon: Tag,        description: 'Precios por canal',   permKey: 'admin.listas_precio.ver'},
       { label: 'Vendedores',       href: '/dashboard/admin/vendedores',    Icon: UserCheck,  description: 'Equipo de ventas',    permKey: 'admin.vendedores.ver'   },
-      { label: 'Formas de pago',   href: '/dashboard/admin/formas-pago',   Icon: CreditCard, description: 'Métodos de cobro',    permKey: 'admin.formas_pago.ver'  },
+      { label: 'Formas de pago',   href: '/dashboard/admin/formas-pago',   Icon: CreditCard,        description: 'Métodos de cobro',      permKey: 'admin.formas_pago.ver' },
+      { label: 'Parámetros',        href: '/dashboard/admin/parametros',    Icon: SlidersHorizontal, description: 'Configuración del sistema', permKey: 'admin.parametros.ver'  },
     ],
   },
 ]

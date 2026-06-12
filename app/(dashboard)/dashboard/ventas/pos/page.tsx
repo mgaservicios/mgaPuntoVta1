@@ -94,6 +94,10 @@ export default function POSPage() {
   const [listaId, setListaId] = useState<number | null>(null)
   const listaIdRef = useRef<number | null>(null)
   useEffect(() => { listaIdRef.current = listaId }, [listaId])
+  const listaIdInitialized = useRef(false)
+
+  // Parámetros del sistema
+  const [cantidadesDecimales, setCantidadesDecimales] = useState(false)
 
   // Búsqueda de artículos
   const [q, setQ] = useState('')
@@ -144,17 +148,19 @@ export default function POSPage() {
     }).catch(() => {})
   }, [])
 
-  // Cargar listas de precio de venta
+  // Cargar listas de precio de venta + parámetros
   useEffect(() => {
-    fetch('/api/dashboard/listas-precio')
-      .then(r => r.json())
-      .then(data => {
-        const venta = (Array.isArray(data) ? data : []).filter((l: { categoria: string; activo: boolean }) => l.categoria === 'venta' && l.activo)
-        setListas(venta)
-        const def = venta.find((l: { nombre: string }) => /p[uú]blic/i.test(l.nombre)) ?? venta[0]
-        if (def) setListaId(def.id)
-      })
-      .catch(() => {})
+    Promise.all([
+      fetch('/api/dashboard/listas-precio').then(r => r.json()),
+      fetch('/api/dashboard/admin/parametros').then(r => r.json()),
+    ]).then(([data, params]) => {
+      const venta = (Array.isArray(data) ? data : []).filter((l: { categoria: string; activo: boolean }) => l.categoria === 'venta' && l.activo)
+      setListas(venta)
+      const defId = params['lista_precio_defecto_id'] ? Number(params['lista_precio_defecto_id']) : null
+      const def = (defId ? venta.find((l: { id: number }) => l.id === defId) : null) ?? venta[0]
+      if (def) setListaId(def.id)
+      setCantidadesDecimales(params['cantidades_decimales'] === 'true')
+    }).catch(() => {})
   }, [])
 
   // Cargar NCs y saldo CC cuando cambia el cliente
@@ -207,6 +213,20 @@ export default function POSPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (q.trim()) buscar(q) }, [listaId])
 
+  // Actualizar precio_unitario de items ya en el carrito cuando cambia la lista
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!listaIdInitialized.current) { listaIdInitialized.current = true; return }
+    if (!listaId || cart.length === 0) return
+    const snapshot = cart
+    Promise.all(snapshot.map(item => getPrecioLista(item.articulo_id, listaId, item.variante_id)))
+      .then(precios => {
+        setCart(prev => prev.map((item, i) =>
+          precios[i] != null ? { ...item, precio_unitario: precios[i]! } : item
+        ))
+      })
+  }, [listaId])
+
   async function addToCart(articulo: ArticuloResult, variante?: VarianteResult) {
     const key = variante ? `a${articulo.id}-v${variante.id}` : `a${articulo.id}`
     let precio = variante?.precio_venta ?? articulo.precio_venta ?? 0
@@ -257,7 +277,7 @@ export default function POSPage() {
   }
 
   function setCantidad(key: string, val: string) {
-    const n = parseInt(val, 10)
+    const n = cantidadesDecimales ? parseFloat(val) : parseInt(val, 10)
     if (!isNaN(n) && n !== 0) {
       setCart(prev => prev.map(i => i.key === key ? { ...i, cantidad: n } : i))
     }
@@ -578,7 +598,7 @@ export default function POSPage() {
                             </button>
                             <input
                               type="number"
-                              step="1"
+                              step={cantidadesDecimales ? '0.001' : '1'}
                               className="w-14 text-center text-sm border border-gray-200 rounded px-1 py-0.5"
                               value={item.cantidad}
                               onChange={(e) => setCantidad(item.key, e.target.value)}
