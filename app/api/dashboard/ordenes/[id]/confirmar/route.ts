@@ -50,9 +50,11 @@ export async function POST(_: NextRequest, { params }: Ctx) {
   const sucursalId = orden.sucursal_id ?? await getHomeSucursalId()
   if (!sucursalId) return NextResponse.json({ error: 'sin_sucursal_activa' }, { status: 403 })
 
-  // Validar stock antes de descontar (solo si la sucursal controla stock)
+  if (Number(orden.total) <= 0) return NextResponse.json({ error: 'El total de la orden debe ser mayor a cero' }, { status: 400 })
+
+  // Validar stock antes de descontar (solo items con cantidad positiva; los negativos reingresan stock)
   const stockValidErr = await validarStockSuficiente(
-    items.map((i: { articulo_id: number; variante_id: number | null; cantidad: number }) => ({ articulo_id: i.articulo_id, variante_id: i.variante_id ?? null, cantidad: i.cantidad })),
+    items.filter((i: { cantidad: number }) => i.cantidad > 0).map((i: { articulo_id: number; variante_id: number | null; cantidad: number }) => ({ articulo_id: i.articulo_id, variante_id: i.variante_id ?? null, cantidad: i.cantidad })),
     sucursalId,
     supabase,
   )
@@ -80,7 +82,7 @@ export async function POST(_: NextRequest, { params }: Ctx) {
       articulo_id: item.articulo_id,
       variante_id: vid,
       sucursal_id: sucursalId,
-      tipo: 'orden',
+      tipo: item.cantidad < 0 ? 'devolucion' : 'orden',
       cantidad: item.cantidad,
       stock_antes: stockAntes,
       stock_despues: stockAntes - item.cantidad,

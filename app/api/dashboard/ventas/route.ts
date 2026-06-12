@@ -112,6 +112,8 @@ export async function POST(req: NextRequest) {
   const descuento_monto = Math.round(subtotal * (descuento_pct / 100) * 100) / 100
   const total = Math.round((subtotal - descuento_monto + recargo_monto) * 100) / 100
 
+  if (total <= 0) return NextResponse.json({ error: 'El total de la venta debe ser mayor a cero' }, { status: 400 })
+
   const totalPagado = pagos.reduce((acc, p) => acc + p.monto, 0)
   if (Math.round(totalPagado * 100) < Math.round(total * 100))
     return NextResponse.json({ error: 'El total pagado es menor al total de la venta' }, { status: 400 })
@@ -255,7 +257,7 @@ export async function POST(req: NextRequest) {
       articulo_id: item.articulo_id,
       variante_id: vid,
       sucursal_id: sucursalId,
-      tipo: 'venta',
+      tipo: item.cantidad < 0 ? 'devolucion' : 'venta',
       cantidad: item.cantidad,
       stock_antes: stockAntes,
       stock_despues: stockAntes - item.cantidad,

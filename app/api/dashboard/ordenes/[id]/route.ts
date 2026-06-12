@@ -66,6 +66,8 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
   const descuento_monto = Math.round(subtotal * (descuento_pct / 100) * 100) / 100
   const total = Math.round((subtotal - descuento_monto + recargo_monto) * 100) / 100
 
+  if (total <= 0) return NextResponse.json({ error: 'El total de la orden debe ser mayor a cero' }, { status: 400 })
+
   const { error: updateError } = await supabase
     .from('ordenes_venta')
     .update({

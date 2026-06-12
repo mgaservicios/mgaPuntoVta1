@@ -248,15 +248,17 @@ export default function POSPage() {
   }
 
   function updateCantidad(key: string, delta: number) {
-    setCart(prev => prev.map(i => i.key === key
-      ? { ...i, cantidad: Math.max(1, i.cantidad + delta) }
-      : i
-    ))
+    setCart(prev => prev.map(i => {
+      if (i.key !== key) return i
+      let next = i.cantidad + delta
+      if (next === 0) next = delta > 0 ? 1 : -1
+      return { ...i, cantidad: next }
+    }))
   }
 
   function setCantidad(key: string, val: string) {
-    const n = parseFloat(val)
-    if (!isNaN(n) && n > 0) {
+    const n = parseInt(val, 10)
+    if (!isNaN(n) && n !== 0) {
       setCart(prev => prev.map(i => i.key === key ? { ...i, cantidad: n } : i))
     }
   }
@@ -349,6 +351,7 @@ export default function POSPage() {
 
   async function handleSubmit() {
     if (cart.length === 0) { toast.error('Agregá al menos un artículo'); return }
+    if (total <= 0) { toast.error('El total de la venta debe ser mayor a cero'); return }
     if (totalPagado < totalFinal - 0.005) { toast.error('El monto pagado no cubre el total'); return }
 
     const pagoCC = pagos.find(p => p.metodo === 'CUENTA_CORRIENTE')
@@ -561,7 +564,7 @@ export default function POSPage() {
                   {cart.map(item => {
                     const lineTotal = item.cantidad * item.precio_unitario * (1 - item.descuento_pct / 100)
                     return (
-                      <tr key={item.key}>
+                      <tr key={item.key} className={item.cantidad < 0 ? 'bg-orange-50' : ''}>
                         <td className="px-4 py-2.5">
                           <p className="font-medium text-gray-800">{item.nombre}</p>
                           {item.descripcion_variante && (
@@ -575,7 +578,6 @@ export default function POSPage() {
                             </button>
                             <input
                               type="number"
-                              min="1"
                               step="1"
                               className="w-14 text-center text-sm border border-gray-200 rounded px-1 py-0.5"
                               value={item.cantidad}

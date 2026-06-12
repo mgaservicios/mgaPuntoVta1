@@ -276,7 +276,7 @@ export default function OrdenPage({ params }: { params: Promise<{ id: string }> 
   }
 
   function updateItem(key: string, field: keyof FormItem, raw: string) {
-    const val = parseFloat(raw)
+    const val = field === 'cantidad' ? parseInt(raw, 10) : parseFloat(raw)
     setItems(prev => prev.map(i => i.key === key ? { ...i, [field]: isNaN(val) ? 0 : val } : i))
   }
 
@@ -340,6 +340,7 @@ export default function OrdenPage({ params }: { params: Promise<{ id: string }> 
 
   async function handleSave() {
     if (items.length === 0) { toast.error('Agregá al menos un ítem'); return }
+    if (totalFinal <= 0) { toast.error('El total debe ser mayor a cero'); return }
     setSaving(true)
     const payload = buildPayload()
     const res = await fetch(
@@ -358,6 +359,7 @@ export default function OrdenPage({ params }: { params: Promise<{ id: string }> 
 
   async function handleConfirmar() {
     if (items.length === 0) { toast.error('Agregá al menos un ítem'); return }
+    if (totalFinal <= 0) { toast.error('El total debe ser mayor a cero'); return }
     setConfirming(true)
 
     // Guardar primero si hay cambios pendientes
@@ -786,7 +788,7 @@ export default function OrdenPage({ params }: { params: Promise<{ id: string }> 
                   {items.map(item => {
                     const sub = Math.round(item.cantidad * item.precio_unitario * (1 - item.descuento_pct / 100) * 100) / 100
                     return (
-                      <tr key={item.key}>
+                      <tr key={item.key} className={item.cantidad < 0 ? 'bg-orange-50' : ''}>
                         <td className="px-3 py-2.5">
                           <p className="font-medium text-gray-800">{item.nombre_articulo}</p>
                           {item.descripcion_variante && (
@@ -795,7 +797,7 @@ export default function OrdenPage({ params }: { params: Promise<{ id: string }> 
                         </td>
                         <td className="px-3 py-2.5">
                           <input
-                            type="number" min="1" step="1"
+                            type="number" step="1"
                             className="w-full text-center text-sm border border-gray-200 rounded px-2 py-1"
                             value={item.cantidad}
                             onChange={(e) => updateItem(item.key, 'cantidad', e.target.value)}

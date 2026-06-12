@@ -72,6 +72,8 @@ export async function POST(req: NextRequest) {
   const descuento_monto = Math.round(subtotal * (descuento_pct / 100) * 100) / 100
   const total = Math.round((subtotal - descuento_monto + recargo_monto) * 100) / 100
 
+  if (total <= 0) return NextResponse.json({ error: 'El total de la orden debe ser mayor a cero' }, { status: 400 })
+
   const { count } = await supabase.from('ordenes_venta').select('id', { count: 'exact', head: true })
   const numero = `OV-${String((count ?? 0) + 1).padStart(5, '0')}`
 
