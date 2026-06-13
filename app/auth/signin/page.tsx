@@ -128,114 +128,124 @@ export default function SignInPage() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        <div className="space-y-1.5">
-          <Label htmlFor="empresa_codigo">Código de empresa</Label>
-          <div className="relative">
-            <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <Input
-              id="empresa_codigo"
-              type="text"
-              placeholder="Ej: MGA2025"
-              autoComplete="organization"
-              className={`pl-9 uppercase ${errors.empresa_codigo || lookup.status === 'empresa_not_found' ? 'border-red-400' : ''}`}
-              {...register('empresa_codigo', {
-                onChange: () => { if (lookup.status !== 'idle' && lookup.status !== 'loading') setLookup({ status: 'idle' }) },
-              })}
-              onBlur={lookupUser}
-            />
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
+        <div className="flex items-start gap-3">
+          <Label htmlFor="empresa_codigo" className="w-32 shrink-0 pt-2 text-right text-sm">Código empresa</Label>
+          <div className="flex-1">
+            <div className="relative">
+              <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Input
+                id="empresa_codigo"
+                type="text"
+                placeholder="Ej: MGA2025"
+                autoComplete="organization"
+                className={`pl-9 uppercase ${errors.empresa_codigo || lookup.status === 'empresa_not_found' ? 'border-red-400' : ''}`}
+                {...register('empresa_codigo', {
+                  onChange: () => { if (lookup.status !== 'idle' && lookup.status !== 'loading') setLookup({ status: 'idle' }) },
+                })}
+                onBlur={lookupUser}
+              />
+            </div>
+            {errors.empresa_codigo && (
+              <p className="text-xs text-red-600 mt-1">{errors.empresa_codigo.message}</p>
+            )}
+            {lookup.status === 'empresa_not_found' && (
+              <p className="text-xs text-red-600 mt-1">No existe ninguna empresa con ese código.</p>
+            )}
           </div>
-          {errors.empresa_codigo && (
-            <p className="text-xs text-red-600">{errors.empresa_codigo.message}</p>
-          )}
-          {lookup.status === 'empresa_not_found' && (
-            <p className="text-xs text-red-600">No existe ninguna empresa con ese código.</p>
-          )}
         </div>
 
-        <div className="space-y-1.5">
-          <Label htmlFor="email">Email</Label>
-          <Input
-            id="email"
-            type="email"
-            placeholder="tu@email.com"
-            autoComplete="email"
-            {...register('email', {
-              onChange: () => { if (lookup.status === 'user_not_found') setLookup({ status: 'idle' }) },
-            })}
-            className={errors.email || lookup.status === 'user_not_found' ? 'border-red-400' : ''}
-            onBlur={lookupUser}
-          />
-          {errors.email && (
-            <p className="text-xs text-red-600">{errors.email.message}</p>
-          )}
-          {lookup.status === 'user_not_found' && (
-            <p className="text-xs text-red-600">El email no está registrado en esta empresa.</p>
-          )}
+        <div className="flex items-start gap-3">
+          <Label htmlFor="email" className="w-32 shrink-0 pt-2 text-right text-sm">Email</Label>
+          <div className="flex-1">
+            <Input
+              id="email"
+              type="email"
+              placeholder="tu@email.com"
+              autoComplete="email"
+              {...register('email', {
+                onChange: () => { if (lookup.status === 'user_not_found') setLookup({ status: 'idle' }) },
+              })}
+              className={errors.email || lookup.status === 'user_not_found' ? 'border-red-400' : ''}
+              onBlur={lookupUser}
+            />
+            {errors.email && (
+              <p className="text-xs text-red-600 mt-1">{errors.email.message}</p>
+            )}
+            {lookup.status === 'user_not_found' && (
+              <p className="text-xs text-red-600 mt-1">El email no está registrado en esta empresa.</p>
+            )}
+          </div>
         </div>
 
         {lookup.status === 'loading' && (
-          <div className="flex items-center gap-2 text-sm text-gray-400 py-1">
+          <div className="flex items-center gap-2 text-sm text-gray-400 py-1 pl-35">
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
             Verificando...
           </div>
         )}
 
         {lookup.status === 'found' && (
-          <div className="space-y-1.5">
-            <Label className="flex items-center gap-1.5 text-gray-600">
+          <div className="flex items-start gap-3">
+            <Label className="w-32 shrink-0 pt-2 text-right text-sm text-gray-600 flex items-center justify-end gap-1">
               <MapPin className="w-3.5 h-3.5" />
-              Sucursal asignada
+              Sucursal
             </Label>
-            {lookup.isAdmin && lookup.sucursales.length > 1 ? (
-              <Select
-                value={selectedSucursalId ? String(selectedSucursalId) : undefined}
-                onValueChange={(v) => setSelectedSucursalId(v ? parseInt(v, 10) : null)}
-                items={Object.fromEntries(lookup.sucursales.map((s) => [String(s.id), s.nombre]))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar sucursal" />
-                </SelectTrigger>
-                <SelectContent>
-                  {lookup.sucursales.map((s) => (
-                    <SelectItem key={s.id} value={String(s.id)}>
-                      {s.nombre}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : (
-              <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-100 rounded-md text-sm text-blue-800">
-                <MapPin className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
-                {lookup.sucursales[0]?.nombre ?? '—'}
-              </div>
-            )}
+            <div className="flex-1">
+              {lookup.isAdmin && lookup.sucursales.length > 1 ? (
+                <Select
+                  value={selectedSucursalId ? String(selectedSucursalId) : undefined}
+                  onValueChange={(v) => setSelectedSucursalId(v ? parseInt(v, 10) : null)}
+                  items={Object.fromEntries(lookup.sucursales.map((s) => [String(s.id), s.nombre]))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar sucursal" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {lookup.sucursales.map((s) => (
+                      <SelectItem key={s.id} value={String(s.id)}>
+                        {s.nombre}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-100 rounded-md text-sm text-blue-800">
+                  <MapPin className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+                  {lookup.sucursales[0]?.nombre ?? '—'}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
-        <div className="space-y-1.5">
-          <Label htmlFor="password">Contraseña</Label>
-          <div className="relative">
-            <Input
-              id="password"
-              type={showPassword ? 'text' : 'password'}
-              placeholder="••••••"
-              autoComplete="current-password"
-              {...register('password')}
-              className={errors.password ? 'border-red-400 pr-10' : 'pr-10'}
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-              tabIndex={-1}
-            >
-              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-            </button>
+        <div className="flex items-start gap-3">
+          <Label htmlFor="password" className={`w-32 shrink-0 pt-2 text-right text-sm ${lookup.status !== 'found' ? 'text-gray-300' : ''}`}>Contraseña</Label>
+          <div className="flex-1">
+            <div className="relative">
+              <Input
+                id="password"
+                type={showPassword ? 'text' : 'password'}
+                placeholder="••••••"
+                autoComplete="current-password"
+                disabled={lookup.status !== 'found'}
+                {...register('password')}
+                className={`${errors.password ? 'border-red-400 pr-10' : 'pr-10'} ${lookup.status !== 'found' ? 'opacity-40 cursor-not-allowed' : ''}`}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                disabled={lookup.status !== 'found'}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+            {errors.password && (
+              <p className="text-xs text-red-600 mt-1">{errors.password.message}</p>
+            )}
           </div>
-          {errors.password && (
-            <p className="text-xs text-red-600">{errors.password.message}</p>
-          )}
         </div>
 
         <Button type="submit" className="w-full mt-2" disabled={isSubmitting}>
