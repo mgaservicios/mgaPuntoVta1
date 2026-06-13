@@ -6,8 +6,8 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       <div className="w-full max-w-md">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-4 flex justify-center">
           <Image
-            src="/logos/kosken_erp.png"
-            alt="Kosken ERP"
+            src="/logos/posmga_erp.png"
+            alt="POS MGA ERP"
             width={360}
             height={220}
             priority
