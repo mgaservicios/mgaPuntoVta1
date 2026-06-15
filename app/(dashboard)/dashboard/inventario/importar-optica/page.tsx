@@ -224,7 +224,9 @@ function ImportTab<T>({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ rows }),
       })
-      const data = await res.json()
+      const text = await res.text()
+      let data: ImportResult & { error?: string }
+      try { data = JSON.parse(text) } catch { setStatus('error'); setResult({ ok: 0, errors: [{ codigo: '', error: `Respuesta inesperada del servidor: ${text.slice(0, 200)}` }] }); return }
       if (!res.ok) { setStatus('error'); setResult({ ok: 0, errors: [{ codigo: '', error: data.error ?? 'Error desconocido' }] }); return }
       setResult(data)
       setStatus('done')

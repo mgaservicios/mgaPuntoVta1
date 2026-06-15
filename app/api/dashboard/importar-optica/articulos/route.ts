@@ -5,13 +5,13 @@ import { requirePermission } from '@/lib/require-permission'
 const RUBRO_MAP: Record<string, number> = { ANS: 2, ARM: 3, LCQ: 4 }
 
 export async function POST(req: NextRequest) {
+  try {
   const session = await requirePermission('inventario.articulos.crear')
   if (!session) return NextResponse.json({ error: 'Sin permiso' }, { status: 403 })
   const supabase = await getTenantClient(session)
 
-  const { rows } = await req.json() as {
-    rows: { codigo: string; nombre: string; codigoRubro: string; codigoBarra: string }[]
-  }
+  const body = await req.json().catch(() => null)
+  const rows = (body as { rows?: { codigo: string; nombre: string; codigoRubro: string; codigoBarra: string }[] } | null)?.rows
   if (!Array.isArray(rows) || rows.length === 0)
     return NextResponse.json({ error: 'Sin filas' }, { status: 400 })
 
@@ -81,4 +81,11 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({ ok: okCount, errors })
+  } catch (err) {
+    console.error('[importar-optica/articulos]', err)
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : 'Error interno del servidor' },
+      { status: 500 }
+    )
+  }
 }
