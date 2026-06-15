@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getTenantClient } from '@/services/supabase-tenant'
 import { requirePermission } from '@/lib/require-permission'
 
+export const maxDuration = 300
+
 const RUBRO_MAP: Record<string, number> = { ANS: 2, ARM: 3, LCQ: 4 }
 
 export async function POST(req: NextRequest) {
@@ -60,24 +62,24 @@ export async function POST(req: NextRequest) {
     activo:        true,
   }))
 
-  const BATCH = 100
-  for (let i = 0; i < articulos.length; i += BATCH) {
-    const batch = articulos.slice(i, i + BATCH)
+  async function upsertBatch(items: typeof articulos): Promise<void> {
+    if (items.length === 0) return
     const { error } = await supabase
       .from('articulos')
-      .upsert(batch, { onConflict: 'codigo', ignoreDuplicates: false })
-
-    if (error) {
-      for (const row of batch) {
-        const { error: e } = await supabase
-          .from('articulos')
-          .upsert([row], { onConflict: 'codigo', ignoreDuplicates: false })
-        if (e) errors.push({ codigo: row.codigo, error: e.message })
-        else okCount++
-      }
-    } else {
-      okCount += batch.length
+      .upsert(items, { onConflict: 'codigo', ignoreDuplicates: false })
+    if (!error) { okCount += items.length; return }
+    if (items.length === 1) {
+      errors.push({ codigo: items[0].codigo, error: error.message })
+      return
     }
+    const mid = Math.floor(items.length / 2)
+    await upsertBatch(items.slice(0, mid))
+    await upsertBatch(items.slice(mid))
+  }
+
+  const BATCH = 500
+  for (let i = 0; i < articulos.length; i += BATCH) {
+    await upsertBatch(articulos.slice(i, i + BATCH))
   }
 
   return NextResponse.json({ ok: okCount, errors })
