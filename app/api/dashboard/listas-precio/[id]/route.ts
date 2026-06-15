@@ -6,7 +6,7 @@ import { requirePermission } from '@/lib/require-permission'
 type Ctx = { params: Promise<{ id: string }> }
 
 export async function PUT(req: NextRequest, { params }: Ctx) {
-  const session = await requirePermission('admin.listas_precio.editar')
+  const session = await requirePermission('altas.listas_precio.editar')
   if (!session) return NextResponse.json({ error: 'Sin permiso' }, { status: 403 })
   const supabase = await getTenantClient(session)
 
@@ -41,7 +41,7 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
 }
 
 export async function DELETE(_req: NextRequest, { params }: Ctx) {
-  const session = await requirePermission('admin.listas_precio.eliminar')
+  const session = await requirePermission('altas.listas_precio.eliminar')
   if (!session) return NextResponse.json({ error: 'Sin permiso' }, { status: 403 })
   const supabase = await getTenantClient(session)
 

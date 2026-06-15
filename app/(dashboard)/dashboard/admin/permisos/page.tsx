@@ -9,7 +9,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import type { Role } from '@/types/auth'
-import { PERM_MODULES } from '@/lib/perm-groups'
+import { PERM_MODULES, PERM_MODULE_BD_KEY } from '@/lib/perm-groups'
+import { usePermissions } from '@/components/PermissionsProvider'
 
 type PermRow = { operation: string; allowed: boolean }
 
@@ -45,6 +46,13 @@ function triState(vals: boolean[]): 'all' | 'some' | 'none' {
 
 export default function PermisosPage() {
   const router = useRouter()
+  const { modules } = usePermissions()
+
+  // Solo mostrar módulos que el tenant tiene activos en BD maestra
+  const visibleModules = modules.length === 0
+    ? PERM_MODULES
+    : PERM_MODULES.filter(m => modules.includes(PERM_MODULE_BD_KEY[m.id] ?? m.id))
+
   const [roles, setRoles] = useState<Role[]>([])
   const [roleId, setRoleId] = useState('')
   const [perms, setPerms] = useState<Record<string, boolean>>({})
@@ -159,7 +167,7 @@ export default function PermisosPage() {
               </tr>
             </thead>
             <tbody>
-              {PERM_MODULES.map((mod) => {
+              {visibleModules.map((mod) => {
                 const modOps = mod.subs.flatMap((s) => s.ops.map((o) => o.id))
                 const modVals = modOps.map(get)
                 const modState = triState(modVals)

@@ -117,7 +117,7 @@ export async function GET(_: NextRequest, { params }: Ctx) {
 }
 
 export async function POST(req: NextRequest, { params }: Ctx) {
-  const session = await requirePermission('caja.caja.movimiento')
+  const session = await requirePermission('fondos.caja.movimiento')
   if (!session) return NextResponse.json({ error: 'Sin permiso' }, { status: 403 })
   const supabase = await getTenantClient(session)
 

@@ -89,16 +89,19 @@ export const PERM_MODULES: PermMod[] = [
     ],
   },
   {
-    id: 'caja', label: 'Caja',
+    id: 'fondos', label: 'Fondos',
     subs: [
-      { id: 'caja.caja', label: 'Caja', ops: [
-        { id: 'caja.caja.ver',        label: 'Ver estado de caja' },
-        { id: 'caja.caja.abrir',      label: 'Abrir caja' },
-        { id: 'caja.caja.cerrar',     label: 'Cerrar caja' },
-        { id: 'caja.caja.movimiento', label: 'Registrar ingreso/egreso' },
+      { id: 'fondos.caja', label: 'Caja', ops: [
+        { id: 'fondos.caja.ver',        label: 'Ver estado de caja' },
+        { id: 'fondos.caja.abrir',      label: 'Abrir caja' },
+        { id: 'fondos.caja.cerrar',     label: 'Cerrar caja' },
+        { id: 'fondos.caja.movimiento', label: 'Registrar ingreso/egreso' },
       ]},
-      { id: 'caja.cobranzas', label: 'Cobranzas', ops: [
-        { id: 'caja.cobranzas.ver', label: 'Ver cobranzas' },
+      { id: 'fondos.cobranzas', label: 'Cobranzas', ops: [
+        { id: 'fondos.cobranzas.ver', label: 'Ver cobranzas' },
+      ]},
+      { id: 'fondos.recibos', label: 'Recibos', ops: [
+        { id: 'fondos.recibos.ver', label: 'Ver recibos' },
       ]},
     ],
   },
@@ -153,6 +156,23 @@ export const PERM_MODULES: PermMod[] = [
         { id: 'altas.atributos.editar',   label: 'Editar atributo' },
         { id: 'altas.atributos.eliminar', label: 'Eliminar atributo' },
       ]},
+      { id: 'altas.listas_precio', label: 'Listas de precio', ops: [
+        { id: 'altas.listas_precio.ver',      label: 'Ver listas de precio' },
+        { id: 'altas.listas_precio.crear',    label: 'Crear lista de precio' },
+        { id: 'altas.listas_precio.editar',   label: 'Editar lista de precio' },
+        { id: 'altas.listas_precio.eliminar', label: 'Desactivar lista de precio' },
+      ]},
+      { id: 'altas.vendedores', label: 'Vendedores', ops: [
+        { id: 'altas.vendedores.ver',    label: 'Ver vendedores' },
+        { id: 'altas.vendedores.crear',  label: 'Crear vendedor' },
+        { id: 'altas.vendedores.editar', label: 'Editar vendedor' },
+      ]},
+      { id: 'altas.formas_pago', label: 'Formas de pago', ops: [
+        { id: 'altas.formas_pago.ver',      label: 'Ver formas de pago' },
+        { id: 'altas.formas_pago.crear',    label: 'Crear forma de pago' },
+        { id: 'altas.formas_pago.editar',   label: 'Editar forma de pago' },
+        { id: 'altas.formas_pago.eliminar', label: 'Eliminar forma de pago' },
+      ]},
     ],
   },
   {
@@ -179,23 +199,6 @@ export const PERM_MODULES: PermMod[] = [
         { id: 'admin.sucursales.editar',   label: 'Editar sucursal' },
         { id: 'admin.sucursales.eliminar', label: 'Eliminar sucursal' },
       ]},
-      { id: 'admin.listas_precio', label: 'Listas de precio', ops: [
-        { id: 'admin.listas_precio.ver',      label: 'Ver listas de precio' },
-        { id: 'admin.listas_precio.crear',    label: 'Crear lista de precio' },
-        { id: 'admin.listas_precio.editar',   label: 'Editar lista de precio' },
-        { id: 'admin.listas_precio.eliminar', label: 'Desactivar lista de precio' },
-      ]},
-      { id: 'admin.vendedores', label: 'Vendedores', ops: [
-        { id: 'admin.vendedores.ver',    label: 'Ver vendedores' },
-        { id: 'admin.vendedores.crear',  label: 'Crear vendedor' },
-        { id: 'admin.vendedores.editar', label: 'Editar vendedor' },
-      ]},
-      { id: 'admin.formas_pago', label: 'Formas de pago', ops: [
-        { id: 'admin.formas_pago.ver',      label: 'Ver formas de pago' },
-        { id: 'admin.formas_pago.crear',    label: 'Crear forma de pago' },
-        { id: 'admin.formas_pago.editar',   label: 'Editar forma de pago' },
-        { id: 'admin.formas_pago.eliminar', label: 'Eliminar forma de pago' },
-      ]},
       { id: 'admin.parametros', label: 'Parámetros', ops: [
         { id: 'admin.parametros.ver',    label: 'Ver parámetros' },
         { id: 'admin.parametros.editar', label: 'Editar parámetros' },
@@ -203,6 +206,19 @@ export const PERM_MODULES: PermMod[] = [
     ],
   },
 ]
+
+// Mapeo PERM_MODULE id → valor de empresa_modulos.modulo en BD maestra
+// Sub-secciones (altas, consultas, listados) heredan el módulo padre
+export const PERM_MODULE_BD_KEY: Record<string, string> = {
+  'ventas':     'ventas',
+  'inventario': 'inventario',
+  'altas':      'altas',
+  'consultas':  'consultas',
+  'listados':   'listados',
+  'fondos':     'fondos',
+  'optica':     'optica',
+  'admin':      'administracion',
+}
 
 export const ALL_OPERATIONS: string[] = PERM_MODULES.flatMap(
   (m) => m.subs.flatMap((s) => s.ops.map((o) => o.id))
@@ -225,8 +241,10 @@ export const ROUTE_TO_PERM: [string, string][] = [
   ['/dashboard/listados/cobranzas',           'listados.cobranzas.ver'],
   ['/dashboard/listados/ventas-articulos',    'listados.ventas_articulos.ver'],
   ['/dashboard/listados/precios',             'listados.precios.ver'],
-  ['/dashboard/caja',                         'caja.caja.ver'],
-  ['/dashboard/cobranzas',                    'caja.cobranzas.ver'],
+  ['/dashboard/fondos',                        'fondos.caja.ver'],
+  ['/dashboard/fondos/historial',             'fondos.caja.ver'],
+  ['/dashboard/fondos/cobranzas',             'fondos.cobranzas.ver'],
+  ['/dashboard/fondos/recibos',               'fondos.recibos.ver'],
   ['/dashboard/optica/ordenes',               'optica.ordenes.ver'],
   ['/dashboard/optica/servicios',             'optica.servicios.ver'],
   ['/dashboard/optica/medicos',               'optica.medicos.ver'],
@@ -238,10 +256,10 @@ export const ROUTE_TO_PERM: [string, string][] = [
   ['/dashboard/admin/usuarios',               'admin.usuarios.ver'],
   ['/dashboard/admin/roles',                  'admin.roles.ver'],
   ['/dashboard/admin/permisos',               'admin.permisos.ver'],
-  ['/dashboard/admin/listas-precio',          'admin.listas_precio.ver'],
-  ['/dashboard/admin/vendedores',             'admin.vendedores.ver'],
-  ['/dashboard/admin/formas-pago',            'admin.formas_pago.ver'],
+  ['/dashboard/admin/listas-precio',          'altas.listas_precio.ver'],
+  ['/dashboard/admin/vendedores',             'altas.vendedores.ver'],
+  ['/dashboard/admin/formas-pago',            'altas.formas_pago.ver'],
   ['/dashboard/admin/parametros',             'admin.parametros.ver'],
-  ['/dashboard/recibos',                      'caja.cobranzas.ver'],
+  ['/dashboard/inventario/importar-optica',    'optica.ordenes.ver'],
   ['/dashboard/inventario/actualizar-precios','inventario.articulos.ver'],
 ]

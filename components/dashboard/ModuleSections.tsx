@@ -74,20 +74,23 @@ const MODULE_SECTIONS: ModuleSection[] = [
   {
     id: 'altas',
     label: 'Altas',
-    module: 'inventario',
+    module: 'altas',
     headerIcon: Tag,
     color: 'orange',
     items: [
-      { label: 'Marcas',        href: '/dashboard/altas/marcas',        Icon: Tag,               description: 'Marcas de productos',      permKey: 'altas.marcas.ver'        },
-      { label: 'Categorías',    href: '/dashboard/altas/categorias',    Icon: FolderOpen,        description: 'Grupos de artículos',      permKey: 'altas.categorias.ver'    },
-      { label: 'Subcategorías', href: '/dashboard/altas/subcategorias', Icon: Layers,            description: 'Subgrupos de artículos',   permKey: 'altas.subcategorias.ver' },
-      { label: 'Atributos',     href: '/dashboard/altas/atributos',     Icon: SlidersHorizontal, description: 'Propiedades de artículos', permKey: 'altas.atributos.ver'     },
+      { label: 'Marcas',           href: '/dashboard/altas/marcas',           Icon: Tag,               description: 'Marcas de productos',      permKey: 'altas.marcas.ver'        },
+      { label: 'Categorías',     href: '/dashboard/altas/categorias',     Icon: FolderOpen,        description: 'Grupos de artículos',      permKey: 'altas.categorias.ver'    },
+      { label: 'Subcategorías',  href: '/dashboard/altas/subcategorias',  Icon: Layers,            description: 'Subgrupos de artículos',   permKey: 'altas.subcategorias.ver' },
+      { label: 'Atributos',      href: '/dashboard/altas/atributos',      Icon: SlidersHorizontal, description: 'Propiedades de artículos', permKey: 'altas.atributos.ver'     },
+      { label: 'Listas de precio', href: '/dashboard/admin/listas-precio', Icon: Tag,             description: 'Precios por canal',        permKey: 'altas.listas_precio.ver' },
+      { label: 'Vendedores',     href: '/dashboard/admin/vendedores',     Icon: UserCheck,         description: 'Equipo de ventas',         permKey: 'altas.vendedores.ver'    },
+      { label: 'Formas de pago', href: '/dashboard/admin/formas-pago',   Icon: CreditCard,        description: 'Métodos de cobro',         permKey: 'altas.formas_pago.ver'   },
     ],
   },
   {
     id: 'consultas',
     label: 'Consultas',
-    module: 'inventario',
+    module: 'consultas',
     headerIcon: Search,
     color: 'violet',
     items: [
@@ -99,19 +102,20 @@ const MODULE_SECTIONS: ModuleSection[] = [
   {
     id: 'fondos',
     label: 'Fondos',
-    module: 'caja',
+    module: 'fondos',
     headerIcon: Wallet,
     color: 'amber',
     items: [
-      { label: 'Caja',              href: '/dashboard/caja',           Icon: Wallet,      description: 'Sesión activa de caja',     permKey: 'caja.caja.ver'      },
-      { label: 'Historial de cierres', href: '/dashboard/caja/historial', Icon: History,  description: 'Movimientos anteriores',    permKey: 'caja.caja.ver'      },
-      { label: 'Cobranzas',         href: '/dashboard/cobranzas',      Icon: DollarSign,  description: 'Cuenta corriente clientes', permKey: 'caja.cobranzas.ver' },
-      { label: 'Recibos',           href: '/dashboard/recibos',        Icon: ReceiptText, description: 'Comprobantes emitidos',     permKey: 'caja.cobranzas.ver' },
+      { label: 'Caja',                 href: '/dashboard/fondos',           Icon: Wallet,      description: 'Sesión activa de caja',     permKey: 'fondos.caja.ver'      },
+      { label: 'Historial de cierres', href: '/dashboard/fondos/historial', Icon: History,     description: 'Movimientos anteriores',    permKey: 'fondos.caja.ver'      },
+      { label: 'Cobranzas',            href: '/dashboard/fondos/cobranzas', Icon: DollarSign,  description: 'Cuenta corriente clientes', permKey: 'fondos.cobranzas.ver' },
+      { label: 'Recibos',              href: '/dashboard/fondos/recibos',   Icon: ReceiptText, description: 'Comprobantes emitidos',     permKey: 'fondos.recibos.ver'   },
     ],
   },
   {
     id: 'listados',
     label: 'Listados',
+    module: 'listados',
     headerIcon: BarChart3,
     color: 'slate',
     items: [
@@ -143,9 +147,6 @@ const MODULE_SECTIONS: ModuleSection[] = [
       { label: 'Usuarios',         href: '/dashboard/admin/usuarios',      Icon: Settings,   description: 'Cuentas de acceso',   permKey: 'admin.usuarios.ver'     },
       { label: 'Roles',            href: '/dashboard/admin/roles',         Icon: Shield,     description: 'Perfiles de usuario', permKey: 'admin.roles.ver'        },
       { label: 'Permisos',         href: '/dashboard/admin/permisos',      Icon: Lock,       description: 'Control de acceso',   permKey: 'admin.permisos.ver'     },
-      { label: 'Listas de precio', href: '/dashboard/admin/listas-precio', Icon: Tag,        description: 'Precios por canal',   permKey: 'admin.listas_precio.ver'},
-      { label: 'Vendedores',       href: '/dashboard/admin/vendedores',    Icon: UserCheck,  description: 'Equipo de ventas',    permKey: 'admin.vendedores.ver'   },
-      { label: 'Formas de pago',   href: '/dashboard/admin/formas-pago',   Icon: CreditCard,        description: 'Métodos de cobro',      permKey: 'admin.formas_pago.ver' },
       { label: 'Parámetros',        href: '/dashboard/admin/parametros',    Icon: SlidersHorizontal, description: 'Configuración del sistema', permKey: 'admin.parametros.ver'  },
     ],
   },
@@ -153,11 +154,9 @@ const MODULE_SECTIONS: ModuleSection[] = [
 
 export function ModuleSections({
   modules,
-  isAdmin,
   userPermissions,
 }: {
   modules: string[]
-  isAdmin: boolean
   userPermissions: Record<string, boolean> | null
 }) {
   const [openId, setOpenId] = useState<string | null>(null)
@@ -168,7 +167,7 @@ export function ModuleSections({
   }
 
   const visible = MODULE_SECTIONS
-    .filter(s => !s.module || isAdmin || modules.includes(s.module))
+    .filter(s => !s.module || modules.includes(s.module))
     .map(s => ({ ...s, items: s.items.filter(item => canView(item.permKey)) }))
     .filter(s => s.items.length > 0)
 

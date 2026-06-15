@@ -152,7 +152,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         <QuickActionsBar modules={session.user.modules ?? []} color={brandColor} userPermissions={permMap} />
         <main className="flex-1 overflow-y-auto p-6 lg:p-8">
           <SessionGuard />
-          <PermissionsProvider permissions={permMap}>
+          <PermissionsProvider permissions={permMap} modules={session.user.modules ?? []}>
             {children}
           </PermissionsProvider>
         </main>

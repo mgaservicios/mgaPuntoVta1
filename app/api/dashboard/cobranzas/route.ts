@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
 
 // POST — registrar un cobro (PAGO) contra el saldo de un cliente
 export async function POST(req: NextRequest) {
-  const session = await requirePermission('caja.cobranzas.ver')
+  const session = await requirePermission('fondos.cobranzas.ver')
   if (!session) return NextResponse.json({ error: 'Sin permiso' }, { status: 403 })
   const supabase = await getTenantClient(session)
 

@@ -115,7 +115,7 @@ export default function RecibosPage() {
       toast.success('Recibo generado')
       setShowForm(false)
       loadRecibos()
-      window.open(`/dashboard/cobranzas/recibos/${cobro.id}/print`, '_blank')
+      window.open(`/dashboard/fondos/cobranzas/recibos/${cobro.id}/print`, '_blank')
     } else {
       const err = await res.json()
       toast.error(err.error ?? 'Error al guardar')
@@ -205,7 +205,7 @@ export default function RecibosPage() {
                 <TableCell>
                   <button
                     title="Ver recibo"
-                    onClick={() => window.open(`/dashboard/cobranzas/recibos/${r.id}/print`, '_blank')}
+                    onClick={() => window.open(`/dashboard/fondos/cobranzas/recibos/${r.id}/print`, '_blank')}
                     className="text-gray-400 hover:text-blue-600 transition-colors"
                   >
                     <ExternalLink className="w-4 h-4" />

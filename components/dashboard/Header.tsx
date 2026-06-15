@@ -17,10 +17,12 @@ const ROUTE_LABELS: Record<string, string> = {
   '/dashboard/ventas/pos': 'Ticket de Venta',
   '/dashboard/articulos': 'Artículos',
   '/dashboard/stock': 'Stock',
-  '/dashboard/caja': 'Caja',
+  '/dashboard/fondos': 'Fondos',
+  '/dashboard/fondos/historial': 'Historial de Caja',
+  '/dashboard/fondos/cobranzas': 'Cobranzas',
+  '/dashboard/fondos/recibos': 'Recibos',
   '/dashboard/clientes': 'Clientes',
   '/dashboard/proveedores': 'Proveedores',
-  '/dashboard/cobranzas': 'Cobranzas',
   '/dashboard/admin/usuarios': 'Usuarios',
   '/dashboard/admin/roles': 'Roles',
   '/dashboard/admin/permisos': 'Permisos',
@@ -149,7 +151,7 @@ const QUICK_ACTIONS: QuickAction[] = [
   { href: '/dashboard/optica/ordenes/nueva',     label: 'Nueva OT',         Icon: Glasses,      module: 'optica',     permKey: 'optica.ordenes.ver'      },
   { href: '/dashboard/inventario/remitos/nuevo', label: 'Nuevo remito',     Icon: ReceiptText,  module: 'inventario', permKey: 'inventario.remitos.ver'  },
   { href: '/dashboard/optica/servicios/nueva',   label: 'Nuevo servicio',   Icon: Wrench,       module: 'optica',     permKey: 'optica.servicios.ver'    },
-  { href: '/dashboard/consultas/stock',          label: 'Stock y precios',  Icon: Search,       module: 'inventario', permKey: 'consultas.stock.ver'     },
+  { href: '/dashboard/consultas/stock',          label: 'Stock y precios',  Icon: Search,       module: 'consultas',  permKey: 'consultas.stock.ver'     },
   { href: '/dashboard/inventario/articulos',     label: 'Artículos',        Icon: Package,      module: 'inventario', permKey: 'inventario.articulos.ver'},
 ]
 

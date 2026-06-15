@@ -412,14 +412,14 @@ export default function CajaPage() {
         </div>
         {isHomeCaja && (
           estaAbierta ? (
-            can('caja.caja.cerrar') && (
+            can('fondos.caja.cerrar') && (
               <Button variant="outline" className="text-red-500 hover:text-red-600" onClick={() => setShowCerrar(true)}>
                 <LogOut className="w-4 h-4 mr-2" />
                 Cerrar caja
               </Button>
             )
           ) : sesion !== undefined ? (
-            can('caja.caja.abrir') && (
+            can('fondos.caja.abrir') && (
               <Button onClick={() => setShowAbrir(true)} disabled={openingCaja}>
                 Nueva sesión
               </Button>
@@ -619,7 +619,7 @@ export default function CajaPage() {
               <div className="bg-white rounded-xl border border-gray-200 p-5"><SinCaja /></div>
             ) : (
               <>
-                {isHomeCaja && can('caja.caja.movimiento') && (
+                {isHomeCaja && can('fondos.caja.movimiento') && (
                   <div className="flex justify-end gap-2">
                     <Button size="sm" variant="outline" onClick={() => setMovDialog('ingreso')}>
                       <Plus className="w-3.5 h-3.5 mr-1" /> Ingreso

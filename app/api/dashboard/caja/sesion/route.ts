@@ -43,7 +43,7 @@ export async function GET() {
 
 // POST — abrir nueva sesión para la sucursal activa
 export async function POST(req: NextRequest) {
-  const session = await requirePermission('caja.caja.abrir')
+  const session = await requirePermission('fondos.caja.abrir')
   if (!session) return NextResponse.json({ error: 'Sin permiso' }, { status: 403 })
   const supabase = await getTenantClient(session)
 

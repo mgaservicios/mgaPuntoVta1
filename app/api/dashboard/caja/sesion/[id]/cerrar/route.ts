@@ -6,7 +6,7 @@ import { assertHomeSucursal } from '@/lib/sucursal'
 type Ctx = { params: Promise<{ id: string }> }
 
 export async function POST(req: NextRequest, { params }: Ctx) {
-  const session = await requirePermission('caja.caja.cerrar')
+  const session = await requirePermission('fondos.caja.cerrar')
   if (!session) return NextResponse.json({ error: 'Sin permiso' }, { status: 403 })
   const supabase = await getTenantClient(session)
 

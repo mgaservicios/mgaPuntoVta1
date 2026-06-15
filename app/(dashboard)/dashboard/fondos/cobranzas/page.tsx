@@ -170,7 +170,7 @@ export default function CobranzasPage() {
       toast.success('Cobro registrado')
       setCobrandoId(null)
       load()
-      window.open(`/dashboard/cobranzas/recibos/${cobro.id}/print`, '_blank')
+      window.open(`/dashboard/fondos/cobranzas/recibos/${cobro.id}/print`, '_blank')
     } else {
       const err = await res.json()
       toast.error(err.error ?? 'Error al registrar cobro')
@@ -263,7 +263,7 @@ export default function CobranzasPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      {row.saldo > 0.001 && can('caja.cobranzas.ver') && (
+                      {row.saldo > 0.001 && can('fondos.cobranzas.ver') && (
                         <Button size="sm" variant="outline" onClick={() => openCobro(row.cliente_id)}>
                           Cobrar
                         </Button>

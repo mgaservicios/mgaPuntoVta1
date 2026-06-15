@@ -133,7 +133,6 @@ export default async function DashboardPage() {
     saldoCobrar = ars(Math.max(0, saldoCC + saldoOT + saldoOrds))
   }
 
-  const isAdmin = session?.user.role === 'Administrador'
   const modules = session?.user.modules ?? []
 
   // null permMap = admin, ve todo; si tiene al menos un permiso activo del grupo, muestra las cards
@@ -143,7 +142,7 @@ export default async function DashboardPage() {
   const showVentas      = hasAnyPerm('ventas')
   const showTrabajos    = hasAnyPerm('optica')
   const showStockBajo   = hasAnyPerm('inventario')
-  const showCaja        = hasAnyPerm('caja')
+  const showCaja        = hasAnyPerm('fondos')
   const showSaldoCobrar = showVentas || showTrabajos || showCaja
 
   const anyCard = showVentas || showTrabajos || showStockBajo || showCaja || showSaldoCobrar
@@ -167,7 +166,7 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      <ModuleSections modules={modules} isAdmin={isAdmin} userPermissions={permMap} />
+      <ModuleSections modules={modules} userPermissions={permMap} />
     </div>
   )
 }
