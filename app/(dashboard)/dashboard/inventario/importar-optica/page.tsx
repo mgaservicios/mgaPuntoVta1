@@ -114,6 +114,7 @@ function mapArticulos(raw: Record<string, string>[]) {
       marca:       nombre.trim().split(/\s+/)[0]?.toUpperCase() ?? '',
       codigoRubro: col(r, 'codigorrubro', 'codigorubro', 'rubro', 'categoria', 'cat', 'codrubro'),
       codigoBarra: col(r, 'codigobarra', 'codbarra', 'barcode', 'ean', 'barra'),
+      proNum:      col(r, 'pronum', 'proveedornum', 'codproveedor', 'proveedor'),
     }
   }).filter(r => r.codigo && r.nombre)
 }
@@ -416,6 +417,7 @@ export default function ImportarOpticaPage() {
               { label: 'Marca', key: 'marca' as const },
               { label: 'Rubro', key: 'codigoRubro' as const },
               { label: 'Cód. Barra', key: 'codigoBarra' as const },
+              { label: 'Proveedor', key: 'proNum' as const },
             ]}
           />
         </TabsContent>

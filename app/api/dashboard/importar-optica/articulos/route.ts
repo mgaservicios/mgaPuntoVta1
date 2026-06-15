@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
   const supabase = await getTenantClient(session)
 
   const body = await req.json().catch(() => null)
-  const rows = (body as { rows?: { codigo: string; nombre: string; codigoRubro: string; codigoBarra: string }[] } | null)?.rows
+  const rows = (body as { rows?: { codigo: string; nombre: string; codigoRubro: string; codigoBarra: string; proNum?: string }[] } | null)?.rows
   if (!Array.isArray(rows) || rows.length === 0)
     return NextResponse.json({ error: 'Sin filas' }, { status: 400 })
 
@@ -28,6 +28,7 @@ export async function POST(req: NextRequest) {
       marcaNombre: r.nombre.trim().split(/\s+/)[0].toUpperCase(),
       categoria_id: RUBRO_MAP[r.codigoRubro?.trim().toUpperCase()] ?? null,
       codigo_barras: r.codigoBarra?.trim() || null,
+      proveedor_id: r.proNum?.trim() ? Number(r.proNum.trim()) || null : null,
     }))
 
   if (valid.length === 0) return NextResponse.json({ ok: 0, errors })
@@ -56,7 +57,7 @@ export async function POST(req: NextRequest) {
     tipo_articulo: 'simple' as const,
     categoria_id:  r.categoria_id,
     marca_id:      marcaMap[r.marcaNombre] ?? null,
-    proveedor_id:  1,
+    proveedor_id:  r.proveedor_id,
     unidad_id:     2,
     codigo_barras: r.codigo_barras,
     activo:        true,
