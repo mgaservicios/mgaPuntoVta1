@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
   const sucursalId = await getHomeSucursalId()
   if (!sucursalId) return NextResponse.json({ error: 'sin_sucursal_activa' }, { status: 403 })
 
-  const { rows } = await req.json() as { rows: { artCodigo: string; stock: number }[] }
+  const { rows } = await req.json() as { rows: { artCodigo: string; stock: number; proNum?: string }[] }
   if (!Array.isArray(rows) || rows.length === 0)
     return NextResponse.json({ error: 'Sin filas' }, { status: 400 })
 
@@ -39,14 +39,15 @@ export async function POST(req: NextRequest) {
   }
 
   // Build valid items
-  const items: { articuloId: number; codigo: string; stock: number }[] = []
+  const items: { articuloId: number; codigo: string; stock: number; proveedorId: number | null }[] = []
   for (const r of rows) {
     const codigo = r.artCodigo?.trim()
     const articuloId = codigoToId[codigo]
     if (!articuloId) { errors.push({ codigo: codigo ?? '', error: 'Artículo no encontrado' }); continue }
     const stock = Number(r.stock)
     if (isNaN(stock) || stock <= 0) { errors.push({ codigo, error: 'Stock inválido' }); continue }
-    items.push({ articuloId, codigo, stock })
+    const proveedorId = r.proNum?.trim() ? (Number(r.proNum.trim()) || null) : null
+    items.push({ articuloId, codigo, stock, proveedorId })
   }
 
   if (items.length === 0) return NextResponse.json({ ok: 0, remitos: 0, errors })
@@ -54,9 +55,16 @@ export async function POST(req: NextRequest) {
   let okCount = 0
   let remitoCount = 0
 
-  // Process in batches of ITEMS_POR_REMITO
-  for (let i = 0; i < items.length; i += ITEMS_POR_REMITO) {
-    const batch = items.slice(i, i + ITEMS_POR_REMITO)
+  // Agrupar por proveedor
+  const byProv = new Map<number | null, typeof items>()
+  for (const it of items) {
+    if (!byProv.has(it.proveedorId)) byProv.set(it.proveedorId, [])
+    byProv.get(it.proveedorId)!.push(it)
+  }
+
+  for (const [provId, provItems] of byProv) {
+  for (let i = 0; i < provItems.length; i += ITEMS_POR_REMITO) {
+    const batch = provItems.slice(i, i + ITEMS_POR_REMITO)
 
     // Generate remito number
     const { count } = await supabase.from('remitos').select('id', { count: 'exact', head: true })
@@ -70,7 +78,7 @@ export async function POST(req: NextRequest) {
         tipo: 'entrada',
         sucursal_id: sucursalId,
         contraparte_tipo: 'proveedor',
-        contraparte_proveedor_id: 2,
+        contraparte_proveedor_id: provId,
         contraparte_nombre: 'Stock Inicial',
         fecha: new Date().toISOString(),
         observaciones: 'Importación stock inicial óptica',
@@ -162,6 +170,7 @@ export async function POST(req: NextRequest) {
 
     okCount += batch.length
   }
+  } // fin byProv
 
   return NextResponse.json({ ok: okCount, remitos: remitoCount, errors })
 }

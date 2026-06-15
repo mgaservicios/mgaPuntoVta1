@@ -147,6 +147,7 @@ function mapStock(raw: Record<string, string>[]) {
   return raw.map(r => ({
     artCodigo: col(r, 'artnumcod', 'codigo', 'cod', 'codart'),
     stock:     parseNum(col(r, 'stock', 'cantidad', 'qty')),
+    proNum:    col(r, 'pronum', 'proveedornum', 'codproveedor', 'proveedor'),
   })).filter(r => r.artCodigo && r.stock > 0 && !isNaN(r.stock))
 }
 
@@ -445,6 +446,7 @@ export default function ImportarOpticaPage() {
             previewColumns={[
               { label: 'Artículo', key: 'artCodigo' as const },
               { label: 'Stock', key: 'stock' as const },
+              { label: 'Proveedor', key: 'proNum' as const },
             ]}
             extraSummary={r => `Los remitos generados aparecen en Inventario → Remitos como "confirmados".`}
           />
