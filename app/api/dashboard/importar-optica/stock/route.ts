@@ -66,9 +66,9 @@ export async function POST(req: NextRequest) {
   for (let i = 0; i < provItems.length; i += ITEMS_POR_REMITO) {
     const batch = provItems.slice(i, i + ITEMS_POR_REMITO)
 
-    // Generate remito number
-    const { count } = await supabase.from('remitos').select('id', { count: 'exact', head: true })
-    const numero = `E-${String((count ?? 0) + 1).padStart(5, '0')}`
+    // Generate remito number using sucursal counter
+    const { data: nextNum } = await supabase.rpc('next_numero_sucursal', { p_sucursal_id: sucursalId, p_tipo: 'remito_entrada' })
+    const numero = `E-${String(sucursalId).padStart(2, '0')}-${String(nextNum).padStart(5, '0')}`
 
     // Create remito
     const { data: remito, error: errRemito } = await supabase
@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
         tipo: 'entrada',
         sucursal_id: sucursalId,
         contraparte_tipo: 'proveedor',
-        contraparte_proveedor_id: provId,
+        contraparte_proveedor_id: 2,
         contraparte_nombre: 'Stock Inicial',
         fecha: new Date().toISOString(),
         observaciones: 'Importación stock inicial óptica',

@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
-import { Upload, FileText, CheckCircle, XCircle, Package, Tag, BarChart3 } from 'lucide-react'
+import { Upload, FileText, CheckCircle, XCircle, Package, Tag, BarChart3, ChevronDown, ChevronUp, Info } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 // ─── CSV parser ───────────────────────────────────────────────────────────────
@@ -166,6 +166,7 @@ function ImportTab<T>({
   previewColumns,
   extraSummary,
   diagnoseDiscards,
+  manual,
 }: {
   title: string
   description: string
@@ -174,7 +175,9 @@ function ImportTab<T>({
   previewColumns: { label: string; key: keyof T }[]
   extraSummary?: (r: ImportResult) => string
   diagnoseDiscards?: (raw: Record<string, string>[]) => string | null
+  manual?: React.ReactNode
 }) {
+  const [showManual, setShowManual] = useState(false)
   const [rows, setRows] = useState<T[]>([])
   const [rawCount, setRawCount] = useState(0)
   const [rawRows, setRawRows] = useState<Record<string, string>[]>([])
@@ -242,7 +245,24 @@ function ImportTab<T>({
 
   return (
     <div className="space-y-5">
-      <p className="text-sm text-gray-500">{description}</p>
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-sm text-gray-500">{description}</p>
+        {manual && (
+          <button
+            onClick={() => setShowManual(v => !v)}
+            className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 shrink-0 font-medium"
+          >
+            <Info className="w-3.5 h-3.5" />
+            {showManual ? 'Ocultar manual' : 'Ver manual'}
+            {showManual ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+          </button>
+        )}
+      </div>
+      {manual && showManual && (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-xs space-y-3">
+          {manual}
+        </div>
+      )}
 
       {/* Drop zone */}
       <div
@@ -408,7 +428,7 @@ export default function ImportarOpticaPage() {
         <TabsContent value="articulos" className="mt-5">
           <ImportTab
             title="Artículos"
-            description="Columnas esperadas: Codigo · Descripcion · CodigoRubro (ANS/ARM/LCQ) · codigoBarra. Se crea/actualiza por Codigo."
+            description="Importa o actualiza artículos desde el sistema óptica. Upsert por Codigo — si ya existe lo actualiza, si no lo crea."
             endpoint="/api/dashboard/importar-optica/articulos"
             mapper={mapArticulos}
             diagnoseDiscards={diagnoseArticulos}
@@ -420,13 +440,39 @@ export default function ImportarOpticaPage() {
               { label: 'Cód. Barra', key: 'codigoBarra' as const },
               { label: 'Proveedor', key: 'proNum' as const },
             ]}
+            manual={
+              <div className="space-y-3">
+                <div>
+                  <p className="font-semibold text-blue-800 mb-1.5">Columnas del CSV</p>
+                  <table className="w-full text-xs border-collapse">
+                    <thead><tr className="bg-blue-100 text-blue-900"><th className="text-left px-2 py-1 rounded-l">Columna</th><th className="text-left px-2 py-1">Requerida</th><th className="text-left px-2 py-1 rounded-r">Descripción</th></tr></thead>
+                    <tbody className="divide-y divide-blue-100">
+                      <tr><td className="px-2 py-1 font-mono">Codigo</td><td className="px-2 py-1 text-green-700">Sí</td><td className="px-2 py-1 text-gray-600">Código único del artículo. Clave de upsert.</td></tr>
+                      <tr><td className="px-2 py-1 font-mono">Descripcion</td><td className="px-2 py-1 text-green-700">Sí</td><td className="px-2 py-1 text-gray-600">Nombre del artículo. La primera palabra se usa como marca.</td></tr>
+                      <tr><td className="px-2 py-1 font-mono">CodigoRubro</td><td className="px-2 py-1 text-gray-400">No</td><td className="px-2 py-1 text-gray-600">Categoría: <span className="font-mono">ANS</span> · <span className="font-mono">ARM</span> · <span className="font-mono">LCQ</span></td></tr>
+                      <tr><td className="px-2 py-1 font-mono">codigoBarra</td><td className="px-2 py-1 text-gray-400">No</td><td className="px-2 py-1 text-gray-600">Código de barras (EAN/UPC). Debe ser único en toda la tabla.</td></tr>
+                      <tr><td className="px-2 py-1 font-mono">ProNum</td><td className="px-2 py-1 text-gray-400">No</td><td className="px-2 py-1 text-gray-600">Código numérico del proveedor. Se guarda como <span className="font-mono">proveedor_id</span>.</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div>
+                  <p className="font-semibold text-blue-800 mb-1">Comportamiento</p>
+                  <ul className="space-y-0.5 text-gray-700 list-disc list-inside">
+                    <li>Si el artículo ya existe (mismo <span className="font-mono">Codigo</span>), se actualizan todos los campos.</li>
+                    <li>La marca se crea automáticamente si no existe.</li>
+                    <li>Filas sin <span className="font-mono">Codigo</span> o sin <span className="font-mono">Descripcion</span> se descartan.</li>
+                    <li>Se procesa en lotes de 500 — errores aíslan el artículo por bisección.</li>
+                  </ul>
+                </div>
+              </div>
+            }
           />
         </TabsContent>
 
         <TabsContent value="precios" className="mt-5">
           <ImportTab
             title="Precios"
-            description="Columnas esperadas: ArtNumCod · PrecioVenta · fechaPrecio. Se asignan a la lista de Venta Público (lista #2)."
+            description="Importa precios de venta y los asigna a la lista Venta Público (lista #2). Se registra historial de precios por vigencia."
             endpoint="/api/dashboard/importar-optica/precios"
             mapper={mapPrecios}
             previewColumns={[
@@ -434,13 +480,37 @@ export default function ImportarOpticaPage() {
               { label: 'Precio Venta', key: 'precio' as const },
               { label: 'Fecha', key: 'fechaPrecio' as const },
             ]}
+            manual={
+              <div className="space-y-3">
+                <div>
+                  <p className="font-semibold text-blue-800 mb-1.5">Columnas del CSV</p>
+                  <table className="w-full text-xs border-collapse">
+                    <thead><tr className="bg-blue-100 text-blue-900"><th className="text-left px-2 py-1 rounded-l">Columna</th><th className="text-left px-2 py-1">Requerida</th><th className="text-left px-2 py-1 rounded-r">Descripción</th></tr></thead>
+                    <tbody className="divide-y divide-blue-100">
+                      <tr><td className="px-2 py-1 font-mono">ArtNumCod</td><td className="px-2 py-1 text-green-700">Sí</td><td className="px-2 py-1 text-gray-600">Código del artículo (debe existir previamente en la tabla).</td></tr>
+                      <tr><td className="px-2 py-1 font-mono">PrecioVenta</td><td className="px-2 py-1 text-green-700">Sí</td><td className="px-2 py-1 text-gray-600">Precio de venta. Acepta formato argentino con <span className="font-mono">.</span> de miles y <span className="font-mono">,</span> decimal.</td></tr>
+                      <tr><td className="px-2 py-1 font-mono">fechaPrecio</td><td className="px-2 py-1 text-gray-400">No</td><td className="px-2 py-1 text-gray-600">Fecha de vigencia. Formatos: <span className="font-mono">dd-mon-aa</span> (ej. 19-nov-25) · ISO · vacío = hoy.</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div>
+                  <p className="font-semibold text-blue-800 mb-1">Comportamiento</p>
+                  <ul className="space-y-0.5 text-gray-700 list-disc list-inside">
+                    <li>Los precios se registran en la <strong>Lista #2 — Venta Público</strong>.</li>
+                    <li>Se guarda historial: se puede reimportar con distintas fechas sin perder registros anteriores.</li>
+                    <li>Artículos no encontrados se reportan como error (no se descartan silenciosamente).</li>
+                    <li>Filas con precio 0 o negativo se descartan.</li>
+                  </ul>
+                </div>
+              </div>
+            }
           />
         </TabsContent>
 
         <TabsContent value="stock" className="mt-5">
           <ImportTab
             title="Stock"
-            description="Columnas esperadas: ArtNumCod · stock. Se generan Remitos de entrada (hasta 50 ítems c/u) confirmados automáticamente."
+            description="Genera remitos de entrada confirmados. El stock se agrupa por proveedor y se SUMA al existente (no reemplaza)."
             endpoint="/api/dashboard/importar-optica/stock"
             mapper={mapStock}
             previewColumns={[
@@ -448,6 +518,33 @@ export default function ImportarOpticaPage() {
               { label: 'Stock', key: 'stock' as const },
               { label: 'Proveedor', key: 'proNum' as const },
             ]}
+            manual={
+              <div className="space-y-3">
+                <div>
+                  <p className="font-semibold text-blue-800 mb-1.5">Columnas del CSV</p>
+                  <table className="w-full text-xs border-collapse">
+                    <thead><tr className="bg-blue-100 text-blue-900"><th className="text-left px-2 py-1 rounded-l">Columna</th><th className="text-left px-2 py-1">Requerida</th><th className="text-left px-2 py-1 rounded-r">Descripción</th></tr></thead>
+                    <tbody className="divide-y divide-blue-100">
+                      <tr><td className="px-2 py-1 font-mono">ArtNumCod</td><td className="px-2 py-1 text-green-700">Sí</td><td className="px-2 py-1 text-gray-600">Código del artículo (debe existir en la tabla).</td></tr>
+                      <tr><td className="px-2 py-1 font-mono">stock</td><td className="px-2 py-1 text-green-700">Sí</td><td className="px-2 py-1 text-gray-600">Cantidad a ingresar. Debe ser mayor a 0.</td></tr>
+                      <tr><td className="px-2 py-1 font-mono">ProNum</td><td className="px-2 py-1 text-gray-400">No</td><td className="px-2 py-1 text-gray-600">Código del proveedor. Cada proveedor genera su propio grupo de remitos.</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div>
+                  <p className="font-semibold text-blue-800 mb-1">Comportamiento</p>
+                  <ul className="space-y-0.5 text-gray-700 list-disc list-inside">
+                    <li>Los ítems se agrupan por <span className="font-mono">ProNum</span>. Cada grupo genera remitos de hasta 50 ítems.</li>
+                    <li>Los remitos se crean como <strong>Entrada · confirmados</strong> y aparecen en Inventario → Remitos.</li>
+                    <li>El stock se <strong>suma</strong> al existente — no reemplaza. Reimportar duplica el stock.</li>
+                    <li>Artículos no encontrados se reportan como error y se omiten.</li>
+                  </ul>
+                </div>
+                <div className="rounded bg-amber-100 border border-amber-300 px-3 py-2 text-amber-800">
+                  <strong>Atención:</strong> esta importación es para stock inicial. Si ya importaste, no reimportar sin verificar el stock actual.
+                </div>
+              </div>
+            }
             extraSummary={r => `Los remitos generados aparecen en Inventario → Remitos como "confirmados".`}
           />
         </TabsContent>
