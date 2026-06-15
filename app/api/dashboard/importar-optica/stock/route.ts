@@ -21,6 +21,18 @@ export async function POST(req: NextRequest) {
   if (!Array.isArray(rows) || rows.length === 0)
     return NextResponse.json({ error: 'Sin filas' }, { status: 400 })
 
+  // Resolver proveedor "Stock Inicial" (id=2 si existe, si no crear)
+  let stockInicialProvId = 2
+  const { data: provExistente } = await supabase.from('proveedores').select('id').eq('id', 2).maybeSingle()
+  if (!provExistente) {
+    const { data: newProv } = await supabase
+      .from('proveedores')
+      .insert({ nombre: 'Stock Inicial', activo: true })
+      .select('id')
+      .single()
+    if (newProv) stockInicialProvId = newProv.id
+  }
+
   const errors: { codigo: string; error: string }[] = []
 
   // Batch-lookup articulo_ids
@@ -78,7 +90,7 @@ export async function POST(req: NextRequest) {
         tipo: 'entrada',
         sucursal_id: sucursalId,
         contraparte_tipo: 'proveedor',
-        contraparte_proveedor_id: 2,
+        contraparte_proveedor_id: stockInicialProvId,
         contraparte_nombre: 'Stock Inicial',
         fecha: new Date().toISOString(),
         observaciones: 'Importación stock inicial óptica',
