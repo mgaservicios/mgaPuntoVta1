@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { Plus, Eye, Pencil, Check, Trash2 } from 'lucide-react'
+import { Plus, Eye, Pencil, Check, Trash2, Printer } from 'lucide-react'
 import { useSelectedSucursal } from '@/hooks/useSelectedSucursal'
 import { usePermissions } from '@/components/PermissionsProvider'
 import { buttonVariants, Button } from '@/components/ui/button'
@@ -172,6 +172,14 @@ export default function RemitosClient({ isAdmin }: { isAdmin: boolean }) {
                     >
                       <Eye className="w-3.5 h-3.5 mr-1" />
                       Ver
+                    </Link>
+                    <Link
+                      href={`/dashboard/inventario/remitos/${r.id}/print`}
+                      target="_blank"
+                      className={buttonVariants({ variant: 'ghost', size: 'icon' })}
+                      title="Imprimir"
+                    >
+                      <Printer className="w-3.5 h-3.5" />
                     </Link>
                     {canWrite && can('inventario.remitos.crear') && (
                       <Link

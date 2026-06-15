@@ -74,8 +74,8 @@ export async function POST(req: NextRequest) {
 
   if (total <= 0) return NextResponse.json({ error: 'El total de la orden debe ser mayor a cero' }, { status: 400 })
 
-  const { count } = await supabase.from('ordenes_venta').select('id', { count: 'exact', head: true })
-  const numero = `OV-${String((count ?? 0) + 1).padStart(5, '0')}`
+  const { data: nextNum } = await supabase.rpc('next_numero_sucursal', { p_sucursal_id: sucursalId, p_tipo: 'orden_venta' })
+  const numero = `OV-${String(sucursalId).padStart(2, '0')}-${String(nextNum).padStart(5, '0')}`
 
   const { data: orden, error: ordenError } = await supabase
     .from('ordenes_venta')

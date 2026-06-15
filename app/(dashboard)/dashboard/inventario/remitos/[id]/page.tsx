@@ -3,7 +3,8 @@
 import { useEffect, useState, use } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { ArrowLeft, CheckCircle, XCircle } from 'lucide-react'
+import { ArrowLeft, CheckCircle, XCircle, Printer } from 'lucide-react'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import ConfirmDialog from '@/components/dashboard/ConfirmDialog'
@@ -105,6 +106,12 @@ export default function RemitoDetailPage({ params }: { params: Promise<{ id: str
         </div>
 
         <div className="flex gap-2">
+          <Link href={`/dashboard/inventario/remitos/${id}/print`} target="_blank">
+            <Button variant="outline">
+              <Printer className="w-4 h-4 mr-2" />
+              Imprimir
+            </Button>
+          </Link>
           {remito.estado === 'borrador' && can('inventario.remitos.confirmar') && (
             <Button onClick={handleConfirmar} disabled={confirming}>
               <CheckCircle className="w-4 h-4 mr-2" />

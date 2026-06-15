@@ -34,8 +34,18 @@ type Grupo = {
 const fmt = (n: number) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(n)
 
-const fmtFecha = (s: string) =>
-  s ? new Date(s).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'
+const fmtFecha = (s: string) => {
+  if (!s) return '—'
+  const [y, m, d] = s.slice(0, 10).split('-').map(Number)
+  return new Date(y, m - 1, d).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+}
+
+function bsasDateStr(offsetDays = 0): string {
+  const d = new Date(Date.now() + offsetDays * 86_400_000)
+  return new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+  }).format(d)
+}
 
 function varianteLabel(v: Entry['variante']): string {
   if (!v) return '—'
@@ -53,12 +63,9 @@ function origenLabel(e: Entry): string {
 }
 
 export default function PreciosCostoPage() {
-  const hoy = new Date().toISOString().slice(0, 10)
-  const hace30 = new Date(Date.now() - 30 * 86400_000).toISOString().slice(0, 10)
-
   const [q, setQ]               = useState('')
-  const [fechaDesde, setFechaDesde] = useState(hace30)
-  const [fechaHasta, setFechaHasta] = useState(hoy)
+  const [fechaDesde, setFechaDesde] = useState(() => bsasDateStr())
+  const [fechaHasta, setFechaHasta] = useState(() => bsasDateStr())
   const [grupos, setGrupos]     = useState<Grupo[]>([])
   const [loading, setLoading]   = useState(false)
   const [buscado, setBuscado]   = useState(false)

@@ -21,8 +21,38 @@ import type { ListaPrecio, PrecioVigente, Precio, ArticuloPreciosResponse } from
 const fmt = (n: number) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(n)
 
-const fmtFecha = (s: string) =>
-  s ? new Date(s).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'
+// Evita el problema de UTC midnight: 'YYYY-MM-DD' se parsea como día anterior en zonas UTC-N
+const fmtFecha = (s: string) => {
+  if (!s) return '—'
+  const [y, m, d] = s.slice(0, 10).split('-').map(Number)
+  return new Date(y, m - 1, d).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+}
+
+// Fecha de hoy en zona Buenos Aires (YYYY-MM-DD), independiente del timezone del navegador
+function localDateStr(): string {
+  return new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+  }).format(new Date())
+}
+
+/**
+ * Convierte una fecha YYYY-MM-DD a timestamp con zona horaria Buenos Aires (-03:00).
+ * Si la fecha es hoy → usa la hora actual. Si es otro día → usa 00:00:00.
+ */
+function vigenteDesdeBsAs(dateStr: string): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const today = localDateStr()
+  if (dateStr === today) {
+    const ahora = new Intl.DateTimeFormat('sv-SE', {
+      timeZone: 'America/Argentina/Buenos_Aires',
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+    }).format(new Date()).replace(' ', 'T')
+    return ahora + '-03:00'
+  }
+  return `${dateStr}T00:00:00-03:00`
+}
+
 
 interface Props {
   articuloId: number
@@ -60,6 +90,9 @@ export default function PreciosPanel({ articuloId, varianteId, tieneVariantes }:
   const [form, setForm] = useState<PrecioForm>(FORM_EMPTY)
   const [preciosDerivados, setPreciosDerivados] = useState<Record<number, string>>({})
   const [guardando, setGuardando] = useState(false)
+
+  const [histFechaDesde, setHistFechaDesde] = useState(localDateStr)
+  const [histFechaHasta, setHistFechaHasta] = useState(localDateStr)
 
   const varianteParam = varianteId ? `&variante_id=${varianteId}` : ''
 
@@ -110,7 +143,7 @@ export default function PreciosPanel({ articuloId, varianteId, tieneVariantes }:
     setForm({
       ...FORM_EMPTY,
       lista_precio_id: listaPrecioId ? String(listaPrecioId) : '1',
-      vigente_desde: new Date().toISOString().slice(0, 10),
+      vigente_desde: localDateStr(),
     })
     setPreciosDerivados({})
     setShowForm(true)
@@ -129,6 +162,8 @@ export default function PreciosPanel({ articuloId, varianteId, tieneVariantes }:
     }
     setGuardando(true)
 
+    const vigenteDesde = vigenteDesdeBsAs(form.vigente_desde || localDateStr())
+
     const baseBody = {
       variante_id: varianteId ?? null,
       lista_precio_id: Number(form.lista_precio_id),
@@ -138,7 +173,7 @@ export default function PreciosPanel({ articuloId, varianteId, tieneVariantes }:
         form.origen_tipo === 'proveedor' && form.origen_proveedor_id
           ? Number(form.origen_proveedor_id)
           : null,
-      vigente_desde: form.vigente_desde || undefined,
+      vigente_desde: vigenteDesde,
     }
 
     const res = await fetch(`/api/dashboard/articulos/${articuloId}/precios`, {
@@ -160,7 +195,7 @@ export default function PreciosPanel({ articuloId, varianteId, tieneVariantes }:
               lista_precio_id: Number(listaId),
               precio: Number(precio),
               origen_tipo: form.origen_tipo,
-              vigente_desde: form.vigente_desde || undefined,
+              vigente_desde: vigenteDesde,
             }),
           })
         )
@@ -246,7 +281,12 @@ export default function PreciosPanel({ articuloId, varianteId, tieneVariantes }:
             size="sm"
             variant="ghost"
             className="text-gray-500 hover:text-gray-700 px-0"
-            onClick={() => setShowHistorial(true)}
+            onClick={() => {
+              const hoy = localDateStr()
+              setHistFechaDesde(hoy)
+              setHistFechaHasta(hoy)
+              setShowHistorial(true)
+            }}
           >
             <History className="w-3.5 h-3.5 mr-1.5" />
             Historial de precios
@@ -392,48 +432,87 @@ export default function PreciosPanel({ articuloId, varianteId, tieneVariantes }:
             <DialogTitle>Historial de precios</DialogTitle>
           </DialogHeader>
 
-          {historial.length === 0 ? (
-            <p className="text-sm text-gray-400 py-4 text-center">Sin historial registrado.</p>
-          ) : (
-            <div className="overflow-y-auto max-h-[60vh]">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Lista</TableHead>
-                    <TableHead>Categoría</TableHead>
-                    <TableHead className="text-right">Precio</TableHead>
-                    <TableHead>Vigente desde</TableHead>
-                    <TableHead>Origen</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {historial.map((p) => (
-                    <TableRow key={p.id} className="text-sm">
-                      <TableCell className="font-medium">{p.lista_precio?.nombre}</TableCell>
-                      <TableCell>
-                        <Badge variant={p.lista_precio?.tipo === 'calculada' ? 'secondary' : 'outline'} className="text-[10px]">
-                          {p.lista_precio?.tipo === 'calculada' ? 'Calculada' : 'Manual'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums font-semibold">
-                        {fmt(p.precio)}
-                      </TableCell>
-                      <TableCell className="text-gray-500">{fmtFecha(p.vigente_desde)}</TableCell>
-                      <TableCell className="text-gray-500">
-                        {p.origen_tipo === 'remito'
-                          ? 'Remito'
-                          : p.origen_tipo === 'proveedor'
-                            ? (p.proveedor?.nombre ?? 'Proveedor')
-                            : p.origen_tipo === 'sucursal'
-                              ? (p.sucursal?.nombre ?? 'Sucursal')
-                              : 'Manual'}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+          {/* Filtros de fecha */}
+          <div className="flex flex-wrap items-center gap-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+            <div className="flex items-center gap-2 flex-1 min-w-[140px]">
+              <Label className="text-xs font-medium text-gray-600 whitespace-nowrap">Desde</Label>
+              <Input
+                type="date"
+                className="h-8 text-sm"
+                value={histFechaDesde}
+                onChange={(e) => setHistFechaDesde(e.target.value)}
+              />
             </div>
-          )}
+            <div className="flex items-center gap-2 flex-1 min-w-[140px]">
+              <Label className="text-xs font-medium text-gray-600 whitespace-nowrap">Hasta</Label>
+              <Input
+                type="date"
+                className="h-8 text-sm"
+                value={histFechaHasta}
+                onChange={(e) => setHistFechaHasta(e.target.value)}
+              />
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 text-xs shrink-0"
+              onClick={() => { setHistFechaDesde(''); setHistFechaHasta('') }}
+            >
+              Ver todo
+            </Button>
+          </div>
+
+          {(() => {
+            const filtrado = historial.filter((p) => {
+              const fecha = p.vigente_desde?.slice(0, 10) ?? ''
+              if (histFechaDesde && fecha < histFechaDesde) return false
+              if (histFechaHasta && fecha > histFechaHasta) return false
+              return true
+            })
+            return filtrado.length === 0 ? (
+              <p className="text-sm text-gray-400 py-6 text-center">Sin registros para el período seleccionado.</p>
+            ) : (
+              <div className="overflow-y-auto max-h-[50vh] rounded-lg border border-gray-200">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-gray-50">
+                      <TableHead className="text-xs font-semibold text-gray-600">Lista</TableHead>
+                      <TableHead className="text-xs font-semibold text-gray-600 text-right">Precio</TableHead>
+                      <TableHead className="text-xs font-semibold text-gray-600">Vigente desde</TableHead>
+                      <TableHead className="text-xs font-semibold text-gray-600">Origen</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filtrado.map((p) => (
+                      <TableRow key={p.id} className="hover:bg-gray-50">
+                        <TableCell className="py-2.5">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-gray-800">{p.lista_precio?.nombre}</span>
+                            {p.lista_precio?.tipo === 'calculada' && (
+                              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">calc.</Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-2.5 text-right tabular-nums font-semibold text-gray-900">
+                          {fmt(p.precio)}
+                        </TableCell>
+                        <TableCell className="py-2.5 text-sm text-gray-500">{fmtFecha(p.vigente_desde)}</TableCell>
+                        <TableCell className="py-2.5 text-sm text-gray-500">
+                          {p.origen_tipo === 'remito'
+                            ? 'Remito'
+                            : p.origen_tipo === 'proveedor'
+                              ? (p.proveedor?.nombre ?? 'Proveedor')
+                              : p.origen_tipo === 'sucursal'
+                                ? (p.sucursal?.nombre ?? 'Sucursal')
+                                : 'Manual'}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )
+          })()}
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowHistorial(false)}>Cerrar</Button>

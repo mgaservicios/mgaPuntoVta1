@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, Fragment } from 'react'
 import { toast } from 'sonner'
 import { Plus, Pencil, Check, X, ChevronDown, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -125,8 +125,8 @@ export default function CategoriasPage() {
             ) : categorias.length === 0 ? (
               <TableRow><TableCell colSpan={4} className="text-center py-8 text-gray-400">Sin categorías</TableCell></TableRow>
             ) : categorias.map((c) => (
-              <>
-                <TableRow key={c.id}>
+              <Fragment key={c.id}>
+                <TableRow>
                   <TableCell>
                     {editId === c.id ? (
                       <div className="flex gap-2 items-center">
@@ -168,7 +168,7 @@ export default function CategoriasPage() {
                     <TableCell />
                   </TableRow>
                 ))}
-              </>
+              </Fragment>
             ))}
           </TableBody>
         </Table>

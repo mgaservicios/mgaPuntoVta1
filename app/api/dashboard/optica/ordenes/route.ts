@@ -96,8 +96,8 @@ export async function POST(req: NextRequest) {
   )
   const total = Math.round((subtotal - descuento_monto + recargo_monto) * 100) / 100
 
-  const { count } = await supabase.from('optica_ordenes').select('id', { count: 'exact', head: true })
-  const numero = `OT-${String((count ?? 0) + 1).padStart(5, '0')}`
+  const { data: nextNum } = await supabase.rpc('next_numero_sucursal', { p_sucursal_id: sucursalId, p_tipo: 'optica_orden' })
+  const numero = `OT-${String(sucursalId).padStart(2, '0')}-${String(nextNum).padStart(5, '0')}`
 
   const { data: orden, error: ordenError } = await supabase
     .from('optica_ordenes')

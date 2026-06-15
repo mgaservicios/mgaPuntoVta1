@@ -30,7 +30,10 @@ export async function POST(req: NextRequest) {
     const tenantClient = await getTenantAdminClient(empresa_id)
     const { error: rpcError } = await tenantClient.rpc('reset_tenant_data')
     if (rpcError) {
-      return NextResponse.json({ error: `Error en reset: ${rpcError.message}` }, { status: 500 })
+      const detail = rpcError.message.includes('schema cache')
+        ? `La función reset_tenant_data no existe en la BD del tenant. Aplicar la migración 20260605_reset_tenant_data.sql en el proyecto Supabase de "${empresa.nombre}".`
+        : `Error en reset: ${rpcError.message}`
+      return NextResponse.json({ error: detail }, { status: 500 })
     }
   } catch (err) {
     return NextResponse.json(

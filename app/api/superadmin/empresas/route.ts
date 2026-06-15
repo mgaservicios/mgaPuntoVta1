@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await supabaseMaster
     .from('empresas')
-    .select('id, nombre, codigo, activo')
+    .select('id, nombre, codigo, activo, estado_implementacion')
     .order('nombre')
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

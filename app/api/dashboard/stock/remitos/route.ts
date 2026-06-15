@@ -82,8 +82,9 @@ export async function POST(req: NextRequest) {
   }
 
   const prefix = tipo === 'entrada' ? 'E' : 'S'
-  const { count } = await supabase.from('remitos').select('id', { count: 'exact', head: true })
-  const numero = `${prefix}-${String((count ?? 0) + 1).padStart(5, '0')}`
+  const tipoRemito = tipo === 'entrada' ? 'remito_entrada' : 'remito_salida'
+  const { data: nextNum } = await supabase.rpc('next_numero_sucursal', { p_sucursal_id: sucursalId, p_tipo: tipoRemito })
+  const numero = `${prefix}-${String(sucursalId).padStart(2, '0')}-${String(nextNum).padStart(5, '0')}`
 
   const { data: remito, error: errRemito } = await supabase
     .from('remitos')

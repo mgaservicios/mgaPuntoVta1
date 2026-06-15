@@ -20,11 +20,17 @@ function buildVigenteMap(rows: Precio[]): Map<number, Precio> {
   return m
 }
 
+/** Fin del día actual en UTC, para incluir registros con timestamp al guardar */
+function endOfDayUtc(): string {
+  return new Date().toISOString().slice(0, 10) + 'T23:59:59'
+}
+
 /**
  * Inserta una nueva entrada de precio para un artículo/variante en una lista manual.
  * - Si variante_id es null y el artículo tiene variantes, actualiza el caché de precio
  *   en TODAS las variantes que no tengan su propio precio para esa lista.
  * - Si variante_id está dado, actualiza sólo el caché de esa variante.
+ * - Si lista 1 (compra) y lista 2 (venta) es calculada, actualiza también precio_venta.
  */
 export async function registrarPrecio(
   params: {
@@ -59,16 +65,30 @@ export async function registrarPrecio(
   const esCompra = params.lista_precio_id === 1
   if (!esVenta && !esCompra) return null
 
+  // Solo actualizar el caché si el precio ya está vigente (vigente_desde <= hoy)
+  const today = new Date().toISOString().slice(0, 10)
+  const fechaVigencia = (params.vigente_desde ?? '').slice(0, 10) || today
+  if (fechaVigencia > today) return null
+
   const campo = esVenta ? 'precio_venta' : 'precio_compra'
 
   if (params.variante_id) {
-    // Precio diferencial de variante: actualizar solo esa variante
     await supabase
       .from('articulo_variantes')
       .update({ [campo]: params.precio })
       .eq('id', params.variante_id)
+
+    // Si se actualizó compra y lista 2 es calculada, actualizar precio_venta de la variante
+    if (esCompra) {
+      const precioVenta = await getPrecioVentaCalculado(params.precio, supabase)
+      if (precioVenta != null) {
+        await supabase
+          .from('articulo_variantes')
+          .update({ precio_venta: precioVenta })
+          .eq('id', params.variante_id)
+      }
+    }
   } else {
-    // Precio base del artículo: actualizar articulos + todas las variantes sin precio propio
     await supabase
       .from('articulos')
       .update({ [campo]: params.precio })
@@ -101,9 +121,57 @@ export async function registrarPrecio(
         .update({ [campo]: params.precio })
         .in('id', sinPrecioPropio)
     }
+
+    // Si se actualizó compra y lista 2 es calculada, actualizar precio_venta del artículo y variantes
+    if (esCompra) {
+      const precioVenta = await getPrecioVentaCalculado(params.precio, supabase)
+      if (precioVenta != null) {
+        await supabase
+          .from('articulos')
+          .update({ precio_venta: precioVenta })
+          .eq('id', params.articulo_id)
+
+        // Solo variantes sin precio propio de venta (lista 2)
+        const { data: variantesConVenta } = await supabase
+          .from('precios')
+          .select('variante_id')
+          .eq('articulo_id', params.articulo_id)
+          .eq('lista_precio_id', 2)
+          .not('variante_id', 'is', null)
+
+        const idsConVenta = new Set(
+          (variantesConVenta ?? []).map((r: { variante_id: number }) => r.variante_id)
+        )
+        const sinVentaPropia = sinPrecioPropio.filter(id => !idsConVenta.has(id))
+        if (sinVentaPropia.length > 0) {
+          await supabase
+            .from('articulo_variantes')
+            .update({ precio_venta: precioVenta })
+            .in('id', sinVentaPropia)
+        }
+      }
+    }
   }
 
   return null
+}
+
+/** Devuelve el precio de venta calculado si lista 2 es una lista calculada basada en lista 1. */
+async function getPrecioVentaCalculado(
+  precioCompra: number,
+  supabase: SupabaseClient,
+): Promise<number | null> {
+  const { data: listaVenta } = await supabase
+    .from('listas_precio')
+    .select('porcentaje')
+    .eq('id', 2)
+    .eq('tipo', 'calculada')
+    .eq('lista_base_id', 1)
+    .eq('activo', true)
+    .single()
+
+  if (!listaVenta) return null
+  return calcularPrecioLista(precioCompra, Number(listaVenta.porcentaje))
 }
 
 /**
@@ -126,11 +194,14 @@ export async function getPreciosVigentes(
 
   if (!listas?.length) return []
 
+  const endOfDay = endOfDayUtc()
+
   // Precios específicos de la variante (o del artículo si variante_id=null)
   let q = supabase
     .from('precios')
     .select(PRECIOS_SELECT)
     .eq('articulo_id', articulo_id)
+    .lte('vigente_desde', endOfDay)
     .order('vigente_desde', { ascending: false })
 
   q = variante_id ? q.eq('variante_id', variante_id) : q.is('variante_id', null)
@@ -145,6 +216,7 @@ export async function getPreciosVigentes(
       .select(PRECIOS_SELECT)
       .eq('articulo_id', articulo_id)
       .is('variante_id', null)
+      .lte('vigente_desde', endOfDay)
       .order('vigente_desde', { ascending: false })
     baseMap = buildVigenteMap((historialBase ?? []) as Precio[])
   }
@@ -171,24 +243,30 @@ export async function getPreciosVigentes(
         })
       }
     } else if (lista.tipo === 'calculada' && lista.lista_base_id && lista.porcentaje != null) {
-      // Si hay un precio guardado directamente en esta lista calculada, tiene prioridad (override manual)
+      // Precio de la lista base (para derivación dinámica)
+      const propioBase   = propioMap.get(lista.lista_base_id)
+      const heredadoBase = baseMap.get(lista.lista_base_id)
+      const fuenteBase   = propioBase ?? heredadoBase
+      const baseDate     = fuenteBase?.vigente_desde?.slice(0, 10) ?? ''
+
+      // Override guardado directamente en esta lista calculada
       const propioOverride = propioMap.get(lista.id)
       const baseOverride   = baseMap.get(lista.id)
-      if (propioOverride || baseOverride) {
-        const src = propioOverride ?? baseOverride!
+      const overrideSrc    = propioOverride ?? baseOverride
+      const overrideDate   = overrideSrc?.vigente_desde?.slice(0, 10) ?? ''
+
+      // El override tiene prioridad SOLO si es más reciente o igual al precio base
+      if (overrideSrc && overrideDate >= baseDate) {
         result.push({
-          ...src,
+          ...overrideSrc,
           variante_id: propioOverride ? variante_id : null,
           lista_precio: { id: lista.id, nombre: lista.nombre, tipo: lista.tipo, categoria: lista.categoria },
-          precio_calculado: src.precio,
+          precio_calculado: overrideSrc.precio,
           heredado: !propioOverride && !!baseOverride && !!variante_id,
         })
       } else {
-        // Derivar del precio de la lista base
-        const propioBase   = propioMap.get(lista.lista_base_id)
-        const heredadoBase = baseMap.get(lista.lista_base_id)
-        const fuenteBase   = propioBase ?? heredadoBase
-        const precioBase   = fuenteBase?.precio ?? 0
+        // Derivar dinámicamente del precio base
+        const precioBase = fuenteBase?.precio ?? 0
         const precioCalculado = precioBase > 0
           ? calcularPrecioLista(precioBase, Number(lista.porcentaje))
           : 0

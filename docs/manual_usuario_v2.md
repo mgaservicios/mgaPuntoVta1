@@ -220,9 +220,43 @@ ABM de proveedores del negocio.
 
 ---
 
-### 4.5 Importador Óptica
+### 4.5 Importar Stock
 
-Herramienta para importar datos desde archivos CSV. Ideal para carga inicial o migraciones.
+Herramienta para cargar cantidades de stock de forma masiva desde un archivo Excel o CSV. Ideal para carga inicial de inventario o para registrar ingresos masivos de mercadería.
+
+**Acceso:** Inventario → Importar stock
+
+**Formatos soportados:** Excel (`.xlsx`, `.xls`) y CSV (`.csv`) con separadores `,` `;` `|` o tabulación.
+
+**Columnas del archivo:**
+
+| Columna | Descripción |
+|---|---|
+| `codigo` | Código del artículo existente en el sistema *(obligatorio)* |
+| `stock` | Cantidad a ingresar *(obligatorio, mayor a 0)* |
+
+Las columnas no distinguen mayúsculas ni acentos. También se reconocen nombres alternativos como `cod`, `codart`, `cantidad`, `qty`, `cant`.
+
+**Proceso de importación:**
+
+1. Arrastrá el archivo al área marcada o hacé clic para seleccionarlo.
+2. El sistema muestra una **vista previa** con las primeras 8 filas válidas e informa cuántas fueron descartadas (por código vacío o stock inválido).
+3. Hacé clic en **Importar N artículos**.
+4. El sistema:
+   - Busca cada artículo por su código en la base de datos.
+   - Genera **remitos de entrada** automáticos (hasta 50 ítems por remito), confirmados al instante.
+   - Suma el stock al `articulo_stock` de la **sucursal activa**.
+   - Sincroniza el stock total en `articulos.stock_actual` considerando todas las sucursales.
+   - Usa el proveedor **"Stock Inicial"** como contraparte (lo crea automáticamente si no existe).
+5. Al finalizar, muestra la cantidad de artículos importados, los remitos generados y los errores por código no encontrado.
+
+> Los remitos generados quedan visibles en **Inventario → Remitos** con estado *Confirmado* y numeración `E-NNNNN`.
+
+---
+
+### 4.6 Importador Óptica
+
+Herramienta para importar datos desde archivos CSV. Ideal para carga inicial o migraciones en negocios de óptica.
 
 **Tres pestañas:**
 

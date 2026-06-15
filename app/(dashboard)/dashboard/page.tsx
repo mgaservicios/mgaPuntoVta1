@@ -139,10 +139,10 @@ export default async function DashboardPage() {
   const hasAnyPerm = (prefix: string) =>
     !permMap || Object.entries(permMap).some(([k, v]) => k.startsWith(prefix + '.') && v === true)
 
-  const showVentas      = hasAnyPerm('ventas')
-  const showTrabajos    = hasAnyPerm('optica')
-  const showStockBajo   = hasAnyPerm('inventario')
-  const showCaja        = hasAnyPerm('fondos')
+  const showVentas      = modules.includes('ventas')     && hasAnyPerm('ventas')
+  const showTrabajos    = modules.includes('optica')     && hasAnyPerm('optica')
+  const showStockBajo   = modules.includes('inventario') && hasAnyPerm('inventario')
+  const showCaja        = modules.includes('fondos')     && hasAnyPerm('fondos')
   const showSaldoCobrar = showVentas || showTrabajos || showCaja
 
   const anyCard = showVentas || showTrabajos || showStockBajo || showCaja || showSaldoCobrar
@@ -153,7 +153,7 @@ export default async function DashboardPage() {
         Bienvenido, {session?.user.name || 'Usuario'}
       </h2>
       <p className="text-sm text-gray-500 mb-8">
-        Panel de control — MGA Pto. Venta
+        Panel Control — {session?.user.empresa_nombre || 'MGA Pto. Venta'}
       </p>
 
       {anyCard && (

@@ -33,14 +33,14 @@ export async function GET(req: NextRequest) {
   if (!articulos?.length) return NextResponse.json([])
 
   const articuloIds = articulos.map((a) => a.id)
-  const today = new Date().toISOString().slice(0, 10)
+  const endOfDay = new Date().toISOString().slice(0, 10) + 'T23:59:59'
 
   const { data: preciosData, error: precError } = await supabase
     .from('precios')
     .select('articulo_id, variante_id, precio')
     .eq('lista_precio_id', Number(lista_precio_id))
     .in('articulo_id', articuloIds)
-    .lte('vigente_desde', today)
+    .lte('vigente_desde', endOfDay)
     .order('vigente_desde', { ascending: false })
 
   if (precError) return NextResponse.json({ error: precError.message }, { status: 500 })
@@ -116,7 +116,14 @@ export async function POST(req: NextRequest) {
   if (lista?.tipo !== 'manual')
     return NextResponse.json({ error: 'Solo se pueden actualizar listas manuales' }, { status: 400 })
 
-  const fecha = vigente_desde || new Date().toISOString().slice(0, 10)
+  // Si la fecha elegida es hoy (hora BA), usar timestamp actual para que
+  // el precio masivo sea más reciente que cualquier precio guardado antes hoy.
+  const now = new Date()
+  const bsasHoy = new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+  }).format(now)
+  const fechaInput = vigente_desde || bsasHoy
+  const fecha = fechaInput === bsasHoy ? now.toISOString() : fechaInput
 
   // Crear registro del lote antes de insertar precios
   const { data: lote, error: loteError } = await supabase
@@ -151,6 +158,27 @@ export async function POST(req: NextRequest) {
     // Limpiar el lote si falló la inserción de precios
     await supabase.from('precio_lotes').delete().eq('id', (lote as unknown as { id: string }).id)
     return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  // Actualizar caché en articulos/variantes solo si el precio ya es vigente (hoy)
+  const bsasHoyCheck = new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+  }).format(now)
+  const esPrecioVigente = fechaInput === bsasHoyCheck
+
+  if (esPrecioVigente && (lista_precio_id === 1 || lista_precio_id === 2)) {
+    const campo = lista_precio_id === 2 ? 'precio_venta' : 'precio_compra'
+    const simpleItems = items.filter(i => i.variante_id === null)
+    const varianteItems = items.filter(i => i.variante_id !== null)
+
+    await Promise.all([
+      ...simpleItems.map(item =>
+        supabase.from('articulos').update({ [campo]: item.precio_nuevo }).eq('id', item.articulo_id)
+      ),
+      ...varianteItems.map(item =>
+        supabase.from('articulo_variantes').update({ [campo]: item.precio_nuevo }).eq('id', item.variante_id!)
+      ),
+    ])
   }
 
   return NextResponse.json({ updated: rows.length, lote_id: (lote as unknown as { id: string }).id })

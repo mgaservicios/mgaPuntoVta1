@@ -61,40 +61,52 @@ export async function GET(req: NextRequest) {
     if (articles.length > 0) {
       const articuloIds = articles.map(a => a.id)
 
+      const endOfDay = new Date().toISOString().slice(0, 10) + 'T23:59:59'
+
       const [lista2Res, preciosRes] = await Promise.all([
         supabase.from('listas_precio').select('tipo, porcentaje').eq('id', 2).single(),
         supabase.from('precios')
-          .select('articulo_id, lista_precio_id, precio')
+          .select('articulo_id, lista_precio_id, precio, vigente_desde')
           .in('articulo_id', articuloIds)
           .in('lista_precio_id', [1, 2])
           .is('variante_id', null)
+          .lte('vigente_desde', endOfDay)
           .order('vigente_desde', { ascending: false }),
       ])
 
       const lista2Tipo = lista2Res.data?.tipo ?? 'calculada'
       const lista2Pct  = Number(lista2Res.data?.porcentaje ?? 0)
 
-      type PR = { articulo_id: number; lista_precio_id: number; precio: number }
-      const latestL1: Record<number, number> = {}
-      const latestL2: Record<number, number> = {}
+      type PR = { articulo_id: number; lista_precio_id: number; precio: number; vigente_desde: string }
+      const latestL1: Record<number, { precio: number; fecha: string }> = {}
+      const latestL2: Record<number, { precio: number; fecha: string }> = {}
       const seen1 = new Set<number>(), seen2 = new Set<number>()
 
       for (const p of (preciosRes.data ?? []) as PR[]) {
         if (p.lista_precio_id === 1 && !seen1.has(p.articulo_id)) {
-          latestL1[p.articulo_id] = p.precio; seen1.add(p.articulo_id)
+          latestL1[p.articulo_id] = { precio: p.precio, fecha: p.vigente_desde?.slice(0, 10) ?? '' }
+          seen1.add(p.articulo_id)
         }
         if (p.lista_precio_id === 2 && !seen2.has(p.articulo_id)) {
-          latestL2[p.articulo_id] = p.precio; seen2.add(p.articulo_id)
+          latestL2[p.articulo_id] = { precio: p.precio, fecha: p.vigente_desde?.slice(0, 10) ?? '' }
+          seen2.add(p.articulo_id)
         }
       }
 
       articles = articles.map(a => {
         let pv: number | null = null
-        if (latestL2[a.id] != null) {
-          pv = latestL2[a.id]
-        } else if (lista2Tipo === 'calculada' && lista2Pct > 0 && latestL1[a.id] != null) {
-          pv = latestL1[a.id] * (1 + lista2Pct / 100)
+        const l1 = latestL1[a.id]
+        const l2 = latestL2[a.id]
+
+        // El override de lista 2 solo tiene prioridad si es más reciente que el precio base
+        if (l2 && (!l1 || l2.fecha >= l1.fecha)) {
+          pv = l2.precio
+        } else if (lista2Tipo === 'calculada' && lista2Pct > 0 && l1) {
+          pv = l1.precio * (1 + lista2Pct / 100)
+        } else if (l2) {
+          pv = l2.precio
         }
+
         return {
           ...a,
           precio_venta: pv ?? (a as { precio_venta?: number | null }).precio_venta ?? null,

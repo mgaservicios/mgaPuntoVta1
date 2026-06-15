@@ -88,6 +88,7 @@ const navGroups: NavGroup[] = [
       { label: 'Proveedores',      href: '/dashboard/inventario/proveedores',       Icon: Truck,             permKey: 'inventario.proveedores.ver' },
       { label: 'Ajustes de stock',     href: '/dashboard/inventario/remitos/ajustes',      Icon: SlidersHorizontal, permKey: 'inventario.ajustes.ver' },
       { label: 'Actualizar precios',   href: '/dashboard/inventario/actualizar-precios',  Icon: TrendingUp,        permKey: 'inventario.articulos.ver' },
+      { label: 'Importar stock',       href: '/dashboard/inventario/importar-stock',       Icon: FileUp,            permKey: 'inventario.articulos.crear' },
     ],
   },
   {
@@ -155,6 +156,7 @@ const navGroups: NavGroup[] = [
     id: 'admin',
     label: 'Administración',
     Icon: Settings,
+    module: 'administracion',
     items: [
       { label: 'Sucursales',      href: '/dashboard/admin/sucursales',   Icon: Building2, permKey: 'admin.sucursales.ver' },
       { label: 'Usuarios',        href: '/dashboard/admin/usuarios',     Icon: Settings,  permKey: 'admin.usuarios.ver' },

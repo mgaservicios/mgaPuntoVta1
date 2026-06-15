@@ -15,6 +15,9 @@ export async function GET(req: NextRequest) {
   const q = searchParams.get('q')
   const soloActivos = searchParams.get('activo') !== 'false'
   const conStock = searchParams.get('con_stock') === 'true'
+  const filtroProveedorId = searchParams.get('proveedor_id')
+  const filtroMarcaId = searchParams.get('marca_id')
+  const filtroCategoriaId = searchParams.get('categoria_id')
 
   const VARIANTES_SELECT = 'id, sku, precio_venta, stock_actual, activo, articulo_id, variante_atributos(valor, atributo_tipos(nombre))'
 
@@ -110,13 +113,14 @@ export async function GET(req: NextRequest) {
     if (rows.length === 0) return rows
 
     const articuloIds = rows.map(a => a.id)
+    const endOfDay = new Date().toISOString().slice(0, 10) + 'T23:59:59'
 
     const [listasRes, preciosBaseRes, preciosVarianteRes] = await Promise.all([
       supabase.from('listas_precio').select('id, nombre, tipo, categoria, lista_base_id, porcentaje').eq('activo', true).order('id'),
       supabase.from('precios').select('articulo_id, lista_precio_id, precio, vigente_desde')
-        .in('articulo_id', articuloIds).is('variante_id', null).order('vigente_desde', { ascending: false }),
+        .in('articulo_id', articuloIds).is('variante_id', null).lte('vigente_desde', endOfDay).order('vigente_desde', { ascending: false }),
       supabase.from('precios').select('variante_id, lista_precio_id, precio, vigente_desde')
-        .in('articulo_id', articuloIds).not('variante_id', 'is', null).order('vigente_desde', { ascending: false }),
+        .in('articulo_id', articuloIds).not('variante_id', 'is', null).lte('vigente_desde', endOfDay).order('vigente_desde', { ascending: false }),
     ])
 
     const listas = listasRes.data ?? []
@@ -145,22 +149,28 @@ export async function GET(req: NextRequest) {
           const heredado = varianteId ? (!propio && !!base) : false
           return { lista_id: lista.id, lista_nombre: lista.nombre, tipo: lista.tipo, categoria: lista.categoria, precio: fuente?.precio ?? null, vigente_desde: fuente?.vigente_desde ?? null, heredado }
         } else {
-          // Si hay precio guardado directamente en esta lista calculada, tiene prioridad (override manual)
-          const overridePropio = varianteId ? ultimosVariante.get(`${varianteId}-${lista.id}`) : null
-          const overrideBase   = ultimosBase.get(`${articuloId}-${lista.id}`)
-          if (overridePropio ?? overrideBase) {
-            const src = overridePropio ?? overrideBase!
-            const heredado = varianteId ? (!overridePropio && !!overrideBase) : false
-            return { lista_id: lista.id, lista_nombre: lista.nombre, tipo: lista.tipo, categoria: lista.categoria, precio: src.precio, vigente_desde: src.vigente_desde, heredado }
-          }
-          // Derivar del precio de la lista base
+          // Precio base de la lista calculada
           const bid = lista.lista_base_id
           const propioBase = (varianteId && bid) ? ultimosVariante.get(`${varianteId}-${bid}`) : null
           const baseA      = bid ? ultimosBase.get(`${articuloId}-${bid}`) : null
-          const fuente     = propioBase ?? baseA
-          const precio = fuente && lista.porcentaje != null ? fuente.precio * (1 + Number(lista.porcentaje) / 100) : null
+          const fuenteBase = propioBase ?? baseA
+          const baseDate   = fuenteBase?.vigente_desde?.slice(0, 10) ?? ''
+
+          // Override guardado directamente en esta lista calculada
+          const overridePropio = varianteId ? ultimosVariante.get(`${varianteId}-${lista.id}`) : null
+          const overrideBase   = ultimosBase.get(`${articuloId}-${lista.id}`)
+          const overrideSrc    = overridePropio ?? overrideBase
+          const overrideDate   = overrideSrc?.vigente_desde?.slice(0, 10) ?? ''
+
+          // El override tiene prioridad SOLO si es más reciente que el precio base
+          if (overrideSrc && overrideDate >= baseDate) {
+            const heredado = varianteId ? (!overridePropio && !!overrideBase) : false
+            return { lista_id: lista.id, lista_nombre: lista.nombre, tipo: lista.tipo, categoria: lista.categoria, precio: overrideSrc.precio, vigente_desde: overrideSrc.vigente_desde, heredado }
+          }
+          // Derivar dinámicamente del precio base
+          const precio = fuenteBase && lista.porcentaje != null ? fuenteBase.precio * (1 + Number(lista.porcentaje) / 100) : null
           const heredado = varianteId ? (!propioBase && !!baseA) : false
-          return { lista_id: lista.id, lista_nombre: lista.nombre, tipo: lista.tipo, categoria: lista.categoria, precio, vigente_desde: fuente?.vigente_desde ?? null, heredado }
+          return { lista_id: lista.id, lista_nombre: lista.nombre, tipo: lista.tipo, categoria: lista.categoria, precio, vigente_desde: fuenteBase?.vigente_desde ?? null, heredado }
         }
       })
     }
@@ -181,7 +191,7 @@ export async function GET(req: NextRequest) {
   if (q?.trim()) {
     const term = q.trim()
     const SELECT_Q = `id, codigo, nombre, tipo_articulo, precio_venta, stock_actual, activo, imagen_url,
-      categorias(id, nombre), subcategorias(id, nombre), marcas(id, nombre),
+      categorias(id, nombre), subcategorias(id, nombre), marcas(id, nombre), proveedores(id, nombre),
       articulo_variantes(${VARIANTES_SELECT})`
 
     // 1. Exacto en codigo o codigo_barras
@@ -192,6 +202,9 @@ export async function GET(req: NextRequest) {
       .order('nombre')
       .limit(50)
     if (soloActivos) byCodeQ = byCodeQ.eq('activo', true)
+    if (filtroProveedorId) byCodeQ = byCodeQ.eq('proveedor_id', filtroProveedorId)
+    if (filtroMarcaId)     byCodeQ = byCodeQ.eq('marca_id', filtroMarcaId)
+    if (filtroCategoriaId) byCodeQ = byCodeQ.eq('categoria_id', filtroCategoriaId)
 
     const { data: byCode, error: errCode } = await byCodeQ
     if (errCode) return NextResponse.json({ error: errCode.message }, { status: 500 })
@@ -207,6 +220,9 @@ export async function GET(req: NextRequest) {
         .order('nombre')
         .limit(50)
       if (soloActivos) byPartialQ = byPartialQ.eq('activo', true)
+      if (filtroProveedorId) byPartialQ = byPartialQ.eq('proveedor_id', filtroProveedorId)
+      if (filtroMarcaId)     byPartialQ = byPartialQ.eq('marca_id', filtroMarcaId)
+      if (filtroCategoriaId) byPartialQ = byPartialQ.eq('categoria_id', filtroCategoriaId)
 
       const { data: byPartial, error: errPartial } = await byPartialQ
       if (errPartial) return NextResponse.json({ error: errPartial.message }, { status: 500 })
@@ -216,11 +232,14 @@ export async function GET(req: NextRequest) {
     let query = supabase
       .from('articulos')
       .select(`id, codigo, nombre, tipo_articulo, precio_venta, stock_actual, activo,
-        categorias(id, nombre), subcategorias(id, nombre), marcas(id, nombre),
+        categorias(id, nombre), subcategorias(id, nombre), marcas(id, nombre), proveedores(id, nombre),
         articulo_variantes(${VARIANTES_SELECT})`)
       .order('nombre')
 
     if (soloActivos) query = query.eq('activo', true)
+    if (filtroProveedorId) query = query.eq('proveedor_id', filtroProveedorId)
+    if (filtroMarcaId)     query = query.eq('marca_id', filtroMarcaId)
+    if (filtroCategoriaId) query = query.eq('categoria_id', filtroCategoriaId)
 
     if (conStock) {
       const { data: stockIds } = await supabase

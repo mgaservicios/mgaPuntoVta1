@@ -118,9 +118,9 @@ export async function POST(req: NextRequest) {
   if (Math.round(totalPagado * 100) < Math.round(total * 100))
     return NextResponse.json({ error: 'El total pagado es menor al total de la venta' }, { status: 400 })
 
-  // Número de venta
-  const { count } = await supabase.from('ventas').select('id', { count: 'exact', head: true })
-  const numero = `V-${String((count ?? 0) + 1).padStart(5, '0')}`
+  // Número de venta por sucursal
+  const { data: nextNum } = await supabase.rpc('next_numero_sucursal', { p_sucursal_id: sucursalId, p_tipo: 'venta' })
+  const numero = `V-${String(sucursalId).padStart(2, '0')}-${String(nextNum).padStart(5, '0')}`
 
   // Nombres de artículos y variantes (snapshot)
   const articuloIds = [...new Set(items.map(i => i.articulo_id))]

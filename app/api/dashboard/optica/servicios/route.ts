@@ -88,11 +88,8 @@ export async function POST(req: NextRequest) {
   )
   const total = Math.round((subtotal - descuento_monto + recargo_monto) * 100) / 100
 
-  // Generar número correlativo
-  const { count } = await supabase
-    .from('optica_servicios')
-    .select('id', { count: 'exact', head: true })
-  const numero = `SV-${String((count ?? 0) + 1).padStart(5, '0')}`
+  const { data: nextNum } = await supabase.rpc('next_numero_sucursal', { p_sucursal_id: sucursalId, p_tipo: 'optica_servicio' })
+  const numero = `SV-${String(sucursalId).padStart(2, '0')}-${String(nextNum).padStart(5, '0')}`
 
   const { data: servicio, error: servicioError } = await supabase
     .from('optica_servicios')
