@@ -39,9 +39,21 @@ import {
   UserCheck,
   CreditCard,
   TrendingUp,
+  Download,
+  Loader2,
   type LucideIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog'
 
 interface SidebarProps {
   userName: string
@@ -170,6 +182,34 @@ const navGroups: NavGroup[] = [
 
 export default function Sidebar({ userName, userRole, userModules, userPermissions, logoUrl, color }: SidebarProps) {
   const pathname = usePathname()
+  const [backupConfirmOpen, setBackupConfirmOpen] = useState(false)
+  const [backupInProgress, setBackupInProgress] = useState(false)
+
+  async function handleBackupConfirm() {
+    setBackupConfirmOpen(false)
+    setBackupInProgress(true)
+    try {
+      const res = await fetch('/api/dashboard/backup')
+      if (!res.ok) {
+        toast.error('Error al generar el backup')
+        return
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `backup-${new Date().toISOString().slice(0, 10)}.xlsx`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      toast.success('Backup descargado correctamente')
+    } catch {
+      toast.error('Error al generar el backup')
+    } finally {
+      setBackupInProgress(false)
+    }
+  }
 
   // null = admin (all visible), Record = filter by can_view
   function canView(permKey?: string): boolean {
@@ -232,7 +272,7 @@ export default function Sidebar({ userName, userRole, userModules, userPermissio
       style={{ backgroundColor: color || '#0D1525' }}
     >
       {/* Logo */}
-      <div className="px-5 py-5 border-b border-white/10 flex items-center justify-center">
+      <div className="px-5 py-5 border-b border-white/10 flex flex-col items-center gap-3">
         {logoUrl ? (
           <div className="w-24 h-24 rounded-full bg-white shadow-sm flex items-center justify-center overflow-hidden p-2">
             <img src={logoUrl} alt="Logo" className="max-h-full max-w-full object-contain" />
@@ -246,6 +286,16 @@ export default function Sidebar({ userName, userRole, userModules, userPermissio
             className="object-contain"
             priority
           />
+        )}
+        {userRole === 'Administrador' && (
+          <button
+            onClick={() => setBackupConfirmOpen(true)}
+            disabled={backupInProgress}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white/70 border border-white/15 hover:bg-white/10 hover:text-white hover:border-white/25 transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-full justify-center"
+          >
+            <Download className="w-4 h-4 flex-shrink-0" />
+            Descargar backup
+          </button>
         )}
       </div>
 
@@ -333,6 +383,72 @@ export default function Sidebar({ userName, userRole, userModules, userPermissio
           })}
         </div>
       </nav>
+
+      {/* Dialog de confirmación */}
+      <Dialog open={backupConfirmOpen} onOpenChange={setBackupConfirmOpen}>
+        <DialogContent showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>Backup completo del sistema</DialogTitle>
+            <DialogDescription>
+              Se va a exportar toda la base de datos a un archivo Excel con una hoja por cada tabla.
+              Este proceso puede demorar unos segundos dependiendo de la cantidad de datos.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBackupConfirmOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleBackupConfirm}>
+              <Download className="w-4 h-4" />
+              Descargar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de progreso — bloquea toda la pantalla, no se puede cerrar */}
+      <Dialog open={backupInProgress} onOpenChange={() => {}}>
+        <DialogContent showCloseButton={false} className="max-w-sm text-center">
+          <style>{`
+            @keyframes bar-slide {
+              0%   { transform: translateX(-100%); }
+              60%  { transform: translateX(250%); }
+              100% { transform: translateX(250%); }
+            }
+          `}</style>
+
+          <div className="flex flex-col items-center gap-5 py-2">
+            {/* Spinner */}
+            <div className="w-16 h-16 rounded-full border-4 border-blue-100 flex items-center justify-center">
+              <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+            </div>
+
+            {/* Texto principal */}
+            <div className="space-y-1">
+              <p className="font-semibold text-gray-800">Generando backup…</p>
+              <p className="text-sm text-gray-500">Exportando todos los datos del sistema</p>
+            </div>
+
+            {/* Barra de progreso indeterminada */}
+            <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+              <div
+                className="h-full w-2/5 bg-blue-600 rounded-full"
+                style={{ animation: 'bar-slide 1.6s ease-in-out infinite' }}
+              />
+            </div>
+
+            {/* Aviso bloqueante */}
+            <div className="bg-amber-50 border border-amber-300 rounded-lg px-4 py-3 space-y-1 w-full">
+              <p className="font-bold text-amber-800 text-sm tracking-wide">
+                ⚠ NO CERRAR VENTANA
+              </p>
+              <p className="text-xs text-amber-700 leading-snug">
+                AGUARDE A QUE SE TERMINE EL BACKUP PARA CERRAR. GRACIAS!
+              </p>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Usuario */}
       <div className="px-3 py-4 border-t border-white/10">
