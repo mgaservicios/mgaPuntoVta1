@@ -35,7 +35,7 @@ const articuloSchema = z.object({
   codigo:        z.string().min(1, 'El código es obligatorio'),
   descripcion:   z.string().optional(),
   tipo_articulo: z.enum(['simple', 'con_variantes']),
-  categoria_id:     z.string().min(1, 'La categoría es obligatoria'),
+  categoria_id:     z.string().optional(),
   subcategoria_id:  z.string().optional(),
   marca_id:         z.string().optional(),
   proveedor_id:  z.string().optional(),
@@ -554,7 +554,7 @@ export default function ArticuloFormPage({ params }: { params: Promise<{ id: str
                     value={watch('categoria_id') || ''}
                     onValueChange={(v) => { setValue('categoria_id', v ?? '', { shouldValidate: true }); setValue('subcategoria_id', '') }}
                   >
-                    <SelectTrigger className={`flex-1 min-w-0 ${errors.categoria_id ? 'border-red-500' : ''}`}>
+                    <SelectTrigger className="flex-1 min-w-0">
                       <SelectValue placeholder="Seleccioná…">{categorias.find(c => String(c.id) === watch('categoria_id'))?.nombre}</SelectValue>
                     </SelectTrigger>
                     <SelectContent>{categorias.map((c) => <SelectItem key={c.id} value={String(c.id)}>{c.nombre}</SelectItem>)}</SelectContent>
