@@ -84,7 +84,7 @@ export async function GET() {
     XLSX.utils.book_append_sheet(wb, ws, name)
   })
 
-  const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer
+  const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' }) as Uint8Array
   const date = new Date().toISOString().slice(0, 10)
 
   return new Response(buf, {

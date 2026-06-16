@@ -672,6 +672,26 @@ export const AYUDA_MODULOS: AyudaModulo[] = [
           'Los cambios en parámetros afectan a todas las sucursales salvo que se indique lo contrario.',
         ],
       },
+      {
+        id: 'admin-backup',
+        nombre: 'Backup del sistema',
+        descripcion: 'Exporta toda la información de la base de datos a un archivo Excel (.xlsx) con una hoja por tabla. Permite guardar una copia de seguridad fuera del servidor. Solo disponible para el rol Administrador.',
+        pasos: [
+          'Hacer clic en el botón "Descargar backup" ubicado debajo del logo en el menú lateral izquierdo.',
+          'Leer el aviso de confirmación: se exportará toda la base de datos a un archivo Excel.',
+          'Presionar "Descargar" para confirmar.',
+          'Aguardar sin cerrar la ventana ni el navegador. Un diálogo bloqueante muestra el progreso.',
+          'Al finalizar, el archivo backup-YYYY-MM-DD.xlsx se descarga automáticamente.',
+          'Guardar el archivo en un lugar seguro fuera del servidor (disco externo, pendrive, nube, etc.).',
+        ],
+        tips: [
+          'El archivo contiene una hoja por tabla: artículos, variantes, ventas, stock, cobranzas, caja, óptica, configuración, usuarios y más.',
+          'NO cerrar la ventana ni el navegador durante la generación. El sistema lo advierte en pantalla.',
+          'Se recomienda hacer un backup periódico como medida preventiva ante pérdida de datos.',
+          'Los backups deben almacenarse fuera del servidor (pendrive, disco externo o servicio en la nube).',
+          'El archivo es de solo lectura: no puede reimportarse automáticamente al sistema.',
+        ],
+      },
     ],
   },
 ]
