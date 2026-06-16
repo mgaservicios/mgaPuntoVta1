@@ -427,7 +427,7 @@ export default function PreciosPanel({ articuloId, varianteId, tieneVariantes }:
 
       {/* ── Dialog: Historial de precios ── */}
       <Dialog open={showHistorial} onOpenChange={setShowHistorial}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="sm:max-w-[615px]">
           <DialogHeader>
             <DialogTitle>Historial de precios</DialogTitle>
           </DialogHeader>

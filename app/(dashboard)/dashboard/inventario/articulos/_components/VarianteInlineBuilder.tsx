@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Plus, X, ChevronDown, BookmarkPlus } from 'lucide-react'
+import { Plus, X, ChevronDown } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -36,7 +36,6 @@ function AtributoCombobox({ value, tipoId, onChange, onValorCreado, options, pla
   }, [])
 
   const filtered = options.filter(o => o.toLowerCase().includes(query.toLowerCase()))
-  const esNuevo = query.trim() !== '' && !options.some(o => o.toLowerCase() === query.trim().toLowerCase())
 
   function select(v: string) {
     onChange(v)
@@ -44,26 +43,29 @@ function AtributoCombobox({ value, tipoId, onChange, onValorCreado, options, pla
     setOpen(false)
   }
 
-  function handleBlur() {
-    onChange(query)
+  async function handleBlur() {
+    const trimmed = query.trim()
+    onChange(trimmed)
+    const isNew = trimmed !== '' && !options.some(o => o.toLowerCase() === trimmed.toLowerCase())
+    if (isNew) await guardarEnLista(trimmed)
     setTimeout(() => setOpen(false), 150)
   }
 
-  async function guardarEnLista() {
-    if (!query.trim()) return
+  async function guardarEnLista(val?: string) {
+    const texto = (val ?? query).trim()
+    if (!texto) return
     setSaving(true)
     const res = await fetch('/api/dashboard/atributo-valores', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ atributo_tipo_id: tipoId, valor: query.trim() }),
+      body: JSON.stringify({ atributo_tipo_id: tipoId, valor: texto }),
     })
     if (res.ok) {
       const created: AtributoValor = await res.json()
       onValorCreado?.(created)
-      toast.success(`"${created.valor}" guardado en la lista`)
     } else {
       const err = await res.json()
-      toast.error(err.error ?? 'Error al guardar')
+      toast.error(err.error ?? 'Error al guardar valor')
     }
     setSaving(false)
   }
@@ -102,18 +104,8 @@ function AtributoCombobox({ value, tipoId, onChange, onValorCreado, options, pla
           ))}
         </div>
       )}
-      {/* Botón guardar en lista — solo cuando el valor es nuevo */}
-      {esNuevo && !open && (
-        <button
-          type="button"
-          onMouseDown={e => e.preventDefault()}
-          onClick={guardarEnLista}
-          disabled={saving}
-          title="Guardar en lista de valores"
-          className="absolute right-8 top-1/2 -translate-y-1/2 text-indigo-400 hover:text-indigo-600 disabled:opacity-40 transition-colors"
-        >
-          <BookmarkPlus className="w-3.5 h-3.5" />
-        </button>
+      {saving && (
+        <span className="absolute right-8 top-1/2 -translate-y-1/2 text-[10px] text-indigo-400">guardando…</span>
       )}
     </div>
   )
@@ -292,7 +284,7 @@ export default function VarianteInlineBuilder({
       {variantes.length === 0 && (
         <p className="text-xs text-gray-400">
           Hacé clic en "Agregar variante" para armar combinaciones (ej: Talle M + Color Rojo).
-          Si escribís un valor nuevo, aparece <BookmarkPlus className="inline w-3 h-3 text-indigo-400" /> para guardarlo en la lista.
+          Si escribís un valor nuevo, se guarda automáticamente en la lista.
         </p>
       )}
     </div>

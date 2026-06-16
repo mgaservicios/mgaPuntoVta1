@@ -436,6 +436,7 @@ export default function ArticuloFormPage({ params }: { params: Promise<{ id: str
 
   const tabList = [
     { id: 'basicos', label: 'Datos básicos' },
+    ...(tipoArticulo === 'con_variantes' ? [{ id: 'variantes', label: 'Variantes' }] : []),
     ...(!isNew ? [{ id: 'precios', label: 'Precios' }] : []),
     { id: 'stock', label: 'Stock' },
   ]
@@ -661,86 +662,6 @@ export default function ArticuloFormPage({ params }: { params: Promise<{ id: str
             </div>
           </section>
 
-          {/* Variantes — lista guardada + builder inline */}
-          {tipoArticulo === 'con_variantes' && (
-            <section className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
-              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Variantes</h3>
-
-              {/* Lista de variantes ya guardadas */}
-              {!isNew && (
-                variantes.length === 0 ? (
-                  <p className="text-sm text-gray-400 text-center py-2">Sin variantes guardadas.</p>
-                ) : (
-                  <div className="divide-y divide-gray-100">
-                    {variantes.map((v) => {
-                      const pvs = variantesPrecios[v.id]
-                      const ventaPrecios = pvs?.filter(pv => pv.lista_precio?.categoria === 'venta') ?? []
-                      return (
-                        <div key={v.id} className={`py-3 ${!v.activo ? 'opacity-50' : ''}`}>
-                          <div className="flex items-center gap-3">
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-gray-800 truncate">{labelAtributos(v)}</p>
-                              <p className="text-xs text-gray-400">
-                                {v.sku ? `SKU: ${v.sku}` : 'Sin SKU'}
-                                {v.codigo_barras ? ` · ${v.codigo_barras}` : ''}
-                              </p>
-                            </div>
-                            <p className="text-xs text-gray-400 shrink-0">Stock: {v.stock_actual}</p>
-                            <Badge variant={v.activo ? 'default' : 'secondary'} className="shrink-0">
-                              {v.activo ? 'Activa' : 'Inactiva'}
-                            </Badge>
-                            <div className="flex gap-1 shrink-0">
-                              <Button variant="ghost" size="icon" title="Gestionar precios" onClick={() => setVariantePreciosId(v.id)}>
-                                <Tag className="w-3.5 h-3.5 text-indigo-500" />
-                              </Button>
-                              <Button variant="ghost" size="icon" onClick={() => setVarianteDialog({ open: true, variante: v })}>
-                                <Pencil className="w-4 h-4" />
-                              </Button>
-                              <Button variant="ghost" size="icon" className="text-red-500 hover:text-red-600" onClick={() => handleDeleteVariante(v.id)} disabled={deletingVarianteId === v.id}>
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          </div>
-                          {ventaPrecios.length > 0 && (
-                            <div className="flex gap-4 mt-1.5 flex-wrap">
-                              {ventaPrecios.map(pv => {
-                                const precio = pv.precio_calculado ?? pv.precio
-                                return (
-                                  <span key={pv.lista_precio_id} className="text-xs">
-                                    <span className="text-gray-400">{pv.lista_precio?.nombre}:</span>{' '}
-                                    <span className={precio > 0 ? (pv.heredado ? 'text-gray-500' : 'text-gray-800 font-semibold') : 'text-gray-400'}>
-                                      {formatPrecio(precio > 0 ? precio : null)}
-                                    </span>
-                                    {pv.heredado && <span className="text-gray-400 ml-1 italic">(base)</span>}
-                                  </span>
-                                )
-                              })}
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
-                )
-              )}
-
-              {/* Separador + builder para agregar nuevas */}
-              <div className={!isNew && variantes.length > 0 ? 'pt-3 border-t border-gray-100' : ''}>
-                <p className="text-xs font-medium text-gray-500 mb-2">
-                  {isNew ? 'Cargá las combinaciones antes de guardar:' : 'Agregar más variantes:'}
-                </p>
-                <VarianteInlineBuilder
-                  atributoTipos={atributoTipos}
-                  atributoValores={atributoValores}
-                  articuloCodigo={watch('codigo') ?? ''}
-                  variantes={pendingVariantes}
-                  onChange={setPendingVariantes}
-                  onValorCreado={(v) => setAtributoValores(prev => [...prev, v])}
-                />
-              </div>
-            </section>
-          )}
-
           {/* Precios iniciales — solo en alta de artículos simples */}
           {isNew && tipoArticulo === 'simple' && listasTodas.length > 0 && (
             <section className="bg-white rounded-xl border border-gray-200 p-4 space-y-2.5">
@@ -779,22 +700,104 @@ export default function ArticuloFormPage({ params }: { params: Promise<{ id: str
           )}
         </div>
 
+        {/* ══ Tab: Variantes ══ */}
+        <div className={cn('space-y-3', activeTab !== 'variantes' && 'hidden')}>
+          <section className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Variantes</h3>
+
+            {/* Lista de variantes ya guardadas */}
+            {!isNew && (
+              variantes.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-2">Sin variantes guardadas.</p>
+              ) : (
+                <div className="divide-y divide-gray-100">
+                  {variantes.map((v) => {
+                    const pvs = variantesPrecios[v.id]
+                    const ventaPrecios = pvs?.filter(pv => pv.lista_precio?.categoria === 'venta') ?? []
+                    return (
+                      <div key={v.id} className={`py-3 ${!v.activo ? 'opacity-50' : ''}`}>
+                        <div className="flex items-center gap-3">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-800 truncate">{labelAtributos(v)}</p>
+                            <p className="text-xs text-gray-400">
+                              {v.sku ? `SKU: ${v.sku}` : 'Sin SKU'}
+                              {v.codigo_barras ? ` · ${v.codigo_barras}` : ''}
+                            </p>
+                          </div>
+                          <p className="text-xs text-gray-400 shrink-0">Stock: {v.stock_actual}</p>
+                          <Badge variant={v.activo ? 'default' : 'secondary'} className="shrink-0">
+                            {v.activo ? 'Activa' : 'Inactiva'}
+                          </Badge>
+                          <div className="flex gap-1 shrink-0">
+                            <Button variant="ghost" size="icon" title="Gestionar precios" onClick={() => setVariantePreciosId(v.id)}>
+                              <Tag className="w-3.5 h-3.5 text-indigo-500" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => setVarianteDialog({ open: true, variante: v })}>
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="text-red-500 hover:text-red-600" onClick={() => handleDeleteVariante(v.id)} disabled={deletingVarianteId === v.id}>
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+                        {ventaPrecios.length > 0 && (
+                          <div className="flex gap-4 mt-1.5 flex-wrap">
+                            {ventaPrecios.map(pv => {
+                              const precio = pv.precio_calculado ?? pv.precio
+                              return (
+                                <span key={pv.lista_precio_id} className="text-xs">
+                                  <span className="text-gray-400">{pv.lista_precio?.nombre}:</span>{' '}
+                                  <span className={precio > 0 ? (pv.heredado ? 'text-gray-500' : 'text-gray-800 font-semibold') : 'text-gray-400'}>
+                                    {formatPrecio(precio > 0 ? precio : null)}
+                                  </span>
+                                  {pv.heredado && <span className="text-gray-400 ml-1 italic">(base)</span>}
+                                </span>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            )}
+
+            {/* Builder para agregar nuevas */}
+            <div className={!isNew && variantes.length > 0 ? 'pt-3 border-t border-gray-100' : ''}>
+              <p className="text-xs font-medium text-gray-500 mb-2">
+                {isNew ? 'Cargá las combinaciones antes de guardar:' : 'Agregar más variantes:'}
+              </p>
+              <VarianteInlineBuilder
+                atributoTipos={atributoTipos}
+                atributoValores={atributoValores}
+                articuloCodigo={watch('codigo') ?? ''}
+                variantes={pendingVariantes}
+                onChange={setPendingVariantes}
+                onValorCreado={(v) => setAtributoValores(prev => [...prev, v])}
+              />
+            </div>
+          </section>
+        </div>
+
         {/* ══ Tab: Stock ══ */}
         <div className={cn('space-y-3', activeTab !== 'stock' && 'hidden')}>
 
           {/* Configuración */}
           <section className="bg-white rounded-xl border border-gray-200 p-4 space-y-2.5">
             <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Configuración</h3>
+            {!isNew && (
+              <div className="flex items-center gap-3">
+                <span className={lbl2}>Stock actual</span>
+                <span className="text-sm font-semibold text-gray-800 tabular-nums">
+                  {Number(watch('stock_actual') || 0).toLocaleString('es-AR')}
+                </span>
+              </div>
+            )}
             <div className="flex items-center gap-3">
               <span className={lbl2}>Stock mín.</span>
               <Input {...register('stock_minimo')} type="number" step="1" className="w-32" />
             </div>
-            {isNew && (
-              <div className="flex items-center gap-3">
-                <span className={lbl2}>Stock inicial</span>
-                <Input {...register('stock_actual')} type="number" step="0.001" className="w-32" />
-              </div>
-            )}
           </section>
 
           {/* Stock por sucursal — artículos simples */}
