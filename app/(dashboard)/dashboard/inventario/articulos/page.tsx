@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { Plus, Search, Eye, Pencil, PowerOff, Layers, Upload } from 'lucide-react'
+import { Plus, Search, Eye, Pencil, PowerOff, Layers } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { usePermissions } from '@/components/PermissionsProvider'
@@ -151,16 +151,10 @@ export default function ArticulosPage() {
             />
           </div>
           {can('inventario.articulos.crear') && (
-            <div className="flex gap-2">
-              <Link href="/dashboard/inventario/importar-articulos" className={buttonVariants({ variant: 'outline' })}>
-                <Upload className="w-4 h-4 mr-2" />
-                Importar
-              </Link>
-              <Link href="/dashboard/inventario/articulos/nuevo" className={buttonVariants()}>
-                <Plus className="w-4 h-4 mr-2" />
-                Nuevo artículo
-              </Link>
-            </div>
+            <Link href="/dashboard/inventario/articulos/nuevo" className={buttonVariants()}>
+              <Plus className="w-4 h-4 mr-2" />
+              Nuevo artículo
+            </Link>
           )}
         </div>
         <div className="flex items-center gap-2 flex-wrap">

@@ -69,6 +69,7 @@ const MODULE_SECTIONS: ModuleSection[] = [
       { label: 'Proveedores',        href: '/dashboard/inventario/proveedores',        Icon: Truck,             description: 'Contactos de compras',   permKey: 'inventario.proveedores.ver'},
       { label: 'Ajustes de stock',   href: '/dashboard/inventario/remitos/ajustes',   Icon: SlidersHorizontal, description: 'Correcciones manuales',   permKey: 'inventario.ajustes.ver'    },
       { label: 'Actualizar precios', href: '/dashboard/inventario/actualizar-precios', Icon: TrendingUp,        description: 'Ajuste masivo de listas', permKey: 'inventario.articulos.ver'  },
+      { label: 'Importar artículos',  href: '/dashboard/inventario/importar-articulos', Icon: FileUp,            description: 'Alta masiva de artículos', permKey: 'inventario.articulos.crear' },
       { label: 'Importar stock',     href: '/dashboard/inventario/importar-stock',     Icon: FileUp,            description: 'Carga masiva desde Excel', permKey: 'inventario.articulos.crear' },
     ],
   },
