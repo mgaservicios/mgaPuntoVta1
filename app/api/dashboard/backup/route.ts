@@ -86,10 +86,12 @@ export async function GET() {
 
   const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' }) as Uint8Array
   const date = new Date().toISOString().slice(0, 10)
+  const blob = new Blob([buf], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  })
 
-  return new Response(buf, {
+  return new Response(blob, {
     headers: {
-      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'Content-Disposition': `attachment; filename="backup-${date}.xlsx"`,
     },
   })
