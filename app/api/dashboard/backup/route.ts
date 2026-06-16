@@ -84,7 +84,8 @@ export async function GET() {
     XLSX.utils.book_append_sheet(wb, ws, name)
   })
 
-  const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' }) as Uint8Array
+  const raw = XLSX.write(wb, { type: 'array', bookType: 'xlsx' }) as Uint8Array
+  const buf = new Uint8Array(raw)
   const date = new Date().toISOString().slice(0, 10)
   const blob = new Blob([buf], {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
