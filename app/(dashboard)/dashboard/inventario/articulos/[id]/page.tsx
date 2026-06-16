@@ -9,6 +9,7 @@ import { toast } from 'sonner'
 import { ArrowLeft, Plus, Pencil, Trash2, X, Save, Upload, Warehouse, Tag } from 'lucide-react'
 import QuickCreateDialog from '../_components/QuickCreateDialog'
 import VarianteDialog from '../_components/VarianteDialog'
+import VarianteInlineBuilder from '../_components/VarianteInlineBuilder'
 import PreciosPanel from '../_components/PreciosPanel'
 import VariantePreciosDialog from '../_components/VariantePreciosDialog'
 import { cn } from '@/lib/utils'
@@ -22,8 +23,8 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
 import type {
-  ArticuloWithVariantes, ArticuloVariante, AtributoTipo,
-  Categoria, Subcategoria, Marca, UnidadMedida,
+  ArticuloWithVariantes, ArticuloVariante, AtributoTipo, AtributoValor,
+  Categoria, Subcategoria, Marca, UnidadMedida, PendingVariante,
 } from '@/types/articulos'
 import type { PrecioVigente, ListaPrecio } from '@/types/precios'
 
@@ -87,6 +88,8 @@ export default function ArticuloFormPage({ params }: { params: Promise<{ id: str
   const [proveedores, setProveedores] = useState<Proveedor[]>([])
   const [unidades, setUnidades] = useState<UnidadMedida[]>([])
   const [atributoTipos, setAtributoTipos] = useState<AtributoTipo[]>([])
+  const [atributoValores, setAtributoValores] = useState<AtributoValor[]>([])
+  const [pendingVariantes, setPendingVariantes] = useState<PendingVariante[]>([])
   const [variantes, setVariantes] = useState<ArticuloVariante[]>([])
   const [varianteDialog, setVarianteDialog] = useState<{
     open: boolean; variante: ArticuloVariante | null
@@ -140,22 +143,25 @@ export default function ArticuloFormPage({ params }: { params: Promise<{ id: str
   }, [id, isNew])
 
   const loadCatalogos = useCallback(async () => {
-    const [resCat, resMar, resProv, resAtrib, resUnd, resListas, resParams] = await Promise.all([
+    const [resCat, resMar, resProv, resAtrib, resAtribVals, resUnd, resListas, resParams] = await Promise.all([
       fetch('/api/dashboard/categorias'),
       fetch('/api/dashboard/marcas'),
       fetch('/api/dashboard/proveedores'),
       fetch('/api/dashboard/atributo-tipos'),
+      fetch('/api/dashboard/atributo-valores'),
       fetch('/api/dashboard/unidades-medida'),
       fetch('/api/dashboard/listas-precio'),
       fetch('/api/dashboard/admin/parametros'),
     ])
-    const [cats, mars, provs, atribs, unds, listas, params] = await Promise.all([
-      resCat.json(), resMar.json(), resProv.json(), resAtrib.json(), resUnd.json(), resListas.json(), resParams.json(),
+    const [cats, mars, provs, atribs, atribVals, unds, listas, params] = await Promise.all([
+      resCat.json(), resMar.json(), resProv.json(), resAtrib.json(), resAtribVals.json(),
+      resUnd.json(), resListas.json(), resParams.json(),
     ])
     setCategorias(Array.isArray(cats) ? cats : [])
     setMarcas(Array.isArray(mars) ? mars : [])
     setProveedores(Array.isArray(provs) ? provs : [])
     setAtributoTipos(Array.isArray(atribs) ? atribs : [])
+    setAtributoValores(Array.isArray(atribVals) ? atribVals : [])
     setUnidades(Array.isArray(unds) ? unds : [])
     setListasTodas((Array.isArray(listas) ? listas : []).filter((l: { activo: boolean }) => l.activo) as ListaPrecio[])
     setManejaVariantes(params['maneja_variantes'] !== 'false')
@@ -262,9 +268,44 @@ export default function ArticuloFormPage({ params }: { params: Promise<{ id: str
             )
           )
         }
+        if (pendingVariantes.length > 0) {
+          const codigo = values.codigo ?? ''
+          await Promise.all(
+            pendingVariantes.map(pv => {
+              const vals = pv.atributos.filter(a => a.valor.trim()).map(a => a.valor.trim().toUpperCase())
+              const sku = [codigo.trim(), ...vals].filter(Boolean).join('-')
+              return fetch(`/api/dashboard/articulos/${created.id}/variantes`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sku, atributos: pv.atributos, stock_minimo: 0, activo: true }),
+              })
+            })
+          )
+          setPendingVariantes([])
+        }
         toast.success('Artículo creado')
         setShowAddAnother(true)
       } else {
+        if (pendingVariantes.length > 0) {
+          const codigo = values.codigo ?? ''
+          const nuevas = await Promise.all(
+            pendingVariantes.map(pv => {
+              const vals = pv.atributos.filter(a => a.valor.trim()).map(a => a.valor.trim().toUpperCase())
+              const sku = [codigo.trim(), ...vals].filter(Boolean).join('-')
+              return fetch(`/api/dashboard/articulos/${id}/variantes`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sku, atributos: pv.atributos, stock_minimo: 0, activo: true }),
+              }).then(r => r.ok ? r.json() as Promise<ArticuloVariante> : null)
+            })
+          )
+          const creadas = nuevas.filter(Boolean) as ArticuloVariante[]
+          if (creadas.length > 0) {
+            setVariantes(prev => [...prev, ...creadas])
+            cargarPreciosVariantes([...variantes, ...creadas])
+          }
+          setPendingVariantes([])
+        }
         toast.success('Artículo actualizado')
       }
     } else {
@@ -292,6 +333,7 @@ export default function ArticuloFormPage({ params }: { params: Promise<{ id: str
     const { codigo } = await r.json()
     setValue('codigo', codigo)
     setPendingPrecios({})
+    setPendingVariantes([])
     setShowAddAnother(false)
   }
 
@@ -393,8 +435,7 @@ export default function ArticuloFormPage({ params }: { params: Promise<{ id: str
   const lbl2 = 'w-24 shrink-0 text-right text-xs text-gray-500 leading-none'
 
   const tabList = [
-    { id: 'basicos',   label: 'Datos básicos' },
-    ...(!isNew && tipoArticulo === 'con_variantes' ? [{ id: 'variantes', label: 'Variantes' }] : []),
+    { id: 'basicos', label: 'Datos básicos' },
     ...(!isNew ? [{ id: 'precios', label: 'Precios' }] : []),
     { id: 'stock', label: 'Stock' },
   ]
@@ -620,6 +661,86 @@ export default function ArticuloFormPage({ params }: { params: Promise<{ id: str
             </div>
           </section>
 
+          {/* Variantes — lista guardada + builder inline */}
+          {tipoArticulo === 'con_variantes' && (
+            <section className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Variantes</h3>
+
+              {/* Lista de variantes ya guardadas */}
+              {!isNew && (
+                variantes.length === 0 ? (
+                  <p className="text-sm text-gray-400 text-center py-2">Sin variantes guardadas.</p>
+                ) : (
+                  <div className="divide-y divide-gray-100">
+                    {variantes.map((v) => {
+                      const pvs = variantesPrecios[v.id]
+                      const ventaPrecios = pvs?.filter(pv => pv.lista_precio?.categoria === 'venta') ?? []
+                      return (
+                        <div key={v.id} className={`py-3 ${!v.activo ? 'opacity-50' : ''}`}>
+                          <div className="flex items-center gap-3">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-800 truncate">{labelAtributos(v)}</p>
+                              <p className="text-xs text-gray-400">
+                                {v.sku ? `SKU: ${v.sku}` : 'Sin SKU'}
+                                {v.codigo_barras ? ` · ${v.codigo_barras}` : ''}
+                              </p>
+                            </div>
+                            <p className="text-xs text-gray-400 shrink-0">Stock: {v.stock_actual}</p>
+                            <Badge variant={v.activo ? 'default' : 'secondary'} className="shrink-0">
+                              {v.activo ? 'Activa' : 'Inactiva'}
+                            </Badge>
+                            <div className="flex gap-1 shrink-0">
+                              <Button variant="ghost" size="icon" title="Gestionar precios" onClick={() => setVariantePreciosId(v.id)}>
+                                <Tag className="w-3.5 h-3.5 text-indigo-500" />
+                              </Button>
+                              <Button variant="ghost" size="icon" onClick={() => setVarianteDialog({ open: true, variante: v })}>
+                                <Pencil className="w-4 h-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="text-red-500 hover:text-red-600" onClick={() => handleDeleteVariante(v.id)} disabled={deletingVarianteId === v.id}>
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+                          {ventaPrecios.length > 0 && (
+                            <div className="flex gap-4 mt-1.5 flex-wrap">
+                              {ventaPrecios.map(pv => {
+                                const precio = pv.precio_calculado ?? pv.precio
+                                return (
+                                  <span key={pv.lista_precio_id} className="text-xs">
+                                    <span className="text-gray-400">{pv.lista_precio?.nombre}:</span>{' '}
+                                    <span className={precio > 0 ? (pv.heredado ? 'text-gray-500' : 'text-gray-800 font-semibold') : 'text-gray-400'}>
+                                      {formatPrecio(precio > 0 ? precio : null)}
+                                    </span>
+                                    {pv.heredado && <span className="text-gray-400 ml-1 italic">(base)</span>}
+                                  </span>
+                                )
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              )}
+
+              {/* Separador + builder para agregar nuevas */}
+              <div className={!isNew && variantes.length > 0 ? 'pt-3 border-t border-gray-100' : ''}>
+                <p className="text-xs font-medium text-gray-500 mb-2">
+                  {isNew ? 'Cargá las combinaciones antes de guardar:' : 'Agregar más variantes:'}
+                </p>
+                <VarianteInlineBuilder
+                  atributoTipos={atributoTipos}
+                  atributoValores={atributoValores}
+                  articuloCodigo={watch('codigo') ?? ''}
+                  variantes={pendingVariantes}
+                  onChange={setPendingVariantes}
+                  onValorCreado={(v) => setAtributoValores(prev => [...prev, v])}
+                />
+              </div>
+            </section>
+          )}
+
           {/* Precios iniciales — solo en alta de artículos simples */}
           {isNew && tipoArticulo === 'simple' && listasTodas.length > 0 && (
             <section className="bg-white rounded-xl border border-gray-200 p-4 space-y-2.5">
@@ -767,75 +888,6 @@ export default function ArticuloFormPage({ params }: { params: Promise<{ id: str
           })()}
         </div>
       </form>
-
-      {/* ══ Tab: Variantes (fuera del form — gestiona su propio estado) ══ */}
-      {!isNew && tipoArticulo === 'con_variantes' && (
-        <div className={cn(activeTab !== 'variantes' && 'hidden')}>
-          <section className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Variantes</h3>
-              <Button size="sm" onClick={() => setVarianteDialog({ open: true, variante: null })}>
-                <Plus className="w-4 h-4 mr-1" />
-                Agregar variante
-              </Button>
-            </div>
-            {variantes.length === 0 ? (
-              <p className="text-sm text-gray-400 py-4 text-center">Sin variantes. Agregá la primera.</p>
-            ) : (
-              <div className="divide-y divide-gray-100">
-                {variantes.map((v) => {
-                  const pvs = variantesPrecios[v.id]
-                  const ventaPrecios = pvs?.filter(pv => pv.lista_precio?.categoria === 'venta') ?? []
-                  return (
-                    <div key={v.id} className={`py-3 ${!v.activo ? 'opacity-50' : ''}`}>
-                      <div className="flex items-center gap-3">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-800 truncate">{labelAtributos(v)}</p>
-                          <p className="text-xs text-gray-400">
-                            {v.sku ? `SKU: ${v.sku}` : 'Sin SKU'}
-                            {v.codigo_barras ? ` · ${v.codigo_barras}` : ''}
-                          </p>
-                        </div>
-                        <p className="text-xs text-gray-400 shrink-0">Stock: {v.stock_actual}</p>
-                        <Badge variant={v.activo ? 'default' : 'secondary'} className="shrink-0">
-                          {v.activo ? 'Activa' : 'Inactiva'}
-                        </Badge>
-                        <div className="flex gap-1 shrink-0">
-                          <Button variant="ghost" size="icon" title="Gestionar precios" onClick={() => setVariantePreciosId(v.id)}>
-                            <Tag className="w-3.5 h-3.5 text-indigo-500" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => setVarianteDialog({ open: true, variante: v })}>
-                            <Pencil className="w-4 h-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="text-red-500 hover:text-red-600" onClick={() => handleDeleteVariante(v.id)} disabled={deletingVarianteId === v.id}>
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </div>
-                      {ventaPrecios.length > 0 && (
-                        <div className="flex gap-4 mt-1.5 flex-wrap">
-                          {ventaPrecios.map(pv => {
-                            const precio = pv.precio_calculado ?? pv.precio
-                            return (
-                              <span key={pv.lista_precio_id} className="text-xs">
-                                <span className="text-gray-400">{pv.lista_precio?.nombre}:</span>{' '}
-                                <span className={precio > 0 ? (pv.heredado ? 'text-gray-500' : 'text-gray-800 font-semibold') : 'text-gray-400'}>
-                                  {formatPrecio(precio > 0 ? precio : null)}
-                                </span>
-                                {pv.heredado && <span className="text-gray-400 ml-1 italic">(base)</span>}
-                              </span>
-                            )
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </section>
-        </div>
-      )}
 
       {/* ══ Tab: Precios (fuera del form — gestiona su propio estado) ══ */}
       {!isNew && (

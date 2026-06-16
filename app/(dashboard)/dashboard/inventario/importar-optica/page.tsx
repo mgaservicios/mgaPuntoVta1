@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
-import { Upload, FileText, CheckCircle, XCircle, Package, Tag, BarChart3, ChevronDown, ChevronUp, Info } from 'lucide-react'
+import { Upload, FileText, CheckCircle, XCircle, Package, Tag, BarChart3, ChevronDown, ChevronUp, Info, Truck } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 // ─── CSV parser ───────────────────────────────────────────────────────────────
@@ -155,6 +155,217 @@ function mapStock(raw: Record<string, string>[]) {
 
 type ImportResult = { ok: number; errors: { codigo: string; error: string }[]; remitos?: number }
 type Status = 'idle' | 'loading' | 'done' | 'error'
+
+// ─── Proveedores mapper ───────────────────────────────────────────────────────
+
+const TIPO_IVA_MAP: Record<string, string> = {
+  I: 'Responsable Inscripto', N: 'No Inscripto', M: 'Monotributista', E: 'Exento',
+}
+
+type ProveedorMapped = {
+  id: number | null; nombre: string; contacto: string | null; cuit: string | null
+  telefono: string | null; direccion: string | null; localidad: string | null
+  provincia: string | null; cod_postal: string | null; tipo_iva: string | null
+}
+
+function mapProveedores(raw: Record<string, string>[]): ProveedorMapped[] {
+  return raw.map(r => {
+    const idRaw = col(r, 'pronum'); const idNum = idRaw ? parseInt(idRaw, 10) : null
+    const tivaRaw = col(r, 'protipiiva', 'protipoiva', 'tipiva').trim().toUpperCase()
+    return {
+      id: idNum && !isNaN(idNum) && idNum > 0 ? idNum : null,
+      nombre: col(r, 'pronom').trim(),
+      contacto: col(r, 'pronomcon') || null, cuit: col(r, 'procui') || null,
+      telefono: col(r, 'protel') || null, direccion: col(r, 'prodom') || null,
+      localidad: col(r, 'proloc') || null, provincia: col(r, 'proprov') || null,
+      cod_postal: col(r, 'procodpos') || null,
+      tipo_iva: TIPO_IVA_MAP[tivaRaw] ?? (tivaRaw || null),
+    }
+  }).filter(r => r.nombre.length > 0)
+}
+
+const PROV_PREVIEW_COLS: { label: string; key: keyof ProveedorMapped }[] = [
+  { label: 'ID', key: 'id' }, { label: 'Nombre', key: 'nombre' },
+  { label: 'Contacto', key: 'contacto' }, { label: 'CUIT', key: 'cuit' },
+  { label: 'Domicilio', key: 'direccion' }, { label: 'Localidad', key: 'localidad' },
+  { label: 'Provincia', key: 'provincia' }, { label: 'Teléfono', key: 'telefono' },
+  { label: 'Tipo IVA', key: 'tipo_iva' },
+]
+
+// ─── ProveedoresTab ───────────────────────────────────────────────────────────
+
+function ProveedoresTab() {
+  const [showManual, setShowManual] = useState(false)
+  const [rows, setRows] = useState<ProveedorMapped[]>([])
+  const [rawCount, setRawCount] = useState(0)
+  const [rawRows, setRawRows] = useState<Record<string, string>[]>([])
+  const [detectedHeaders, setDetectedHeaders] = useState<string[]>([])
+  const [detectedSep, setDetectedSep] = useState('')
+  const [parseError, setParseError] = useState('')
+  const [status, setStatus] = useState<Status>('idle')
+  const [result, setResult] = useState<{ ok: number; errors: { id: string; nombre: string; error: string }[] } | null>(null)
+  const [dragging, setDragging] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  const handleFile = useCallback((file: File) => {
+    const reader = new FileReader()
+    reader.onload = e => {
+      const text = e.target?.result as string
+      const { headers, rows: raw, sep, rawLines } = parseCSV(text)
+      const mapped = mapProveedores(raw)
+      setDetectedHeaders(headers); setDetectedSep(sep); setRawCount(raw.length)
+      setRawRows(raw); setRows(mapped); setStatus('idle'); setResult(null)
+      if (rawLines < 2) setParseError(`El archivo tiene ${rawLines} línea(s) — necesita al menos encabezado + datos.`)
+      else if (headers.length <= 1) setParseError(`Solo se detectó ${headers.length} columna con separador "${sep}".`)
+      else setParseError('')
+    }
+    reader.readAsText(file, 'UTF-8')
+  }, [])
+
+  const handleImport = async () => {
+    if (rows.length === 0) return
+    setStatus('loading')
+    try {
+      const res = await fetch('/api/dashboard/importar-proveedores', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rows }),
+      })
+      const text = await res.text()
+      let data: typeof result & { error?: string }
+      try { data = JSON.parse(text) } catch {
+        setStatus('error')
+        setResult({ ok: 0, errors: [{ id: '', nombre: '', error: `Respuesta inesperada: ${text.slice(0, 200)}` }] })
+        return
+      }
+      if (!res.ok) { setStatus('error'); setResult({ ok: 0, errors: [{ id: '', nombre: '', error: data?.error ?? 'Error' }] }); return }
+      setResult(data); setStatus('done')
+    } catch (e) {
+      setStatus('error'); setResult({ ok: 0, errors: [{ id: '', nombre: '', error: String(e) }] })
+    }
+  }
+
+  const handleClear = () => {
+    setRows([]); setRawCount(0); setRawRows([]); setDetectedHeaders([])
+    setDetectedSep(''); setParseError(''); setResult(null); setStatus('idle')
+  }
+
+  const sinNombre = rawRows.filter(r => !col(r, 'pronom').trim()).length
+  const discardDiag = rawRows.length > 0 && sinNombre > 0 ? `${sinNombre} sin nombre` : null
+  const preview = rows.slice(0, 8)
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-sm text-gray-500">Importa o actualiza proveedores desde CSV. Si ProNum coincide con un ID existente, lo actualiza; si no, lo crea.</p>
+        <button onClick={() => setShowManual(v => !v)} className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 shrink-0 font-medium">
+          <Info className="w-3.5 h-3.5" />
+          {showManual ? 'Ocultar manual' : 'Ver manual'}
+          {showManual ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+        </button>
+      </div>
+
+      {showManual && (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-xs space-y-3">
+          <div>
+            <p className="font-semibold text-blue-800 mb-1.5">Columnas del CSV</p>
+            <table className="w-full text-xs border-collapse">
+              <thead><tr className="bg-blue-100 text-blue-900"><th className="text-left px-2 py-1 rounded-l">Columna</th><th className="text-left px-2 py-1">Req.</th><th className="text-left px-2 py-1 rounded-r">Descripción</th></tr></thead>
+              <tbody className="divide-y divide-blue-100">
+                <tr><td className="px-2 py-1 font-mono">ProNum</td><td className="px-2 py-1 text-gray-400">No</td><td className="px-2 py-1 text-gray-600">ID del proveedor. Si coincide con uno existente, lo actualiza.</td></tr>
+                <tr><td className="px-2 py-1 font-mono">ProNom</td><td className="px-2 py-1 text-green-700">Sí</td><td className="px-2 py-1 text-gray-600">Nombre del proveedor.</td></tr>
+                <tr><td className="px-2 py-1 font-mono">ProNomCon</td><td className="px-2 py-1 text-gray-400">No</td><td className="px-2 py-1 text-gray-600">Nombre del contacto.</td></tr>
+                <tr><td className="px-2 py-1 font-mono">ProCui</td><td className="px-2 py-1 text-gray-400">No</td><td className="px-2 py-1 text-gray-600">CUIT.</td></tr>
+                <tr><td className="px-2 py-1 font-mono">ProTel</td><td className="px-2 py-1 text-gray-400">No</td><td className="px-2 py-1 text-gray-600">Teléfono.</td></tr>
+                <tr><td className="px-2 py-1 font-mono">ProDom</td><td className="px-2 py-1 text-gray-400">No</td><td className="px-2 py-1 text-gray-600">Domicilio.</td></tr>
+                <tr><td className="px-2 py-1 font-mono">ProLoc</td><td className="px-2 py-1 text-gray-400">No</td><td className="px-2 py-1 text-gray-600">Localidad.</td></tr>
+                <tr><td className="px-2 py-1 font-mono">ProProv</td><td className="px-2 py-1 text-gray-400">No</td><td className="px-2 py-1 text-gray-600">Provincia.</td></tr>
+                <tr><td className="px-2 py-1 font-mono">ProCodPos</td><td className="px-2 py-1 text-gray-400">No</td><td className="px-2 py-1 text-gray-600">Código postal.</td></tr>
+                <tr><td className="px-2 py-1 font-mono">ProTipIva</td><td className="px-2 py-1 text-gray-400">No</td><td className="px-2 py-1 text-gray-600"><span className="font-mono">I</span> Resp. Inscripto · <span className="font-mono">M</span> Monotributista · <span className="font-mono">N</span> No Inscripto · <span className="font-mono">E</span> Exento</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      <div
+        className={cn('border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors',
+          dragging ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:border-gray-300 bg-gray-50')}
+        onDragOver={e => { e.preventDefault(); setDragging(true) }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={e => { e.preventDefault(); setDragging(false); const f = e.dataTransfer.files[0]; if (f) handleFile(f) }}
+        onClick={() => fileRef.current?.click()}
+      >
+        <input ref={fileRef} type="file" accept=".csv,.txt" className="hidden"
+          onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = '' }} />
+        <Upload className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+        <p className="text-sm font-medium text-gray-600">Arrastrá el CSV aquí o hacé clic para seleccionar</p>
+        <p className="text-xs text-gray-400 mt-1">Soporta separadores , ; | · UTF-8</p>
+      </div>
+
+      {parseError && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{parseError}</div>}
+      {detectedHeaders.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 items-center">
+          <span className="text-xs text-gray-400">Sep:</span>
+          <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded font-mono">{detectedSep === '\t' ? 'TAB' : detectedSep}</span>
+          <span className="text-xs text-gray-400 ml-2">Columnas:</span>
+          {detectedHeaders.map(h => <span key={h} className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded font-mono">{h}</span>)}
+        </div>
+      )}
+
+      {rows.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-gray-700 flex items-center gap-2">
+              <FileText className="w-4 h-4" />
+              {rows.length.toLocaleString()} filas válidas
+              {rawCount > rows.length && (
+                <span className="text-xs text-amber-600 font-normal">({rawCount - rows.length} descartadas{discardDiag ? ` — ${discardDiag}` : ''})</span>
+              )}
+            </span>
+            <Button variant="outline" size="sm" onClick={handleClear}>Limpiar</Button>
+          </div>
+          <div className="overflow-x-auto rounded-lg border border-gray-200">
+            <table className="min-w-full text-xs">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>{PROV_PREVIEW_COLS.map(c => <th key={c.key} className="px-3 py-2 text-left font-semibold text-gray-600 whitespace-nowrap">{c.label}</th>)}</tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {preview.map((row, i) => (
+                  <tr key={i} className="hover:bg-gray-50">
+                    {PROV_PREVIEW_COLS.map(c => <td key={c.key} className="px-3 py-1.5 text-gray-700 max-w-[160px] truncate">{String(row[c.key] ?? '—')}</td>)}
+                  </tr>
+                ))}
+                {rows.length > 8 && <tr><td colSpan={PROV_PREVIEW_COLS.length} className="px-3 py-2 text-xs text-gray-400 text-center">… y {rows.length - 8} filas más</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      <Button onClick={handleImport} disabled={rows.length === 0 || status === 'loading'} className="w-full">
+        {status === 'loading'
+          ? <span className="flex items-center gap-2"><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Importando…</span>
+          : rows.length > 0 ? `Importar ${rows.length.toLocaleString()} proveedores` : 'Seleccioná un archivo CSV para importar'}
+      </Button>
+
+      {result && (
+        <div className={cn('rounded-xl border p-4 space-y-3', result.ok > 0 ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50')}>
+          <div className="flex items-center gap-2">
+            {result.ok > 0 ? <CheckCircle className="w-5 h-5 text-green-600" /> : <XCircle className="w-5 h-5 text-red-600" />}
+            <span className="font-semibold text-sm">{result.ok} proveedor(es) importado(s){result.errors.length > 0 ? ` · ${result.errors.length} error(es)` : ''}</span>
+          </div>
+          {result.errors.length > 0 && (
+            <div className="max-h-40 overflow-y-auto space-y-1">
+              {result.errors.map((e, i) => (
+                <p key={i} className="text-xs text-red-700 font-mono">{e.nombre || e.id ? `[${e.id || '—'} ${e.nombre}] ` : ''}{e.error}</p>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
 
 // ─── Sub-component per tab ────────────────────────────────────────────────────
 
@@ -408,12 +619,15 @@ export default function ImportarOpticaPage() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Importador Óptica</h1>
         <p className="text-sm text-gray-500 mt-1">
-          Importá artículos, precios y stock desde archivos CSV. El orden recomendado es: primero Artículos, luego Precios, luego Stock.
+          Importá datos desde archivos CSV. Orden recomendado: primero Proveedores, luego Artículos, luego Precios, luego Stock.
         </p>
       </div>
 
-      <Tabs defaultValue="articulos">
-        <TabsList className="w-full grid grid-cols-3">
+      <Tabs defaultValue="proveedores">
+        <TabsList className="w-full grid grid-cols-4">
+          <TabsTrigger value="proveedores" className="gap-2">
+            <Truck className="w-4 h-4" /> Proveedores
+          </TabsTrigger>
           <TabsTrigger value="articulos" className="gap-2">
             <Package className="w-4 h-4" /> Artículos
           </TabsTrigger>
@@ -424,6 +638,10 @@ export default function ImportarOpticaPage() {
             <BarChart3 className="w-4 h-4" /> Stock
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="proveedores" className="mt-5">
+          <ProveedoresTab />
+        </TabsContent>
 
         <TabsContent value="articulos" className="mt-5">
           <ImportTab

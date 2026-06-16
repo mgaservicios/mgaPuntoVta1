@@ -113,3 +113,16 @@ export interface VarianteFormData {
   activo: boolean
   atributos: { atributo_tipo_id: number; valor: string }[]
 }
+
+export interface AtributoValor {
+  id: number
+  atributo_tipo_id: number
+  valor: string
+  activo: boolean
+  orden: number
+}
+
+export interface PendingVariante {
+  tempId: string
+  atributos: { atributo_tipo_id: number; valor: string }[]
+}

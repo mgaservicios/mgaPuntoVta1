@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 import { usePathname } from 'next/navigation'
-import { Building2, ShoppingCart, Glasses, ReceiptText, Wrench, Search, Package, LogOut } from 'lucide-react'
+import { Building2, ShoppingCart, Glasses, ReceiptText, Wrench, Search, Package, LogOut, BookOpen } from 'lucide-react'
 import Link from 'next/link'
 import { signOut } from 'next-auth/react'
 import {
@@ -29,6 +29,8 @@ const ROUTE_LABELS: Record<string, string> = {
   '/dashboard/notas-credito': 'Notas de crédito',
   '/dashboard/stock/ajustes': 'Ajustes de stock',
   '/dashboard/articulos/seguimiento': 'Seguimiento de artículos',
+  '/dashboard/inventario/atributos': 'Atributos de variantes',
+  '/dashboard/ayuda': 'Ayuda',
 }
 
 function getPageTitle(pathname: string): string {
@@ -89,8 +91,10 @@ export default function DashboardHeader({
     ? 'Todas las sucursales'
     : sucursales.find((s) => s.id === activeSucursalId)?.nombre ?? 'Sucursal'
 
+  const isAyuda = pathname.startsWith('/dashboard/ayuda')
+
   return (
-    <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-6 flex-shrink-0">
+    <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-6 flex-shrink-0 relative">
       <div className="flex items-center gap-3 min-w-0">
         <h1 className="text-base font-semibold text-gray-900 shrink-0">{displayTitle}</h1>
         {homeSucursalNombre && (
@@ -98,6 +102,20 @@ export default function DashboardHeader({
             Logueado en: <span className="font-medium text-gray-700">{homeSucursalNombre}</span>
           </span>
         )}
+      </div>
+
+      <div className="absolute left-1/2 -translate-x-1/2">
+        <Link
+          href="/dashboard/ayuda"
+          className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition-colors border ${
+            isAyuda
+              ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+              : 'text-gray-500 border-gray-200 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200'
+          }`}
+        >
+          <BookOpen className="w-4 h-4" />
+          Ayuda
+        </Link>
       </div>
 
       <div className="flex items-center gap-3">
