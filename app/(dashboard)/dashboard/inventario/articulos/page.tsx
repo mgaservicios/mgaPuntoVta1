@@ -134,7 +134,8 @@ export default function ArticulosPage() {
     setConfirmId(null)
   }
 
-  const colCount = 7
+  const colCount = 8
+  const costoLista = listas.find(l => l.categoria === 'costo') ?? null
   const mainLista = listas.find(l => l.categoria === 'venta') ?? listas[0] ?? null
 
   return (
@@ -203,6 +204,9 @@ export default function ArticulosPage() {
               <TableHead className="w-28">Marca</TableHead>
               <TableHead className="w-36">Proveedor</TableHead>
               <TableHead className="text-right w-32">
+                {costoLista ? costoLista.nombre : 'Costo'}
+              </TableHead>
+              <TableHead className="text-right w-32">
                 {mainLista ? mainLista.nombre : 'Precio'}
               </TableHead>
               <TableHead className="w-20"></TableHead>
@@ -240,6 +244,14 @@ export default function ArticulosPage() {
                     </TableCell>
                     <TableCell className="text-gray-500 text-sm truncate max-w-[144px]">
                       {a.proveedores?.nombre ?? '—'}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-sm">
+                      {a.tipo_articulo === 'con_variantes'
+                        ? <span className="text-gray-300">—</span>
+                        : formatPrecio(costoLista
+                            ? (a.precios_vigentes?.find(p => p.lista_id === costoLista.id)?.precio ?? null)
+                            : null)
+                      }
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
                       {a.tipo_articulo === 'con_variantes'
@@ -293,6 +305,12 @@ export default function ArticulosPage() {
                       <TableCell className="py-2 text-gray-400 text-xs">Variante</TableCell>
                       <TableCell className="py-2" />
                       <TableCell className="py-2" />
+                      <TableCell className="py-2 text-right tabular-nums text-sm">
+                        {(() => {
+                          const pv = costoLista ? v.precios_vigentes?.find(p => p.lista_id === costoLista.id) : null
+                          return formatPrecio(pv?.precio ?? null)
+                        })()}
+                      </TableCell>
                       <TableCell className="py-2 text-right tabular-nums text-sm">
                         {(() => {
                           const pv = mainLista ? v.precios_vigentes?.find(p => p.lista_id === mainLista.id) : null

@@ -496,6 +496,46 @@ Métodos de pago disponibles en el sistema.
 
 **Cuotas:** para Tarjetas de Crédito se pueden configurar planes de cuotas con recargo porcentual.
 
+---
+
+### 10.8 Backup del sistema
+
+Exporta toda la información de la base de datos a un archivo Excel (`.xlsx`) con una hoja por tabla. Permite guardar una copia de seguridad fuera del servidor.
+
+> Disponible únicamente para el rol **Administrador**.
+
+**Cómo hacer un backup:**
+
+1. Hacer clic en el botón **"Descargar backup"** ubicado debajo del logo en el menú lateral izquierdo.
+2. Leer el aviso de confirmación y presionar **"Descargar"**.
+3. Aguardar sin cerrar la ventana ni el navegador. Un diálogo en pantalla muestra el progreso e indica que **NO se debe cerrar la ventana**.
+4. Al finalizar, el archivo `backup-YYYY-MM-DD.xlsx` se descarga automáticamente.
+5. Guardar el archivo en un lugar seguro **fuera del servidor** (disco externo, pendrive, servicio en la nube, etc.).
+
+**Contenido del backup — hojas incluidas:**
+
+| Hoja | Datos |
+|---|---|
+| Articulos, Variantes, Atributos | Catálogo completo de productos |
+| Categorias, Subcategorias, Marcas | Tablas maestras |
+| Proveedores, Unidades | Datos de proveedores y unidades de medida |
+| Listas Precio, Precios | Precios por lista |
+| Stock, Mov Stock | Stock por sucursal y movimientos |
+| Ventas, Venta Items, Venta Pagos | Historial de ventas |
+| Ordenes, Orden Items, Orden Pagos | Órdenes de venta |
+| Caja Sesiones, Caja Movimientos | Historial de caja |
+| Cobranzas, Notas Credito | Cuenta corriente |
+| Remitos, Remito Items | Remitos de stock |
+| Optica Ordenes, OT Items, OT Pagos | Órdenes de trabajo óptico |
+| Optica Servicios, Sv Pagos | Servicios ópticos |
+| Optica Medicos | Médicos derivantes |
+| Sucursales, Formas Pago, Vendedores | Configuración |
+| Parametros, Usuarios | Parámetros del sistema y usuarios |
+
+> **Importante:** NO cerrar la ventana del navegador durante la generación del backup. El sistema lo advierte en pantalla con un cartel bloqueante.
+
+> El archivo generado es de **solo lectura**: no puede reimportarse automáticamente al sistema.
+
 \newpage
 
 ## 11. Roles y Permisos

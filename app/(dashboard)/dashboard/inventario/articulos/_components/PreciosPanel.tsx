@@ -78,6 +78,7 @@ const FORM_EMPTY: PrecioForm = {
 }
 
 export default function PreciosPanel({ articuloId, varianteId, tieneVariantes }: Props) {
+  const [costoVigentes, setCostoVigentes] = useState<PrecioVigente[]>([])
   const [ventaVigentes, setVentaVigentes] = useState<PrecioVigente[]>([])
   const [historial, setHistorial] = useState<Precio[]>([])
   const [listasManual, setListasManual] = useState<ListaPrecio[]>([])
@@ -88,6 +89,7 @@ export default function PreciosPanel({ articuloId, varianteId, tieneVariantes }:
   const [showHistorial, setShowHistorial] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState<PrecioForm>(FORM_EMPTY)
+  const [formCategoria, setFormCategoria] = useState<'costo' | 'venta' | null>(null)
   const [preciosDerivados, setPreciosDerivados] = useState<Record<number, string>>({})
   const [guardando, setGuardando] = useState(false)
 
@@ -108,7 +110,10 @@ export default function PreciosPanel({ articuloId, varianteId, tieneVariantes }:
       provRes.json(),
     ])
 
-    // Solo listas de venta para mostrar en la ficha
+    const costoListas = (listasData ?? []).filter((l) => l.categoria === 'costo' && l.activo)
+    const costoIds = new Set(costoListas.map((l) => l.id))
+    setCostoVigentes((preciosData.vigentes ?? []).filter((pv) => costoIds.has(pv.lista_precio_id)))
+
     const ventaListas = (listasData ?? []).filter((l) => l.categoria === 'venta' && l.activo)
     const ventaIds = new Set(ventaListas.map((l) => l.id))
     setVentaVigentes((preciosData.vigentes ?? []).filter((pv) => ventaIds.has(pv.lista_precio_id)))
@@ -139,10 +144,16 @@ export default function PreciosPanel({ articuloId, varianteId, tieneVariantes }:
     setPreciosDerivados(result)
   }, [form.lista_precio_id, form.precio, derivadosInfo])
 
-  function openNuevo(listaPrecioId?: number) {
+  function openNuevo(listaPrecioId?: number, categoria?: 'costo' | 'venta') {
+    const defaultId = listaPrecioId
+      ? String(listaPrecioId)
+      : categoria
+        ? String(listasManual.find(l => l.categoria === categoria)?.id ?? '')
+        : String(listasManual[0]?.id ?? '')
+    setFormCategoria(categoria ?? null)
     setForm({
       ...FORM_EMPTY,
-      lista_precio_id: listaPrecioId ? String(listaPrecioId) : '1',
+      lista_precio_id: defaultId,
       vigente_desde: localDateStr(),
     })
     setPreciosDerivados({})
@@ -152,6 +163,7 @@ export default function PreciosPanel({ articuloId, varianteId, tieneVariantes }:
   function cerrarForm() {
     setShowForm(false)
     setForm(FORM_EMPTY)
+    setFormCategoria(null)
     setPreciosDerivados({})
   }
 
@@ -215,6 +227,60 @@ export default function PreciosPanel({ articuloId, varianteId, tieneVariantes }:
 
   return (
     <>
+      {/* ── Precios de costo vigentes ── */}
+      {costoVigentes.length > 0 && (
+        <section className="bg-white rounded-xl border border-gray-200 p-6 mt-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+                Precios de costo
+              </h3>
+            </div>
+            <Button size="sm" variant="outline" onClick={() => openNuevo(undefined, 'costo')}>
+              <Plus className="w-3.5 h-3.5 mr-1.5" />
+              Nuevo precio
+            </Button>
+          </div>
+          <div className="divide-y divide-gray-100">
+            {costoVigentes.map((pv) => {
+              const precio = pv.precio_calculado ?? pv.precio
+              const tieneValor = precio > 0
+              return (
+                <div key={pv.lista_precio_id} className="flex items-center justify-between py-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-gray-700">{pv.lista_precio?.nombre}</span>
+                    {pv.lista_precio?.tipo === 'calculada' && (
+                      <Badge variant="secondary" className="text-[10px]">Calculado</Badge>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <p className={`text-lg font-bold tabular-nums ${tieneValor ? 'text-gray-900' : 'text-gray-300'}`}>
+                        {tieneValor ? fmt(precio) : 'Sin precio'}
+                      </p>
+                      {pv.vigente_desde && (
+                        <p className="text-xs text-gray-400">desde {fmtFecha(pv.vigente_desde)}</p>
+                      )}
+                    </div>
+                    {pv.lista_precio?.tipo === 'manual' && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8 text-gray-400 hover:text-gray-700"
+                        title="Modificar precio"
+                        onClick={() => openNuevo(pv.lista_precio_id, 'costo')}
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </section>
+      )}
+
       {/* ── Precios de venta vigentes ── */}
       <section className="bg-white rounded-xl border border-gray-200 p-6 mt-6 space-y-4">
         <div className="flex items-center justify-between">
@@ -228,7 +294,7 @@ export default function PreciosPanel({ articuloId, varianteId, tieneVariantes }:
               </p>
             )}
           </div>
-          <Button size="sm" variant="outline" onClick={() => openNuevo()}>
+          <Button size="sm" variant="outline" onClick={() => openNuevo(undefined, 'venta')}>
             <Plus className="w-3.5 h-3.5 mr-1.5" />
             Nuevo precio
           </Button>
@@ -264,7 +330,7 @@ export default function PreciosPanel({ articuloId, varianteId, tieneVariantes }:
                         variant="ghost"
                         className="h-8 w-8 text-gray-400 hover:text-gray-700"
                         title="Modificar precio"
-                        onClick={() => openNuevo(pv.lista_precio_id)}
+                        onClick={() => openNuevo(pv.lista_precio_id, 'venta')}
                       >
                         <Pencil className="w-3.5 h-3.5" />
                       </Button>
@@ -300,6 +366,11 @@ export default function PreciosPanel({ articuloId, varianteId, tieneVariantes }:
           <DialogHeader>
             <DialogTitle>
               {form.lista_precio_id ? 'Modificar precio' : 'Nuevo precio'}
+              {formCategoria && (
+                <span className="ml-1 text-gray-400 font-normal text-sm">
+                  — {formCategoria === 'costo' ? 'Compra' : 'Venta'}
+                </span>
+              )}
             </DialogTitle>
           </DialogHeader>
 
@@ -316,14 +387,18 @@ export default function PreciosPanel({ articuloId, varianteId, tieneVariantes }:
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  {listasManual.map((l) => (
-                    <SelectItem key={l.id} value={String(l.id)}>
-                      {l.nombre}
-                      <span className="ml-2 text-xs text-gray-400">
-                        ({l.categoria === 'costo' ? 'Costo' : 'Venta'})
-                      </span>
-                    </SelectItem>
-                  ))}
+                  {listasManual
+                    .filter(l => !formCategoria || l.categoria === formCategoria)
+                    .map((l) => (
+                      <SelectItem key={l.id} value={String(l.id)}>
+                        {l.nombre}
+                        {!formCategoria && (
+                          <span className="ml-2 text-xs text-gray-400">
+                            ({l.categoria === 'costo' ? 'Costo' : 'Venta'})
+                          </span>
+                        )}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
