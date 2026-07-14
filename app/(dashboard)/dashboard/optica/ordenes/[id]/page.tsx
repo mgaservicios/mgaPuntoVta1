@@ -316,13 +316,15 @@ export default function OpticaOrdenPage({ params }: { params: Promise<{ id: stri
   function onRecargoPctChangeOT(val: string) {
     setRecargoPct(val)
     const pct = Math.max(0, parseFloat(val) || 0)
-    setRecargoMonto(Math.round(total * pct / 100 * 100) / 100)
+    const saldoCalc = Math.max(0, total - pagado)
+    setRecargoMonto(Math.round(saldoCalc * pct / 100 * 100) / 100)
   }
 
   function onRecargoMontoChangeOT(val: string) {
     const rm = Math.max(0, parseFloat(val) || 0)
     setRecargoMonto(rm)
-    setRecargoPct(total > 0 ? ((rm / total) * 100).toFixed(2) : '0')
+    const saldoCalc = Math.max(0, total - pagado)
+    setRecargoPct(saldoCalc > 0 ? ((rm / saldoCalc) * 100).toFixed(2) : '0')
   }
   const disabledEdit = esReadonly || esSoloFechaPrometida
 
@@ -996,6 +998,23 @@ export default function OpticaOrdenPage({ params }: { params: Promise<{ id: stri
                 </div>
               </div>
 
+              {recargoMonto > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-sm space-y-1 mt-2">
+                  <div className="flex justify-between text-amber-800">
+                    <span>Saldo pendiente:</span>
+                    <span>{formatARS(Math.max(0, total - pagado))}</span>
+                  </div>
+                  <div className="flex justify-between text-amber-800">
+                    <span>+ Recargo:</span>
+                    <span>{formatARS(recargoMonto)}</span>
+                  </div>
+                  <div className="flex justify-between font-bold text-amber-900 border-t border-amber-200 pt-1">
+                    <span>Total a pagar:</span>
+                    <span>{formatARS(Math.max(0, total - pagado) + recargoMonto)}</span>
+                  </div>
+                </div>
+              )}
+
               <div className="flex justify-between font-semibold text-sm border-t pt-1.5">
                 <span>Total</span>
                 <span>{formatARS(totalFinal)}</span>
@@ -1342,9 +1361,9 @@ export default function OpticaOrdenPage({ params }: { params: Promise<{ id: stri
                                 const cuota = fp.formas_pago_cuotas?.find(c => c.cantidad_cuotas === cuotaNum)
                                 if (cuota) {
                                   const pct = cuota.recargo_pct
-                                  const base = isNueva ? total : (orden?.total ?? total)
+                                  const saldoCalc = Math.max(0, total - pagado)
                                   setRecargoPct(pct.toString())
-                                  setRecargoMonto(Math.round(base * pct / 100 * 100) / 100)
+                                  setRecargoMonto(Math.round(saldoCalc * pct / 100 * 100) / 100)
                                 }
                               }
                             }}

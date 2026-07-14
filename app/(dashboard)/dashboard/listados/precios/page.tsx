@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
+import { Printer } from 'lucide-react'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
@@ -62,6 +63,19 @@ export default function ListadoPreciosPage() {
   }, [listaId, categoriaId, subcategoriaId, marcaId])
 
   useEffect(() => { fetchPrecios() }, [fetchPrecios]) // eslint-disable-line react-hooks/set-state-in-effect
+
+  const hasVariantes = useMemo(() => rows.some(r => r.variante_desc != null), [rows])
+
+  const colCount = hasVariantes ? 4 : 3
+
+  function handlePrint() {
+    const params = new URLSearchParams()
+    if (listaId) params.set('lista_id', listaId)
+    if (categoriaId && categoriaId !== 'todos') params.set('categoria_id', categoriaId)
+    if (subcategoriaId && subcategoriaId !== 'todos') params.set('subcategoria_id', subcategoriaId)
+    if (marcaId && marcaId !== 'todos') params.set('marca_id', marcaId)
+    window.open(`/dashboard/listados/precios/print?${params}`, '_blank')
+  }
 
   return (
     <div>
@@ -135,6 +149,13 @@ export default function ListadoPreciosPage() {
             </SelectContent>
           </Select>
         </div>
+        <button
+          onClick={handlePrint}
+          className="flex items-center gap-1.5 px-3 py-2 text-sm rounded-md bg-gray-100 hover:bg-gray-200 border border-gray-200 transition-colors font-medium"
+        >
+          <Printer className="w-4 h-4" />
+          Imprimir
+        </button>
       </div>
 
       {rows.length > 0 && (
@@ -149,24 +170,26 @@ export default function ListadoPreciosPage() {
             <TableRow>
               <TableHead className="w-28">Código</TableHead>
               <TableHead>Artículo</TableHead>
-              <TableHead>Variante</TableHead>
+              {hasVariantes && <TableHead>Variante</TableHead>}
               <TableHead className="text-right w-32">Precio</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-center py-8 text-gray-400">Cargando…</TableCell>
+                <TableCell colSpan={colCount} className="text-center py-8 text-gray-400">Cargando…</TableCell>
               </TableRow>
             ) : rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-center py-8 text-gray-400">Sin resultados</TableCell>
+                <TableCell colSpan={colCount} className="text-center py-8 text-gray-400">Sin resultados</TableCell>
               </TableRow>
             ) : rows.map((row, i) => (
               <TableRow key={`${row.articulo_id}-${row.variante_id ?? 0}-${i}`}>
                 <TableCell className="font-mono text-xs text-gray-500">{row.codigo ?? '—'}</TableCell>
                 <TableCell className="text-sm">{row.articulo}</TableCell>
-                <TableCell className="text-sm text-gray-500">{row.variante_desc ?? '—'}</TableCell>
+                {hasVariantes && (
+                  <TableCell className="text-sm text-gray-500">{row.variante_desc ?? '—'}</TableCell>
+                )}
                 <TableCell className="text-right font-medium">{formatARS(row.precio)}</TableCell>
               </TableRow>
             ))}

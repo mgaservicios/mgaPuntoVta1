@@ -143,6 +143,18 @@ type OrdenVentaPago = {
 - La `sucursal_id` se guarda al crear la orden y se usa al confirmar. Fallback a sucursal activa solo para órdenes históricas sin `sucursal_id`.
 - Al confirmar, si no hay caja abierta se crea una automáticamente con `monto_apertura = 0`.
 
+### FormasPagoCobro (componente unificado de pagos)
+
+El formulario de OV usa el componente `FormasPagoCobro` (`components/pago/FormasPagoCobro.tsx`) para el selector de métodos de pago. Este componente calcula recargo sobre el **saldo** (no sobre el total):
+
+```
+saldo = max(0, total - totalPagado)
+recargo = round(saldo * pct / 100 * 100) / 100
+```
+
+- Se muestra un banner amber cuando `saldo < total` (indicando que ya hay pagos previos)
+- El recargo y la cuota se recalculan dinámicamente al cambiar los pagos
+
 ---
 
-*Última actualización: 2026-05-28*
+*Última actualización: 2026-07-14*

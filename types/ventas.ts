@@ -58,6 +58,8 @@ export interface CajaSesion {
   diferencia: number | null
   observaciones: string | null
   estado: EstadoCaja
+  fecha: string
+  sesion_anterior_id: number | null
   users?: { name: string | null; email: string } | null
 }
 
@@ -69,5 +71,20 @@ export interface CajaMovimiento {
   concepto: string
   monto: number
   usuario_id: string
+  created_at: string
+}
+
+export interface CajaMovimientoLog {
+  id: number
+  movimiento_id: number
+  sesion_id: number
+  accion: 'anulacion'
+  tipo: TipoMovCaja
+  tipo_concepto: string | null
+  concepto: string
+  monto: number
+  usuario_original: string
+  motivo: string
+  usuario_anula: string
   created_at: string
 }

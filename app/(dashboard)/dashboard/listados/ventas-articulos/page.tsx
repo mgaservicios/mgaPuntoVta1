@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback, Fragment } from 'react'
+import { Printer } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -51,6 +52,14 @@ export default function ListadoVentasArticulosPage() {
 
   const groups = groupByDay(rows)
 
+  function handlePrint() {
+    const params = new URLSearchParams()
+    if (desde) params.set('desde', desde)
+    if (hasta) params.set('hasta', hasta)
+    if (tipo !== 'todos') params.set('tipo', tipo)
+    window.open(`/dashboard/listados/ventas-articulos/print?${params}`, '_blank')
+  }
+
   return (
     <div>
       <h2 className="text-lg font-semibold text-gray-800 mb-4">Listado de venta de artículos</h2>
@@ -91,6 +100,13 @@ export default function ListadoVentasArticulosPage() {
             </Select>
           </div>
         </div>
+        <button
+          onClick={handlePrint}
+          className="flex items-center gap-1.5 px-3 py-2 text-sm rounded-md bg-gray-100 hover:bg-gray-200 border border-gray-200 transition-colors font-medium"
+        >
+          <Printer className="w-4 h-4" />
+          Imprimir
+        </button>
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">

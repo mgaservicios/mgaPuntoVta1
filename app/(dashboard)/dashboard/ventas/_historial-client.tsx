@@ -8,7 +8,6 @@ import { buttonVariants, Button } from '@/components/ui/button'
 import { useSelectedSucursal } from '@/hooks/useSelectedSucursal'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -23,6 +22,8 @@ import { toast } from 'sonner'
 import { CONDICION_LABELS } from '@/types/ordenes'
 import type { Venta } from '@/types/ventas'
 import type { OrdenVenta, CondicionPago } from '@/types/ordenes'
+import FormasPagoCobro from '@/components/pago/FormasPagoCobro'
+import type { PagoFormData } from '@/components/pago/FormasPagoCobro'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -37,16 +38,6 @@ type OrdenRow = Pick<OrdenVenta, 'id' | 'numero' | 'fecha' | 'vencimiento' | 'es
   users?: { name: string | null; email: string } | null
   orden_venta_pagos?: { monto: number }[]
 }
-
-const METODOS_PAGO = [
-  { value: 'EFECTIVO', label: 'Efectivo' },
-  { value: 'TRANSFERENCIA', label: 'Transferencia' },
-  { value: 'TARJETA_DEBITO', label: 'Tarjeta débito' },
-  { value: 'TARJETA_CREDITO', label: 'Tarjeta crédito' },
-  { value: 'CUENTA_CORRIENTE', label: 'Cuenta corriente' },
-  { value: 'CHEQUE', label: 'Cheque' },
-  { value: 'OTRO', label: 'Otro' },
-]
 
 const ORDEN_ESTADO_VARIANT = {
   borrador: 'outline',
@@ -198,8 +189,7 @@ function OrdenesTab({ isAdmin, canWrite }: { isAdmin: boolean; canWrite: boolean
   const [hasta, setHasta] = useState('')
 
   const [pagarOrden, setPagarOrden] = useState<OrdenRow | null>(null)
-  const [pagoMetodo, setPagoMetodo] = useState('EFECTIVO')
-  const [pagoMonto, setPagoMonto] = useState('')
+  const [pagoData, setPagoData] = useState<PagoFormData | null>(null)
   const [savingPago, setSavingPago] = useState(false)
 
   const [deletingOrden, setDeletingOrden] = useState<OrdenRow | null>(null)
@@ -228,14 +218,22 @@ function OrdenesTab({ isAdmin, canWrite }: { isAdmin: boolean; canWrite: boolean
   useEffect(() => { fetchOrdenes() }, [fetchOrdenes])
 
   async function handlePagoRapido() {
-    if (!pagarOrden) return
-    const monto = parseFloat(pagoMonto)
+    if (!pagarOrden || !pagoData) return
+    const monto = parseFloat(pagoData.monto)
     if (isNaN(monto) || monto <= 0) { toast.error('Ingresá un monto válido'); return }
     setSavingPago(true)
     const res = await fetch(`/api/dashboard/ordenes/${pagarOrden.id}/pago`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ metodo: pagoMetodo, monto }),
+      body: JSON.stringify({
+        metodo: pagoData.metodo,
+        monto,
+        forma_pago_id: pagoData.forma_pago_id,
+        cuotas: pagoData.cuotas,
+        referencia: pagoData.referencia || null,
+        fecha_pago: pagoData.fecha_pago || null,
+        nota_credito_id: pagoData.nota_credito_id,
+      }),
     })
     setSavingPago(false)
     if (!res.ok) { const d = await res.json(); toast.error(d.error ?? 'Error'); return }
@@ -256,10 +254,7 @@ function OrdenesTab({ isAdmin, canWrite }: { isAdmin: boolean; canWrite: boolean
   }
 
   function abrirPago(orden: OrdenRow) {
-    const pagado = (orden.orden_venta_pagos ?? []).reduce((a, p) => a + p.monto, 0)
-    const saldo = orden.total - pagado
-    setPagoMonto(saldo > 0.005 ? saldo.toFixed(2) : '')
-    setPagoMetodo('EFECTIVO')
+    setPagoData(null)
     setPagarOrden(orden)
   }
 
@@ -399,21 +394,22 @@ function OrdenesTab({ isAdmin, canWrite }: { isAdmin: boolean; canWrite: boolean
       <Dialog open={!!pagarOrden} onOpenChange={open => { if (!open) setPagarOrden(null) }}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader><DialogTitle>Registrar pago — {pagarOrden?.numero}</DialogTitle></DialogHeader>
-          <div className="space-y-3 py-1">
-            <div>
-              <Label className="mb-1.5 block text-sm">Método de pago</Label>
-              <select className="w-full h-9 text-sm border border-input rounded-md px-2 bg-white" value={pagoMetodo} onChange={e => setPagoMetodo(e.target.value)}>
-                {METODOS_PAGO.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-              </select>
-            </div>
-            <div>
-              <Label className="mb-1.5 block text-sm">Monto</Label>
-              <Input type="number" min="0" step="0.01" placeholder="0.00" value={pagoMonto} onChange={e => setPagoMonto(e.target.value)} autoFocus />
-            </div>
+          <div className="py-1">
+            {pagarOrden && (() => {
+              const pagado = (pagarOrden.orden_venta_pagos ?? []).reduce((a, p) => a + p.monto, 0)
+              const saldo = Math.max(0, pagarOrden.total - pagado)
+              return (
+                <FormasPagoCobro
+                  saldo={saldo}
+                  defaultValue={{ monto: saldo > 0.005 ? saldo.toFixed(2) : '' }}
+                  onChange={setPagoData}
+                />
+              )
+            })()}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setPagarOrden(null)}>Cancelar</Button>
-            <Button onClick={handlePagoRapido} disabled={savingPago || !pagoMonto}>
+            <Button onClick={handlePagoRapido} disabled={savingPago || !pagoData}>
               {savingPago ? 'Registrando…' : 'Confirmar pago'}
             </Button>
           </DialogFooter>

@@ -138,8 +138,8 @@ export default function PrintOrdenPage({ params }: { params: Promise<{ id: strin
                   {orden.clientes?.telefono && <p className="text-[10px] text-gray-500">{orden.clientes.telefono}</p>}
                 </div>
                 <div className="shrink-0 text-right">
-                  <p className="font-mono font-bold text-gray-700 text-xs">{orden.numero}</p>
-                  <p className="text-[10px] text-gray-500">{formatFecha(orden.fecha)}</p>
+                  <p className="font-mono font-bold text-gray-900 text-sm border border-gray-300 px-1.5 py-0.5 rounded bg-gray-50">{orden.numero}</p>
+                  <p className="text-[10px] text-gray-500 mt-0.5">{formatFecha(orden.fecha)}</p>
                   {orden.fecha_prometida && (
                     <p className="text-[10px] text-gray-500">Entrega: {formatFecha(orden.fecha_prometida)}</p>
                   )}
@@ -171,6 +171,12 @@ export default function PrintOrdenPage({ params }: { params: Promise<{ id: strin
             <div className="flex-1 border-t border-dashed border-gray-400" />
             <span className="text-[8px] text-gray-400 uppercase tracking-widest">✂</span>
             <div className="flex-1 border-t border-dashed border-gray-400" />
+          </div>
+
+          {/* ══ NÚMERO DE OT (copia óptica) ══ */}
+          <div className="flex items-center justify-between mb-1.5">
+            <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-wide">Copia Óptica</p>
+            <p className="font-mono font-bold text-gray-900 text-sm border border-gray-300 px-1.5 py-0.5 rounded bg-gray-50">{orden.numero}</p>
           </div>
 
           {/* ══ DATOS DEL CLIENTE Y MÉDICO ══ */}

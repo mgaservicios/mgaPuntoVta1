@@ -86,6 +86,9 @@ export const PERM_MODULES: PermMod[] = [
       { id: 'listados.precios', label: 'Listado de precios', ops: [
         { id: 'listados.precios.ver', label: 'Ver listado de precios' },
       ]},
+      { id: 'listados.movimientos_caja', label: 'Movimientos de caja', ops: [
+        { id: 'listados.movimientos_caja.ver', label: 'Ver movimientos de caja' },
+      ]},
     ],
   },
   {
@@ -96,6 +99,7 @@ export const PERM_MODULES: PermMod[] = [
         { id: 'fondos.caja.abrir',      label: 'Abrir caja' },
         { id: 'fondos.caja.cerrar',     label: 'Cerrar caja' },
         { id: 'fondos.caja.movimiento', label: 'Registrar ingreso/egreso' },
+        { id: 'fondos.caja.anular',     label: 'Anular movimientos' },
       ]},
       { id: 'fondos.cobranzas', label: 'Cobranzas', ops: [
         { id: 'fondos.cobranzas.ver', label: 'Ver cobranzas' },
@@ -241,6 +245,7 @@ export const ROUTE_TO_PERM: [string, string][] = [
   ['/dashboard/listados/cobranzas',           'listados.cobranzas.ver'],
   ['/dashboard/listados/ventas-articulos',    'listados.ventas_articulos.ver'],
   ['/dashboard/listados/precios',             'listados.precios.ver'],
+  ['/dashboard/listados/movimientos-caja',     'listados.movimientos_caja.ver'],
   ['/dashboard/fondos',                        'fondos.caja.ver'],
   ['/dashboard/fondos/historial',             'fondos.caja.ver'],
   ['/dashboard/fondos/cobranzas',             'fondos.cobranzas.ver'],

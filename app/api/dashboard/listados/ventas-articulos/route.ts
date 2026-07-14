@@ -71,7 +71,7 @@ async function queryVentas(
         : item.nombre_articulo
       return {
         fecha: v.fecha,
-        comprobante: `V-${v.numero}`,
+        comprobante: v.numero,
         tipo_origen: 'venta' as const,
         cliente: v.clientes?.nombre ?? null,
         articulo: nombreVar,
@@ -107,7 +107,7 @@ async function queryOrdenes(
         : item.nombre_articulo
       return {
         fecha: o.fecha,
-        comprobante: `OV-${o.numero}`,
+        comprobante: o.numero,
         tipo_origen: 'orden' as const,
         cliente: o.clientes?.nombre ?? null,
         articulo: nombreVar,
@@ -141,7 +141,7 @@ async function queryOptica(
       .filter((item: any) => item.articulo_id != null) // eslint-disable-line @typescript-eslint/no-explicit-any
       .map((item: any) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
         fecha: o.fecha,
-        comprobante: `OT-${o.numero}`,
+        comprobante: o.numero,
         tipo_origen: 'optica' as const,
         cliente: o.clientes?.nombre ?? null,
         articulo: item.nombre,

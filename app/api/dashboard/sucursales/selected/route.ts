@@ -23,13 +23,14 @@ export async function GET() {
   const supabase = await getTenantClient(session)
   const { data } = await supabase
     .from('sucursales')
-    .select('id, nombre')
+    .select('id, nombre, logo_url')
     .eq('id', sucursalId)
     .single()
 
   return NextResponse.json({
     id: data?.id ?? null,
     nombre: data?.nombre ?? null,
+    logo_url: (data as { logo_url?: string | null } | null)?.logo_url ?? null,
     isHome: sucursalId === homeId,
     verTodas: false,
   })

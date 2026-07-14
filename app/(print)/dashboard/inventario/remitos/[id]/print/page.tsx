@@ -5,7 +5,7 @@ import { Printer, X } from 'lucide-react'
 import JsBarcode from 'jsbarcode'
 import type { Remito } from '@/types/stock'
 
-type RemitoDetail = Remito & { sucursal_nombre: string; contraparte_display: string }
+type RemitoDetail = Remito & { sucursal_nombre: string; sucursal_logo_url: string | null; contraparte_display: string }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -45,11 +45,11 @@ function Barcode({ value, width = 2, height = 48 }: { value: string; width?: num
 
 // ── Logo ──────────────────────────────────────────────────────────────────────
 
-function Logo({ size = 16 }: { size?: number }) {
+function Logo({ size = 16, url }: { size?: number; url?: string | null }) {
   return (
     <div className={`w-${size} h-${size} bg-white rounded-lg border border-gray-200 flex items-center justify-center overflow-hidden shrink-0`}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/logos/logo blanco.png" alt="Logo" className="w-[85%] h-[85%] object-contain"
+      <img src={url || '/logos/logo blanco.png'} alt="Logo" className="w-[85%] h-[85%] object-contain"
         onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
     </div>
   )
@@ -68,7 +68,7 @@ function LayoutA4({ remito }: { remito: RemitoDetail }) {
 
       {/* ══ ENCABEZADO ══ */}
       <div className="flex items-center gap-4 border-b-2 border-gray-800 pb-4 mb-5">
-        <Logo size={16} />
+        <Logo size={16} url={remito.sucursal_logo_url} />
 
         <div className="shrink-0">
           <Barcode value={remito.numero} width={1.8} height={44} />
@@ -210,7 +210,7 @@ function LayoutTicket({ remito }: { remito: RemitoDetail }) {
 
       {/* ══ ENCABEZADO ══ */}
       <div className="flex flex-col items-center gap-2 border-b-2 border-gray-800 pb-3 mb-3">
-        <Logo size={14} />
+        <Logo size={14} url={remito.sucursal_logo_url} />
         <Barcode value={remito.numero} width={1.6} height={38} />
         <div className="text-center">
           <p className="font-bold text-sm font-mono">{remito.numero}</p>

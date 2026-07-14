@@ -119,20 +119,21 @@ export async function POST(_: NextRequest, { params }: Ctx) {
     })
   }
 
-  // Movimientos de caja para métodos que no son cuenta corriente
-  const pagosNoCc = pagos.filter((p: { metodo: string; monto: number }) => p.metodo !== 'CUENTA_CORRIENTE')
+  // Movimientos de caja para métodos que no son cuenta corriente ni nota de crédito
+  const pagosNoCc = pagos.filter((p: { metodo: string; monto: number }) => p.metodo !== 'CUENTA_CORRIENTE' && p.metodo !== 'NOTA_CREDITO')
 
   if (pagosNoCc.length > 0) {
     let { data: cajaSesion } = await supabase
       .from('caja_sesiones')
       .select('id')
+      .eq('sucursal_id', sucursalId)
       .eq('estado', 'abierta')
       .maybeSingle()
 
     if (!cajaSesion) {
       const { data: nueva } = await supabase
         .from('caja_sesiones')
-        .insert({ usuario_id: session.user.id, monto_apertura: 0 })
+        .insert({ usuario_id: session.user.id, monto_apertura: 0, sucursal_id: sucursalId })
         .select('id')
         .single()
       cajaSesion = nueva

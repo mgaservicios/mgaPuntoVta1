@@ -1146,18 +1146,11 @@ RETURNS numeric LANGUAGE sql STABLE AS $$
 $$;
 
 -- Monto esperado en caja al cierre
+-- FIX 20260712: eliminar doble conteo — venta_pagos EFECTIVO ya se registra en caja_movimientos
 CREATE OR REPLACE FUNCTION public.caja_monto_esperado(p_sesion_id bigint)
 RETURNS numeric LANGUAGE sql STABLE AS $$
   SELECT
     cs.monto_apertura
-    + COALESCE((
-        SELECT SUM(vp.monto)
-        FROM public.venta_pagos vp
-        JOIN public.ventas v ON v.id = vp.venta_id
-        WHERE v.caja_sesion_id = p_sesion_id
-          AND vp.metodo = 'EFECTIVO'
-          AND v.estado  = 'completada'
-      ), 0)
     + COALESCE((
         SELECT SUM(monto)
         FROM public.caja_movimientos

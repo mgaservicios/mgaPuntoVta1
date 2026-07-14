@@ -57,6 +57,10 @@ notas de crédito y administración de usuarios/roles/permisos.
 | **Óptica — Órdenes de trabajo** | `/dashboard/optica/ordenes` | ✅ |
 | **Óptica — Servicios** | `/dashboard/optica/servicios` | ✅ |
 | **Óptica — Médicos** | `/dashboard/optica/medicos` | ✅ |
+| **Listados — Cta. Cte. Clientes** | `/dashboard/listados/cobranzas` | ✅ |
+| **Listados — Venta de artículos** | `/dashboard/listados/ventas-articulos` | ✅ |
+| **Listados — Lista de precios** | `/dashboard/listados/precios` | ✅ |
+| **Listados — Movimientos de caja** | `/dashboard/listados/movimientos-caja` | ✅ |
 
 ---
 
@@ -75,6 +79,7 @@ notas de crédito y administración de usuarios/roles/permisos.
 | Administración | [context/modulos/administracion.md](modulos/administracion.md) |
 | **Óptica — Órdenes de trabajo** | [context/modulos/optica-ordenes.md](modulos/optica-ordenes.md) |
 | **Óptica — Servicios** | [context/modulos/optica-servicios.md](modulos/optica-servicios.md) |
+| **Listados e informes** | [context/modulos/listados.md](modulos/listados.md) |
 | **UI Theming — Logo y Color** | [context/modulos/ui-theming.md](modulos/ui-theming.md) |
 | Schema completo de BD | [context/DATABASE.md](DATABASE.md) |
 
@@ -110,9 +115,10 @@ proxy.ts                     # Protección de rutas (reemplaza middleware.ts)
 actualizados por `syncArticuloStock()` después de cada operación.
 
 ### Sucursal activa
-Se guarda en cookie (`sucursal_id`). Se lee con `getActiveSucursalId()` desde `lib/sucursal.ts`.
+Se guarda en cookie (`sucursal_id`). Se lee con `getActiveSucursalId()` o `getSucursalFilter()` desde `lib/sucursal.ts`.
 Todas las operaciones de stock (ventas, órdenes) usan la sucursal activa al momento de la transacción
 y la guardan en la fila (`ventas.sucursal_id`, `ordenes_venta.sucursal_id`).
+La API `/api/dashboard/sucursales/selected` devuelve `{ id, nombre, logo_url, isHome, verTodas }` de la sucursal activa.
 
 ### Theming por sucursal
 El campo `sucursales.color` (hex) se aplica como variable CSS `--primary` en todo el dashboard.
@@ -153,4 +159,4 @@ Ver `supabase/migrations/20260603_eliminaciones_log.sql`.
 
 ---
 
-**Última actualización:** 2026-06-09
+**Última actualización:** 2026-07-14

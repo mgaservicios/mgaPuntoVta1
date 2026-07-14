@@ -652,14 +652,6 @@ returns numeric language sql stable as $$
   select
     cs.monto_apertura
     + coalesce((
-        select sum(vp.monto)
-        from public.venta_pagos vp
-        join public.ventas v on v.id = vp.venta_id
-        where v.caja_sesion_id = p_sesion_id
-          and vp.metodo = 'EFECTIVO'
-          and v.estado = 'completada'
-      ), 0)
-    + coalesce((
         select sum(monto)
         from public.caja_movimientos
         where sesion_id = p_sesion_id and tipo = 'ingreso'

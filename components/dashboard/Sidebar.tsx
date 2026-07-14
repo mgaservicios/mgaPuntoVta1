@@ -137,7 +137,7 @@ const navGroups: NavGroup[] = [
     module: 'fondos',
     items: [
       { label: 'Caja',               href: '/dashboard/fondos',           Icon: Wallet,      permKey: 'fondos.caja.ver' },
-      { label: 'Historial de cierres', href: '/dashboard/fondos/historial', Icon: History,   permKey: 'fondos.caja.ver' },
+      { label: 'Historial', href: '/dashboard/fondos/historial', Icon: History,   permKey: 'fondos.caja.ver' },
       { label: 'Cobranzas',          href: '/dashboard/fondos/cobranzas', Icon: DollarSign,  permKey: 'fondos.cobranzas.ver' },
       { label: 'Recibos',            href: '/dashboard/fondos/recibos',   Icon: ReceiptText, permKey: 'fondos.recibos.ver' },
     ],
@@ -151,6 +151,7 @@ const navGroups: NavGroup[] = [
       { label: 'Cta. Cte. Clientes', href: '/dashboard/listados/cobranzas',        Icon: DollarSign, permKey: 'listados.cobranzas.ver' },
       { label: 'Venta de artículos', href: '/dashboard/listados/ventas-articulos', Icon: Package,    permKey: 'listados.ventas_articulos.ver' },
       { label: 'Lista de precios',   href: '/dashboard/listados/precios',          Icon: Tag,        permKey: 'listados.precios.ver' },
+      { label: 'Movimientos de caja', href: '/dashboard/listados/movimientos-caja', Icon: Wallet,    permKey: 'listados.movimientos_caja.ver' },
     ],
   },
   {

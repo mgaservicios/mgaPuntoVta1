@@ -142,6 +142,49 @@ Cuando no hay logo subido → fallback al logo estático `public/logos/logo blan
 
 ---
 
+## Logo en páginas de impresión
+
+El componente `Logo` (`components/Logo.tsx`) acepta una prop `url?: string | null`. Si se provee, usa esa URL; si no, usa el logo estático `/logos/logo blanco.png`.
+
+Todas las páginas de impresión (OT, SV, OV, remitos, listados) cargan el logo desde `/api/dashboard/sucursales/selected`:
+
+```typescript
+const res = await fetch('/api/dashboard/sucursales/selected')
+const data = await res.json()
+// data: { id, nombre, logo_url, isHome, verTodas }
+setSucursalNombre(data.nombre)
+setSucursalLogo(data.logo_url)
+```
+
+Luego lo pasan al componente Logo:
+```tsx
+<Logo url={sucursalLogo} className="w-14 h-14" />
+```
+
+---
+
+## API `/api/dashboard/sucursales/selected`
+
+Devuelve información de la sucursal activa del usuario:
+
+```typescript
+type SucursalSelected = {
+  id: number | null
+  nombre: string | null
+  logo_url: string | null
+  isHome: boolean
+  verTodas: boolean
+}
+```
+
+- `id`: ID de la sucursal activa (null si "ver todas")
+- `nombre`: nombre de la sucursal activa
+- `logo_url`: URL del logo (null si no tiene)
+- `isHome`: true si la sucursal es la de login
+- `verTodas`: true si el admin tiene activado "ver todas las sucursales"
+
+---
+
 ## Nombre de empresa en el header
 
 El nombre de la empresa (tabla `empresas` de la DB maestra) se guarda en el JWT de
@@ -197,4 +240,4 @@ Solo se muestran las acciones cuyo módulo esté en `session.user.modules`.
 
 ---
 
-*Última actualización: 2026-06-09*
+*Última actualización: 2026-07-14*

@@ -104,13 +104,14 @@ export async function POST(_: NextRequest, { params }: Ctx) {
       let { data: cajaSesion } = await supabase
         .from('caja_sesiones')
         .select('id')
+        .eq('sucursal_id', sucursalId)
         .eq('estado', 'abierta')
         .maybeSingle()
 
       if (!cajaSesion) {
         const { data: nueva } = await supabase
           .from('caja_sesiones')
-          .insert({ usuario_id: session.user.id, monto_apertura: 0 })
+          .insert({ usuario_id: session.user.id, monto_apertura: 0, sucursal_id: sucursalId })
           .select('id')
           .single()
         cajaSesion = nueva

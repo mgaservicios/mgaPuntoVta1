@@ -6,6 +6,7 @@ import { getSucursalFilter, getHomeSucursalId, assertActiveSucursalIsHome } from
 
 // GET — sesión abierta de la sucursal que se está viendo + flag isHome
 // Cuando verTodas=true siempre muestra la home (única que puede operar el usuario)
+// Si hay sesión abierta del día anterior, la retorna como sesion_anterior
 export async function GET() {
   const session = await auth()
   if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
@@ -20,13 +21,17 @@ export async function GET() {
   const sucursalId = verTodas ? homeId : activoId
   if (!sucursalId) return NextResponse.json({ error: 'sin_sucursal_activa' }, { status: 403 })
 
+  // Obtener la fecha de hoy en la zona horaria de Argentina
+  const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' })
+
   const [sessionRes, sucursalRes] = await Promise.all([
     supabase
       .from('caja_sesiones')
       .select('*, users(name, email)')
       .eq('estado', 'abierta')
       .eq('sucursal_id', sucursalId)
-      .maybeSingle(),
+      .order('fecha_apertura', { ascending: false })
+      .limit(1),
     supabase
       .from('sucursales')
       .select('nombre')
@@ -34,8 +39,13 @@ export async function GET() {
       .single(),
   ])
 
+  const sesion = sessionRes.data?.[0] ?? null
+  const sesionAnterior = sesion && sesion.fecha !== hoy ? sesion : null
+  const sesionActual = sesion && sesion.fecha === hoy ? sesion : null
+
   return NextResponse.json({
-    sesion: sessionRes.data ?? null,
+    sesion: sesionActual,
+    sesion_anterior: sesionAnterior,
     isHome: sucursalId === homeId,
     sucursalNombre: sucursalRes.data?.nombre ?? null,
   })
@@ -68,9 +78,18 @@ export async function POST(req: NextRequest) {
 
   if (existing) return NextResponse.json({ error: 'Ya hay una caja abierta en esta sucursal' }, { status: 409 })
 
+  const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' })
+
   const { data, error } = await supabase
     .from('caja_sesiones')
-    .insert({ usuario_id: session.user.id, monto_apertura, sucursal_id: sucursalId, vendedor_id: body.vendedor_id })
+    .insert({
+      usuario_id: session.user.id,
+      monto_apertura,
+      sucursal_id: sucursalId,
+      vendedor_id: body.vendedor_id,
+      fecha: body.fecha ?? hoy,
+      sesion_anterior_id: body.sesion_anterior_id ?? null,
+    })
     .select()
     .single()
 

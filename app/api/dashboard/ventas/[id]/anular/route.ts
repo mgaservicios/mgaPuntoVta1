@@ -83,15 +83,35 @@ export async function POST(_: NextRequest, { params }: Ctx) {
     TARJETA_DEBITO: 'Tarjeta débito', TARJETA_CREDITO: 'Tarjeta crédito',
     CHEQUE: 'Cheque', OTRO: 'Otro',
   }
+
+  // Determinar sesión de caja destino: si la original sigue abierta usar esa, si no la actual
+  let sesionCajaTarget = venta.caja_sesion_id as number | null
+  if (sesionCajaTarget) {
+    const { data: sesionCheck } = await supabase
+      .from('caja_sesiones').select('estado').eq('id', sesionCajaTarget).single()
+    if (sesionCheck?.estado !== 'abierta') {
+      const { data: sesionActual } = await supabase
+        .from('caja_sesiones').select('id')
+        .eq('sucursal_id', venta.sucursal_id)
+        .eq('estado', 'abierta')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      sesionCajaTarget = sesionActual?.id ?? null
+    }
+  }
+
   const pagosNoCc = pagos.filter(p => p.metodo !== 'CUENTA_CORRIENTE')
-  for (const p of pagosNoCc) {
-    await supabase.from('caja_movimientos').insert({
-      sesion_id: venta.caja_sesion_id,
-      tipo: 'egreso',
-      concepto: `Anulación venta ${venta.numero} - ${METODO_LABELS[p.metodo] ?? p.metodo}`,
-      monto: p.monto,
-      usuario_id: session.user.id,
-    })
+  if (sesionCajaTarget && pagosNoCc.length > 0) {
+    for (const p of pagosNoCc) {
+      await supabase.from('caja_movimientos').insert({
+        sesion_id: sesionCajaTarget,
+        tipo: 'egreso',
+        concepto: `Anulación venta ${venta.numero} - ${METODO_LABELS[p.metodo] ?? p.metodo}`,
+        monto: p.monto,
+        usuario_id: session.user.id,
+      })
+    }
   }
 
   await supabase

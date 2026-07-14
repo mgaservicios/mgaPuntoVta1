@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { toast } from 'sonner'
-import { DollarSign, LogOut, Plus, Minus } from 'lucide-react'
+import { DollarSign, LogOut, Plus, Minus, AlertTriangle } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -182,6 +182,72 @@ function CerrarCajaDialog({ open, sesionId, onClose, onClosed }: {
   )
 }
 
+// ── Dialogo continuar caja (cerrar y abrir nueva) ──────────────────────────
+
+function ContinuarCajaDialog({ open, sesionAnterior, onClose, onConfirm }: {
+  open: boolean
+  sesionAnterior: CajaSesion | null
+  onClose: () => void
+  onConfirm: (montoCierre: number, observaciones: string) => void
+}) {
+  const [monto, setMonto] = useState('0')
+  const [obs, setObs] = useState('')
+
+  useEffect(() => {
+    if (open) {
+      setMonto(sesionAnterior?.monto_apertura?.toString() ?? '0')
+      setObs('')
+    }
+  }, [open, sesionAnterior])
+
+  function handleConfirm() {
+    onConfirm(parseFloat(monto) || 0, obs)
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Cerrar y abrir nueva caja</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <p className="text-sm text-gray-600">
+            Se cerrará la sesión del día anterior y se abrirá una nueva con el monto que indiques.
+          </p>
+          <div className="space-y-1">
+            <Label>Monto contado en caja ($)</Label>
+            <Input
+              type="number" step="0.01" min="0"
+              value={monto}
+              onChange={(e) => setMonto(e.target.value)}
+              autoFocus
+            />
+            <p className="text-xs text-gray-400">
+              Monto esperado: {formatARS(sesionAnterior?.monto_apertura ?? 0)}
+            </p>
+          </div>
+          <div className="space-y-1">
+            <Label>Observaciones</Label>
+            <textarea
+              rows={2}
+              value={obs}
+              onChange={(e) => setObs(e.target.value)}
+              placeholder="Opcional"
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button onClick={handleConfirm}>
+            Cerrar y abrir nueva
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 // ── Dialogo movimiento ────────────────────────────────────────────────────────
 
 function MovimientoDialog({ open, sesionId, tipo, onClose, onSaved }: {
@@ -304,11 +370,11 @@ interface ResumenData {
   manualEgr: number
 }
 
-async function abrirCaja(monto_apertura: number, vendedor_id: number | null): Promise<{ data: CajaSesion | null; error: string | null }> {
+async function abrirCaja(monto_apertura: number, vendedor_id: number | null, sesion_anterior_id?: number | null): Promise<{ data: CajaSesion | null; error: string | null }> {
   const res = await fetch('/api/dashboard/caja/sesion', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ monto_apertura, vendedor_id }),
+    body: JSON.stringify({ monto_apertura, vendedor_id, sesion_anterior_id }),
   })
   if (res.ok) return { data: await res.json(), error: null }
   const body = await res.json().catch(() => ({}))
@@ -319,6 +385,7 @@ export default function CajaPage() {
   const { can } = usePermissions()
   const [sucursalNombre, setSucursalNombre] = useState<string | null>(null)
   const [sesion, setSesion] = useState<CajaSesion | null | undefined>(undefined)
+  const [sesionAnterior, setSesionAnterior] = useState<CajaSesion | null>(null)
   const [isHomeCaja, setIsHomeCaja] = useState(true)
   const [movimientos, setMovimientos] = useState<CajaMovimiento[]>([])
   const [resumen, setResumen] = useState<ResumenData | null>(null)
@@ -326,6 +393,8 @@ export default function CajaPage() {
   const [showAbrir, setShowAbrir] = useState(false)
   const [movDialog, setMovDialog] = useState<TipoMovCaja | null>(null)
   const [openingCaja, setOpeningCaja] = useState(false)
+  const [continuandoCaja, setContinuandoCaja] = useState(false)
+  const [showContinuarDialog, setShowContinuarDialog] = useState(false)
 
   const loadMovimientos = useCallback(async (id: number) => {
     const res = await fetch(`/api/dashboard/caja/sesion/${id}/movimientos`)
@@ -342,21 +411,29 @@ export default function CajaPage() {
   useEffect(() => {
     async function init() {
       const res = await fetch('/api/dashboard/caja/sesion')
-      const data: { sesion: CajaSesion | null; isHome: boolean; sucursalNombre: string | null } = await res.json()
+      const data: { sesion: CajaSesion | null; sesion_anterior: CajaSesion | null; isHome: boolean; sucursalNombre: string | null } = await res.json()
       setIsHomeCaja(data.isHome ?? true)
       setSucursalNombre(data.sucursalNombre ?? null)
+      setSesionAnterior(data.sesion_anterior ?? null)
       const s = data.sesion
       setSesion(s)
-      if (s) { loadMovimientos(s.id); loadResumen(s.id) }
+      if (s) {
+        loadMovimientos(s.id)
+        loadResumen(s.id)
+      } else if (data.sesion_anterior) {
+        loadMovimientos(data.sesion_anterior.id)
+        loadResumen(data.sesion_anterior.id)
+      }
     }
     init()
   }, [loadMovimientos, loadResumen])
 
   async function handleAbrirConMonto(monto: number, vendedorId: number | null) {
     setOpeningCaja(true)
-    const { data: s, error } = await abrirCaja(monto, vendedorId)
+    const { data: s, error } = await abrirCaja(monto, vendedorId, sesionAnterior?.id)
     if (s) {
       setSesion(s)
+      setSesionAnterior(null)
       setMovimientos([])
       setResumen(null)
       if (monto > 0) loadMovimientos(s.id)
@@ -369,13 +446,52 @@ export default function CajaPage() {
     setShowAbrir(false)
   }
 
+  async function handleContinuar(accion: 'continuar' | 'cerrar_y_abrir', montoCierre?: number, observaciones?: string) {
+    if (!sesionAnterior) return
+    setContinuandoCaja(true)
+    const res = await fetch(`/api/dashboard/caja/sesion/${sesionAnterior.id}/continuar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        accion,
+        monto_cierre: montoCierre,
+        observaciones,
+        fecha_hora_cierre: new Date().toISOString(),
+      }),
+    })
+    if (res.ok) {
+      const data = await res.json()
+      setSesion(data.sesion_nueva)
+      setSesionAnterior(null)
+      setMovimientos([])
+      setResumen(null)
+      loadMovimientos(data.sesion_nueva.id)
+      loadResumen(data.sesion_nueva.id)
+      toast.success(accion === 'continuar' ? 'Caja continuada' : 'Caja cerrada y nueva sesión abierta')
+    } else {
+      const err = await res.json()
+      toast.error(err.error ?? 'Error al procesar')
+    }
+    setContinuandoCaja(false)
+    setShowContinuarDialog(false)
+  }
+
   function handleClosed() {
-    fetch('/api/dashboard/caja/sesion').then(r => r.json()).then((data: { sesion: CajaSesion | null; isHome: boolean; sucursalNombre: string | null }) => {
+    fetch('/api/dashboard/caja/sesion').then(r => r.json()).then((data: { sesion: CajaSesion | null; sesion_anterior: CajaSesion | null; isHome: boolean; sucursalNombre: string | null }) => {
       setSesion(data.sesion)
+      setSesionAnterior(data.sesion_anterior ?? null)
       setIsHomeCaja(data.isHome ?? true)
       setSucursalNombre(data.sucursalNombre ?? null)
       setMovimientos([])
       setResumen(null)
+      const s = data.sesion
+      if (s) {
+        loadMovimientos(s.id)
+        loadResumen(s.id)
+      } else if (data.sesion_anterior) {
+        loadMovimientos(data.sesion_anterior.id)
+        loadResumen(data.sesion_anterior.id)
+      }
     })
   }
 
@@ -386,14 +502,54 @@ export default function CajaPage() {
 
   if (sesion === undefined) return <div className="text-gray-400 text-sm">Iniciando caja…</div>
 
+  // Usar sesión actual si existe, si no la anterior (para mostrar datos)
+  const displaySesion = sesion ?? sesionAnterior
+
   const estaAbierta = sesion?.estado === 'abierta'
   // Excluir Apertura de ingresos: ya está contada en monto_apertura
   const ing = movimientos.filter(m => m.tipo === 'ingreso' && m.tipo_concepto !== 'Apertura').reduce((s, m) => s + Number(m.monto), 0)
   const egr = movimientos.filter(m => m.tipo === 'egreso').reduce((s, m) => s + Number(m.monto), 0)
-  const totalCaja = Number(sesion?.monto_apertura ?? 0) + ing - egr
+  const totalCaja = Number(displaySesion?.monto_apertura ?? 0) + ing - egr
 
   return (
     <div className="max-w-2xl space-y-4">
+
+      {/* Banner sesión anterior */}
+      {sesionAnterior && isHomeCaja && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-500 mt-0.5 shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-amber-800">
+                Caja abierta del día anterior
+              </p>
+              <p className="text-xs text-amber-600 mt-1">
+                Fecha: {new Date(sesionAnterior.fecha_apertura).toLocaleDateString('es-AR')} —
+                Monto actual: {formatARS(sesionAnterior.monto_apertura)}
+              </p>
+              <div className="flex gap-2 mt-3">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleContinuar('continuar')}
+                  disabled={continuandoCaja}
+                >
+                  {continuandoCaja ? 'Procesando…' : 'Continuar caja'}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-red-500 hover:text-red-600"
+                  onClick={() => setShowContinuarDialog(true)}
+                  disabled={continuandoCaja}
+                >
+                  Cerrar y abrir nueva
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -439,7 +595,7 @@ export default function CajaPage() {
         {/* ── Solapa Caja ─────────────────────────────────────────── */}
         <TabsContent value="caja">
           <div className="bg-white rounded-xl border border-gray-200 p-5 mt-2">
-            {!sesion ? <SinCaja /> : (
+            {!displaySesion ? <SinCaja /> : (
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-xs text-gray-400 mb-0.5">Estado</p>
@@ -449,13 +605,13 @@ export default function CajaPage() {
                 </div>
                 <div>
                   <p className="text-xs text-gray-400 mb-0.5">Apertura</p>
-                  <p className="text-sm font-medium">{formatDateTime(sesion.fecha_apertura)}</p>
+                  <p className="text-sm font-medium">{formatDateTime(displaySesion.fecha_apertura)}</p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-400 mb-0.5">Monto apertura</p>
-                  <p className="text-sm font-medium">{formatARS(sesion.monto_apertura)}</p>
+                  <p className="text-sm font-medium">{formatARS(displaySesion.monto_apertura)}</p>
                 </div>
-                {estaAbierta && (
+                {(estaAbierta || !sesion) && (
                   <>
                     <div>
                       <p className="text-xs text-gray-400 mb-0.5">Total caja</p>
@@ -471,24 +627,24 @@ export default function CajaPage() {
                     </div>
                   </>
                 )}
-                {sesion.fecha_cierre && (
+                {displaySesion.fecha_cierre && (
                   <>
                     <div>
                       <p className="text-xs text-gray-400 mb-0.5">Cierre</p>
-                      <p className="text-sm font-medium">{formatDateTime(sesion.fecha_cierre)}</p>
+                      <p className="text-sm font-medium">{formatDateTime(displaySesion.fecha_cierre)}</p>
                     </div>
                     <div>
                       <p className="text-xs text-gray-400 mb-0.5">Monto esperado</p>
-                      <p className="text-sm font-medium">{formatARS(sesion.monto_esperado ?? 0)}</p>
+                      <p className="text-sm font-medium">{formatARS(displaySesion.monto_esperado ?? 0)}</p>
                     </div>
                     <div>
                       <p className="text-xs text-gray-400 mb-0.5">Monto contado</p>
-                      <p className="text-sm font-medium">{formatARS(sesion.monto_cierre ?? 0)}</p>
+                      <p className="text-sm font-medium">{formatARS(displaySesion.monto_cierre ?? 0)}</p>
                     </div>
                     <div>
                       <p className="text-xs text-gray-400 mb-0.5">Diferencia</p>
-                      <p className={`text-sm font-semibold ${(sesion.diferencia ?? 0) < 0 ? 'text-red-500' : (sesion.diferencia ?? 0) > 0 ? 'text-green-600' : ''}`}>
-                        {formatARS(sesion.diferencia ?? 0)}
+                      <p className={`text-sm font-semibold ${(displaySesion.diferencia ?? 0) < 0 ? 'text-red-500' : (displaySesion.diferencia ?? 0) > 0 ? 'text-green-600' : ''}`}>
+                        {formatARS(displaySesion.diferencia ?? 0)}
                       </p>
                     </div>
                   </>
@@ -501,7 +657,7 @@ export default function CajaPage() {
         {/* ── Solapa Resumen Caja ──────────────────────────────────── */}
         <TabsContent value="resumen">
           <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100 mt-2">
-            {!estaAbierta ? (
+            {!displaySesion ? (
               <div className="p-5"><SinCaja /></div>
             ) : !resumen ? (
               <p className="px-4 py-4 text-sm text-gray-400">Cargando resumen…</p>
@@ -615,7 +771,7 @@ export default function CajaPage() {
         {/* ── Solapa Movimientos ───────────────────────────────────── */}
         <TabsContent value="movimientos">
           <div className="space-y-3 mt-2">
-            {!estaAbierta ? (
+            {!displaySesion ? (
               <div className="bg-white rounded-xl border border-gray-200 p-5"><SinCaja /></div>
             ) : (
               <>
@@ -670,12 +826,20 @@ export default function CajaPage() {
 
       {/* Diálogos — solo disponibles para la sucursal logueada */}
       {isHomeCaja && (
-        <AbrirCajaDialog
-          open={showAbrir}
-          saving={openingCaja}
-          onClose={() => setShowAbrir(false)}
-          onConfirm={handleAbrirConMonto}
-        />
+        <>
+          <AbrirCajaDialog
+            open={showAbrir}
+            saving={openingCaja}
+            onClose={() => setShowAbrir(false)}
+            onConfirm={handleAbrirConMonto}
+          />
+          <ContinuarCajaDialog
+            open={showContinuarDialog}
+            sesionAnterior={sesionAnterior}
+            onClose={() => setShowContinuarDialog(false)}
+            onConfirm={(monto, obs) => handleContinuar('cerrar_y_abrir', monto, obs)}
+          />
+        </>
       )}
       {sesion && isHomeCaja && (
         <>

@@ -30,7 +30,7 @@ export async function GET(_: NextRequest, { params }: Ctx) {
   if (error) return NextResponse.json({ error: error.message }, { status: 404 })
 
   const [sucursalRes, contraparteRes] = await Promise.all([
-    supabase.from('sucursales').select('nombre').eq('id', data.sucursal_id).single(),
+    supabase.from('sucursales').select('nombre, logo_url').eq('id', data.sucursal_id).single(),
     data.contraparte_tipo === 'proveedor' && data.contraparte_proveedor_id
       ? supabase.from('proveedores').select('nombre').eq('id', data.contraparte_proveedor_id).single()
       : data.contraparte_tipo === 'sucursal' && data.contraparte_sucursal_id
@@ -45,6 +45,7 @@ export async function GET(_: NextRequest, { params }: Ctx) {
   return NextResponse.json({
     ...data,
     sucursal_nombre: (sucursalRes.data as { nombre: string } | null)?.nombre ?? '—',
+    sucursal_logo_url: (sucursalRes.data as { logo_url: string | null } | null)?.logo_url ?? null,
     contraparte_display,
   })
 }

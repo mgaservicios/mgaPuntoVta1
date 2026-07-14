@@ -341,6 +341,18 @@ function Barcode({ value }: { value: string }) {
 
 **Saldo** = `total − sum(optica_orden_pagos.monto)` (montos negativos de anulación se suman).
 
+### FormasPagoCobro (componente unificado de pagos)
+
+El formulario de OT usa el componente `FormasPagoCobro` (`components/pago/FormasPagoCobro.tsx`) para el selector de métodos de pago. Este componente calcula recargo sobre el **saldo** (no sobre el total):
+
+```
+saldo = max(0, total - totalPagado)
+recargo = round(saldo * pct / 100 * 100) / 100
+```
+
+- Se muestra un banner amber cuando `saldo < total` (indicando que ya hay pagos previos)
+- El recargo y la cuota se recalculan dinámicamente al cambiar los pagos
+
 ---
 
 ## Anulación
@@ -413,4 +425,4 @@ Interfaces principales: `OpticaOrden`, `OpticaOrdenItem`, `OpticaOrdenTarea`, `O
 
 ---
 
-*Última actualización: 2026-06-04*
+*Última actualización: 2026-07-14*

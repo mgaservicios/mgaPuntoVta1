@@ -109,7 +109,7 @@ const MODULE_SECTIONS: ModuleSection[] = [
     color: 'amber',
     items: [
       { label: 'Caja',                 href: '/dashboard/fondos',           Icon: Wallet,      description: 'Sesión activa de caja',     permKey: 'fondos.caja.ver'      },
-      { label: 'Historial de cierres', href: '/dashboard/fondos/historial', Icon: History,     description: 'Movimientos anteriores',    permKey: 'fondos.caja.ver'      },
+      { label: 'Historial', href: '/dashboard/fondos/historial', Icon: History,     description: 'Movimientos y cierres',    permKey: 'fondos.caja.ver'      },
       { label: 'Cobranzas',            href: '/dashboard/fondos/cobranzas', Icon: DollarSign,  description: 'Cuenta corriente clientes', permKey: 'fondos.cobranzas.ver' },
       { label: 'Recibos',              href: '/dashboard/fondos/recibos',   Icon: ReceiptText, description: 'Comprobantes emitidos',     permKey: 'fondos.recibos.ver'   },
     ],
@@ -124,6 +124,7 @@ const MODULE_SECTIONS: ModuleSection[] = [
       { label: 'Cta. Cte. Clientes', href: '/dashboard/listados/cobranzas',        Icon: DollarSign, description: 'Saldos y movimientos',   permKey: 'listados.cobranzas.ver'          },
       { label: 'Venta de artículos', href: '/dashboard/listados/ventas-articulos', Icon: Package,    description: 'Artículos más vendidos', permKey: 'listados.ventas_articulos.ver'   },
       { label: 'Lista de precios',   href: '/dashboard/listados/precios',          Icon: Tag,        description: 'Precios por lista',      permKey: 'listados.precios.ver'            },
+      { label: 'Movimientos de caja', href: '/dashboard/listados/movimientos-caja', Icon: Wallet,    description: 'Ingresos y egresos',     permKey: 'listados.movimientos_caja.ver'   },
     ],
   },
   {

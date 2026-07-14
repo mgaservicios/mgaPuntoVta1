@@ -6,6 +6,23 @@ import { assertHomeSucursal } from '@/lib/sucursal'
 
 type Ctx = { params: Promise<{ id: string }> }
 
+// Helper: verificar si un pago ya tiene movimiento en caja_movimientos
+function pagoYaRegistrado(
+  movs: { concepto: string; monto: number }[],
+  patron: string,
+  monto: number
+): boolean {
+  return movs.some(m =>
+    m.concepto.includes(patron) && Number(m.monto) === Number(monto)
+  )
+}
+
+type SynEntry = {
+  id: number; sesion_id: number; tipo: 'ingreso';
+  tipo_concepto: string; concepto: string; monto: number;
+  usuario_id: string; created_at: string
+}
+
 export async function GET(_: NextRequest, { params }: Ctx) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
@@ -24,6 +41,7 @@ export async function GET(_: NextRequest, { params }: Ctx) {
   const hasta  = sesionData?.fecha_cierre ?? new Date().toISOString()
   const sucursalId = sesionData?.sucursal_id
 
+  // ── 1. Movimientos directos de caja_movimientos ────────────────────────────
   const { data: movs, error } = await supabase
     .from('caja_movimientos')
     .select('*')
@@ -31,8 +49,9 @@ export async function GET(_: NextRequest, { params }: Ctx) {
     .order('created_at', { ascending: false })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  const movsList = movs ?? []
 
-  // ── Pagos CC — Ventas POS ──────────────────────────────────────────────────
+  // ── 2. Ventas POS — por caja_sesion_id (NOT NULL garantizado) ─────────────
   const { data: ventasRows } = await supabase
     .from('ventas')
     .select('id, numero')
@@ -42,11 +61,11 @@ export async function GET(_: NextRequest, { params }: Ctx) {
   const ventaIds = (ventasRows ?? []).map(v => v.id)
   const ventaNumMap = Object.fromEntries((ventasRows ?? []).map(v => [v.id, v.numero]))
 
-  const { data: ventaCC } = ventaIds.length > 0
-    ? await supabase.from('venta_pagos').select('id, venta_id, monto, created_at').in('venta_id', ventaIds).eq('metodo', 'CUENTA_CORRIENTE')
-    : { data: [] as { id: number; venta_id: number; monto: number; created_at: string }[] }
+  const { data: ventaPagos } = ventaIds.length > 0
+    ? await supabase.from('venta_pagos').select('id, venta_id, metodo, monto, created_at').in('venta_id', ventaIds)
+    : { data: [] as { id: number; venta_id: number; metodo: string; monto: number; created_at: string }[] }
 
-  // ── Pagos CC — Órdenes de venta ────────────────────────────────────────────
+  // ── 3. Órdenes de venta — por rango de fechas (no tiene caja_sesion_id) ────
   const { data: ordenesRows } = sucursalId
     ? await supabase.from('ordenes_venta').select('id, numero').eq('sucursal_id', sucursalId).neq('estado', 'anulada')
     : { data: [] as { id: number; numero: number }[] }
@@ -54,62 +73,120 @@ export async function GET(_: NextRequest, { params }: Ctx) {
   const ordenIds = (ordenesRows ?? []).map(o => o.id)
   const ordenNumMap = Object.fromEntries((ordenesRows ?? []).map(o => [o.id, o.numero]))
 
-  const { data: ordenCC } = ordenIds.length > 0
-    ? await supabase.from('orden_venta_pagos').select('id, orden_id, monto, created_at').in('orden_id', ordenIds).gte('created_at', desde).lte('created_at', hasta).eq('metodo', 'CUENTA_CORRIENTE')
-    : { data: [] as { id: number; orden_id: number; monto: number; created_at: string }[] }
+  const { data: ordenPagos } = ordenIds.length > 0
+    ? await supabase.from('orden_venta_pagos').select('id, orden_id, metodo, monto, created_at').in('orden_id', ordenIds).gte('created_at', desde).lte('created_at', hasta)
+    : { data: [] as { id: number; orden_id: number; metodo: string; monto: number; created_at: string }[] }
 
-  // ── Pagos CC — OT ──────────────────────────────────────────────────────────
-  const { data: otCCRaw } = await supabase
+  // ── 4. OT — por rango de fechas (captura pagos con caja_sesion_id NULL) ────
+  const { data: otPagosRaw } = await supabase
     .from('optica_orden_pagos')
-    .select('id, orden_id, monto, created_at')
-    .eq('caja_sesion_id', sesionId)
-    .eq('metodo', 'CUENTA_CORRIENTE')
+    .select('id, orden_id, metodo, monto, created_at')
+    .gte('created_at', desde)
+    .lte('created_at', hasta)
 
-  const otOrdenIds = [...new Set((otCCRaw ?? []).map(p => p.orden_id))]
+  const otOrdenIds = [...new Set((otPagosRaw ?? []).map(p => p.orden_id))]
   const { data: otOrdenes } = otOrdenIds.length > 0
     ? await supabase.from('optica_ordenes').select('id, numero').in('id', otOrdenIds)
     : { data: [] as { id: number; numero: number }[] }
   const otNumMap = Object.fromEntries((otOrdenes ?? []).map(o => [o.id, o.numero]))
 
-  // ── Pagos CC — Servicios ───────────────────────────────────────────────────
-  const { data: svCCRaw } = await supabase
+  // ── 5. Servicios — por rango de fechas (captura pagos con caja_sesion_id NULL) ─
+  const { data: svPagosRaw } = await supabase
     .from('optica_servicio_pagos')
-    .select('id, servicio_id, monto, created_at')
-    .eq('caja_sesion_id', sesionId)
-    .eq('metodo', 'CUENTA_CORRIENTE')
+    .select('id, servicio_id, metodo, monto, created_at')
+    .gte('created_at', desde)
+    .lte('created_at', hasta)
 
-  const svIds = [...new Set((svCCRaw ?? []).map(p => p.servicio_id))]
+  const svIds = [...new Set((svPagosRaw ?? []).map(p => p.servicio_id))]
   const { data: svOrdenes } = svIds.length > 0
     ? await supabase.from('optica_servicios').select('id, numero').in('id', svIds)
     : { data: [] as { id: number; numero: number }[] }
   const svNumMap = Object.fromEntries((svOrdenes ?? []).map(s => [s.id, s.numero]))
 
-  // ── Armar entradas sintéticas CC ───────────────────────────────────────────
+  // ── 6. Armar entradas sintéticas ──────────────────────────────────────────
+  //    - CC y NC siempre se muestran como sintéticos
+  //    - No-CC solo si no tienen movimiento en caja_movimientos (deduplicación)
   let synId = -1
-  const ccEntries = [
-    ...(ventaCC ?? []).map(p => ({
-      id: synId--, sesion_id: sesionId, tipo: 'ingreso' as const,
-      tipo_concepto: 'Cuenta corriente', concepto: `Venta #${ventaNumMap[p.venta_id] ?? p.venta_id}`,
-      monto: Number(p.monto), usuario_id: '', created_at: p.created_at,
-    })),
-    ...(ordenCC ?? []).map(p => ({
-      id: synId--, sesion_id: sesionId, tipo: 'ingreso' as const,
-      tipo_concepto: 'Cuenta corriente', concepto: `Orden de venta #${ordenNumMap[p.orden_id] ?? p.orden_id}`,
-      monto: Number(p.monto), usuario_id: '', created_at: p.created_at,
-    })),
-    ...(otCCRaw ?? []).map(p => ({
-      id: synId--, sesion_id: sesionId, tipo: 'ingreso' as const,
-      tipo_concepto: 'Cuenta corriente', concepto: `Orden de trabajo #${otNumMap[p.orden_id] ?? p.orden_id}`,
-      monto: Number(p.monto), usuario_id: '', created_at: p.created_at,
-    })),
-    ...(svCCRaw ?? []).map(p => ({
-      id: synId--, sesion_id: sesionId, tipo: 'ingreso' as const,
-      tipo_concepto: 'Cuenta corriente', concepto: `Servicio #${svNumMap[p.servicio_id] ?? p.servicio_id}`,
-      monto: Number(p.monto), usuario_id: '', created_at: p.created_at,
-    })),
-  ]
+  const SYNTH: SynEntry[] = []
 
-  const all = [...(movs ?? []), ...ccEntries].sort(
+  // Ventas POS
+  for (const p of (ventaPagos ?? [])) {
+    if (p.metodo === 'CUENTA_CORRIENTE' || p.metodo === 'NOTA_CREDITO') {
+      SYNTH.push({
+        id: synId--, sesion_id: sesionId, tipo: 'ingreso',
+        tipo_concepto: p.metodo === 'CUENTA_CORRIENTE' ? 'Cuenta corriente' : 'Nota de crédito',
+        concepto: `Venta #${ventaNumMap[p.venta_id] ?? p.venta_id}`,
+        monto: Number(p.monto), usuario_id: '', created_at: p.created_at,
+      })
+    } else if (!pagoYaRegistrado(movsList, `Venta ${ventaNumMap[p.venta_id]}`, p.monto)) {
+      SYNTH.push({
+        id: synId--, sesion_id: sesionId, tipo: 'ingreso',
+        tipo_concepto: 'Pago venta',
+        concepto: `Venta #${ventaNumMap[p.venta_id] ?? p.venta_id} — ${p.metodo}`,
+        monto: Number(p.monto), usuario_id: '', created_at: p.created_at,
+      })
+    }
+  }
+
+  // Órdenes de venta
+  for (const p of (ordenPagos ?? [])) {
+    if (p.metodo === 'CUENTA_CORRIENTE' || p.metodo === 'NOTA_CREDITO') {
+      SYNTH.push({
+        id: synId--, sesion_id: sesionId, tipo: 'ingreso',
+        tipo_concepto: p.metodo === 'CUENTA_CORRIENTE' ? 'Cuenta corriente' : 'Nota de crédito',
+        concepto: `Orden de venta #${ordenNumMap[p.orden_id] ?? p.orden_id}`,
+        monto: Number(p.monto), usuario_id: '', created_at: p.created_at,
+      })
+    } else if (!pagoYaRegistrado(movsList, `Orden ${ordenNumMap[p.orden_id]}`, p.monto)) {
+      SYNTH.push({
+        id: synId--, sesion_id: sesionId, tipo: 'ingreso',
+        tipo_concepto: 'Pago orden',
+        concepto: `Orden de venta #${ordenNumMap[p.orden_id] ?? p.orden_id} — ${p.metodo}`,
+        monto: Number(p.monto), usuario_id: '', created_at: p.created_at,
+      })
+    }
+  }
+
+  // OT — deduplicar contra caja_movimientos (patrón: "OT {numero}")
+  for (const p of (otPagosRaw ?? [])) {
+    if (p.metodo === 'CUENTA_CORRIENTE' || p.metodo === 'NOTA_CREDITO') {
+      SYNTH.push({
+        id: synId--, sesion_id: sesionId, tipo: 'ingreso',
+        tipo_concepto: p.metodo === 'CUENTA_CORRIENTE' ? 'Cuenta corriente' : 'Nota de crédito',
+        concepto: `Orden de trabajo #${otNumMap[p.orden_id] ?? p.orden_id}`,
+        monto: Number(p.monto), usuario_id: '', created_at: p.created_at,
+      })
+    } else if (!pagoYaRegistrado(movsList, `${otNumMap[p.orden_id]}`, p.monto)) {
+      SYNTH.push({
+        id: synId--, sesion_id: sesionId, tipo: 'ingreso',
+        tipo_concepto: 'Pago OT',
+        concepto: `Orden de trabajo #${otNumMap[p.orden_id] ?? p.orden_id} — ${p.metodo}`,
+        monto: Number(p.monto), usuario_id: '', created_at: p.created_at,
+      })
+    }
+  }
+
+  // Servicios — deduplicar contra caja_movimientos (patrón: "SV {numero}")
+  for (const p of (svPagosRaw ?? [])) {
+    if (p.metodo === 'CUENTA_CORRIENTE' || p.metodo === 'NOTA_CREDITO') {
+      SYNTH.push({
+        id: synId--, sesion_id: sesionId, tipo: 'ingreso',
+        tipo_concepto: p.metodo === 'CUENTA_CORRIENTE' ? 'Cuenta corriente' : 'Nota de crédito',
+        concepto: `Servicio #${svNumMap[p.servicio_id] ?? p.servicio_id}`,
+        monto: Number(p.monto), usuario_id: '', created_at: p.created_at,
+      })
+    } else if (!pagoYaRegistrado(movsList, `${svNumMap[p.servicio_id]}`, p.monto)) {
+      SYNTH.push({
+        id: synId--, sesion_id: sesionId, tipo: 'ingreso',
+        tipo_concepto: 'Pago servicio',
+        concepto: `Servicio #${svNumMap[p.servicio_id] ?? p.servicio_id} — ${p.metodo}`,
+        monto: Number(p.monto), usuario_id: '', created_at: p.created_at,
+      })
+    }
+  }
+
+  // ── 7. Unir todo y ordenar ────────────────────────────────────────────────
+  const all = [...movsList, ...SYNTH].sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   )
 

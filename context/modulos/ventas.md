@@ -19,6 +19,9 @@ Adjuntá este archivo para trabajar en el módulo de ventas o punto de venta.
 | `app/api/dashboard/ventas/[id]/anular/route.ts` | POST (anular venta) |
 | `app/api/dashboard/ordenes/route.ts` | GET (lista) + POST (crear orden) |
 | `app/api/dashboard/ordenes/[id]/route.ts` | GET + PUT + DELETE (solo admin, solo borradores) |
+| `app/api/dashboard/listados/ventas-articulos/route.ts` | API del listado de venta de artículos |
+| `app/(print)/dashboard/listados/ventas-articulos/print/page.tsx` | Página de impresión / PDF de ventas de artículos |
+| `components/pago/FormasPagoCobro.tsx` | Componente unificado de formas de pago |
 | `types/ventas.ts` | Tipos TypeScript |
 
 ---
@@ -182,4 +185,4 @@ Las páginas de lista (`ventas/ordenes/page.tsx`) son server components que llam
 
 ---
 
-*Última actualización: 2026-06-03*
+*Última actualización: 2026-07-14*

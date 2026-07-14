@@ -156,14 +156,23 @@ export async function POST(req: NextRequest) {
   if (anticipo > 0 && anticipo_metodo?.trim()) {
     let cajaSesionId: number | null = null
     if (sucursalId) {
-      const { data: caja } = await supabase
+      let { data: caja } = await supabase
         .from('caja_sesiones')
         .select('id')
         .eq('sucursal_id', sucursalId)
         .eq('estado', 'abierta')
         .order('created_at', { ascending: false })
         .limit(1)
-        .single()
+        .maybeSingle()
+
+      if (!caja) {
+        const { data: nueva } = await supabase
+          .from('caja_sesiones')
+          .insert({ usuario_id: session.user.id, monto_apertura: 0, sucursal_id: sucursalId })
+          .select('id')
+          .single()
+        caja = nueva
+      }
       cajaSesionId = caja?.id ?? null
     }
     const fechaPago = body.anticipo_fecha || new Date().toISOString().slice(0, 10)
