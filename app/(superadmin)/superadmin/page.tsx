@@ -19,6 +19,12 @@ interface Empresa {
   estado_implementacion: string
 }
 
+interface Sucursal {
+  id: string
+  nombre: string
+  activo: boolean
+}
+
 type ResetState =
   | { phase: 'idle' }
   | { phase: 'confirming'; empresa: Empresa; typedCode: string }
@@ -36,6 +42,16 @@ type SetupState =
   | { phase: 'form'; empresa: Empresa; form: SetupForm }
   | { phase: 'loading'; empresa: Empresa }
 
+type CleanStockState =
+  | { phase: 'idle' }
+  | { phase: 'selecting'; empresa: Empresa; sucursales: Sucursal[]; selectedId: string }
+  | { phase: 'loading'; empresa: Empresa }
+
+type CleanPricesState =
+  | { phase: 'idle' }
+  | { phase: 'confirming'; empresa: Empresa; typedCode: string }
+  | { phase: 'loading'; empresa: Empresa }
+
 const emptyForm = (): SetupForm => ({ nombre: '', email: '', password: '', nombre_sucursal: '' })
 
 export default function SuperadminPage() {
@@ -43,6 +59,8 @@ export default function SuperadminPage() {
   const [fetchError, setFetchError] = useState('')
   const [resetState, setResetState] = useState<ResetState>({ phase: 'idle' })
   const [setupState, setSetupState] = useState<SetupState>({ phase: 'idle' })
+  const [cleanStockState, setCleanStockState] = useState<CleanStockState>({ phase: 'idle' })
+  const [cleanPricesState, setCleanPricesState] = useState<CleanPricesState>({ phase: 'idle' })
 
   useEffect(() => {
     fetch('/api/superadmin/empresas')
@@ -141,6 +159,81 @@ export default function SuperadminPage() {
     }
   }
 
+  // Clean Stock handlers
+  async function openCleanStock(empresa: Empresa) {
+    try {
+      const res = await fetch(`/api/superadmin/sucursales?empresa_id=${empresa.id}`)
+      if (!res.ok) throw new Error('Error al cargar sucursales')
+      const sucursales: Sucursal[] = await res.json()
+      setCleanStockState({ phase: 'selecting', empresa, sucursales, selectedId: '' })
+    } catch {
+      toast.error('No se pudieron cargar las sucursales')
+    }
+  }
+
+  function closeCleanStock() {
+    setCleanStockState({ phase: 'idle' })
+  }
+
+  async function handleCleanStock() {
+    if (cleanStockState.phase !== 'selecting') return
+    const { empresa, selectedId } = cleanStockState
+    setCleanStockState({ phase: 'loading', empresa })
+
+    try {
+      const res = await fetch('/api/superadmin/clean-stock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ empresa_id: empresa.id, sucursal_id: selectedId }),
+      })
+      const data = await res.json()
+
+      if (!res.ok) {
+        toast.error(data.error ?? 'Error al limpiar stock')
+      } else {
+        toast.success(data.message)
+      }
+    } catch {
+      toast.error('Error de conexión')
+    } finally {
+      setCleanStockState({ phase: 'idle' })
+    }
+  }
+
+  // Clean Prices handlers
+  function openCleanPrices(empresa: Empresa) {
+    setCleanPricesState({ phase: 'confirming', empresa, typedCode: '' })
+  }
+
+  function closeCleanPrices() {
+    setCleanPricesState({ phase: 'idle' })
+  }
+
+  async function handleCleanPrices() {
+    if (cleanPricesState.phase !== 'confirming') return
+    const { empresa } = cleanPricesState
+    setCleanPricesState({ phase: 'loading', empresa })
+
+    try {
+      const res = await fetch('/api/superadmin/clean-prices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ empresa_id: empresa.id }),
+      })
+      const data = await res.json()
+
+      if (!res.ok) {
+        toast.error(data.error ?? 'Error al limpiar precios')
+      } else {
+        toast.success(data.message)
+      }
+    } catch {
+      toast.error('Error de conexión')
+    } finally {
+      setCleanPricesState({ phase: 'idle' })
+    }
+  }
+
   const isResetting = resetState.phase === 'confirming' || resetState.phase === 'loading'
   const isResetLoading = resetState.phase === 'loading'
   const resetEmpresa = resetState.phase !== 'idle' ? resetState.empresa : null
@@ -158,6 +251,19 @@ export default function SuperadminPage() {
     setupState.form.email.trim() !== '' &&
     setupState.form.password !== '' &&
     setupState.form.nombre_sucursal.trim() !== ''
+
+  const isCleanStockOpen = cleanStockState.phase === 'selecting' || cleanStockState.phase === 'loading'
+  const isCleanStockLoading = cleanStockState.phase === 'loading'
+  const cleanStockEmpresa = cleanStockState.phase !== 'idle' ? cleanStockState.empresa : null
+  const cleanStockSucursales = cleanStockState.phase === 'selecting' ? cleanStockState.sucursales : []
+  const canCleanStock = cleanStockState.phase === 'selecting' && cleanStockState.selectedId !== ''
+
+  const isCleanPricesOpen = cleanPricesState.phase === 'confirming' || cleanPricesState.phase === 'loading'
+  const isCleanPricesLoading = cleanPricesState.phase === 'loading'
+  const cleanPricesEmpresa = cleanPricesState.phase !== 'idle' ? cleanPricesState.empresa : null
+  const cleanPricesTypedCode = cleanPricesState.phase === 'confirming' ? cleanPricesState.typedCode : ''
+  const canCleanPrices =
+    cleanPricesState.phase === 'confirming' && cleanPricesTypedCode === cleanPricesState.empresa.codigo
 
   return (
     <div className="max-w-3xl">
@@ -203,6 +309,22 @@ export default function SuperadminPage() {
                 >
                   Primer acceso
                 </button>
+              )}
+              {emp.activo && (
+                <>
+                  <button
+                    onClick={() => openCleanStock(emp)}
+                    className="text-sm bg-amber-900 hover:bg-amber-800 text-amber-200 px-3 py-1.5 rounded-md transition-colors"
+                  >
+                    Limpiar stock
+                  </button>
+                  <button
+                    onClick={() => openCleanPrices(emp)}
+                    className="text-sm bg-purple-900 hover:bg-purple-800 text-purple-200 px-3 py-1.5 rounded-md transition-colors"
+                  >
+                    Limpiar precios
+                  </button>
+                </>
               )}
               <button
                 onClick={() => openConfirm(emp)}
@@ -363,6 +485,136 @@ export default function SuperadminPage() {
               className="text-sm px-4 py-2 rounded-md bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {isSetupLoading ? 'Creando...' : 'Crear acceso'}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Limpiar Stock */}
+      <Dialog
+        open={isCleanStockOpen}
+        onOpenChange={(open) => { if (!open && !isCleanStockLoading) closeCleanStock() }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Limpiar stock — {cleanStockEmpresa?.nombre}</DialogTitle>
+            <DialogDescription>
+              Se pondrá en <strong>0 el stock de todos los artículos</strong> en la sucursal seleccionada.
+              <br />
+              <br />
+              También se eliminarán los movimientos de stock de esa sucursal.
+              <br />
+              <br />
+              <strong>Esta operación es irreversible.</strong>
+            </DialogDescription>
+          </DialogHeader>
+
+          {cleanStockState.phase === 'selecting' && (
+            <div className="mt-2">
+              <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                Seleccioná la sucursal:
+              </label>
+              <select
+                value={cleanStockState.selectedId}
+                onChange={(e) =>
+                  setCleanStockState((prev) =>
+                    prev.phase === 'selecting'
+                      ? { ...prev, selectedId: e.target.value }
+                      : prev
+                  )
+                }
+                className="w-full border border-gray-300 dark:border-gray-700 rounded-md px-3 py-2 text-sm bg-transparent focus:outline-none focus:ring-2 focus:ring-amber-500"
+              >
+                <option value="">— Elegir sucursal —</option>
+                {cleanStockSucursales.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {isCleanStockLoading && (
+            <p className="text-sm text-gray-500 mt-2">Limpiando stock...</p>
+          )}
+
+          <DialogFooter>
+            <button
+              onClick={closeCleanStock}
+              disabled={isCleanStockLoading}
+              className="text-sm px-4 py-2 rounded-md border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50 transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleCleanStock}
+              disabled={!canCleanStock || isCleanStockLoading}
+              className="text-sm px-4 py-2 rounded-md bg-amber-600 hover:bg-amber-700 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {isCleanStockLoading ? 'Limpiando...' : 'Limpiar stock'}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Limpiar Precios */}
+      <Dialog
+        open={isCleanPricesOpen}
+        onOpenChange={(open) => { if (!open && !isCleanPricesLoading) closeCleanPrices() }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Limpiar precios — {cleanPricesEmpresa?.nombre}</DialogTitle>
+            <DialogDescription>
+              Esta acción eliminará <strong>todos los precios</strong> de la empresa:{' '}
+              historial de precios, lotes de actualización y precios cached en artículos.
+              <br />
+              <br />
+              Se conservarán: las listas de precio (estructura).
+              <br />
+              <br />
+              <strong>Esta operación es irreversible.</strong>
+            </DialogDescription>
+          </DialogHeader>
+
+          {cleanPricesState.phase === 'confirming' && (
+            <div className="mt-2">
+              <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                Escribí el código de empresa para confirmar:{' '}
+                <span className="font-mono font-semibold">{cleanPricesState.empresa.codigo}</span>
+              </label>
+              <input
+                type="text"
+                value={cleanPricesTypedCode}
+                onChange={(e) =>
+                  setCleanPricesState({
+                    phase: 'confirming',
+                    empresa: cleanPricesState.empresa,
+                    typedCode: e.target.value,
+                  })
+                }
+                autoFocus
+                placeholder={cleanPricesState.empresa.codigo}
+                className="w-full border border-gray-300 dark:border-gray-700 rounded-md px-3 py-2 text-sm bg-transparent focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono"
+              />
+            </div>
+          )}
+
+          <DialogFooter>
+            <button
+              onClick={closeCleanPrices}
+              disabled={isCleanPricesLoading}
+              className="text-sm px-4 py-2 rounded-md border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50 transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleCleanPrices}
+              disabled={!canCleanPrices || isCleanPricesLoading}
+              className="text-sm px-4 py-2 rounded-md bg-purple-600 hover:bg-purple-700 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {isCleanPricesLoading ? 'Limpiando...' : 'Limpiar precios'}
             </button>
           </DialogFooter>
         </DialogContent>
