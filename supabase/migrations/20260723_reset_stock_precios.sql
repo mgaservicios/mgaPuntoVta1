@@ -93,12 +93,22 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
+DECLARE
+  v_tables text[] := ARRAY['precio_lotes', 'precios'];
+  v_existing text[] := '{}';
+  v_table text;
 BEGIN
-  -- 1. Delete all batch price logs
-  DELETE FROM public.precio_lotes;
+  -- Filtrar solo las tablas que existen en este tenant
+  FOREACH v_table IN ARRAY v_tables LOOP
+    IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = v_table) THEN
+      v_existing := array_append(v_existing, 'public.' || v_table);
+    END IF;
+  END LOOP;
 
-  -- 2. Delete all price history
-  DELETE FROM public.precios;
+  -- TRUNCATE dinámico solo con las tablas existentes
+  IF array_length(v_existing, 1) > 0 THEN
+    EXECUTE 'TRUNCATE TABLE ' || array_to_string(v_existing, ', ') || ' RESTART IDENTITY CASCADE';
+  END IF;
 
   -- 3. Clear cached prices on articulos
   UPDATE public.articulos
