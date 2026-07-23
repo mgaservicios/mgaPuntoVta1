@@ -163,6 +163,7 @@ const navGroups: NavGroup[] = [
       { label: 'Órdenes de trabajo', href: '/dashboard/optica/ordenes',              Icon: ClipboardList, permKey: 'optica.ordenes.ver' },
       { label: 'Servicios',          href: '/dashboard/optica/servicios',            Icon: Wrench,        permKey: 'optica.servicios.ver' },
       { label: 'Médicos',            href: '/dashboard/optica/medicos',              Icon: Stethoscope,   permKey: 'optica.medicos.ver' },
+      { label: 'Importar clientes',  href: '/dashboard/optica/importar-clientes',    Icon: Users,         permKey: 'optica.ordenes.ver' },
       { label: 'Importar óptica',    href: '/dashboard/inventario/importar-optica', Icon: FileUp,        permKey: 'optica.ordenes.ver' },
     ],
   },
