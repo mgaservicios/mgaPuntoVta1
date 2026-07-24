@@ -62,7 +62,7 @@ function fmt(v: number | null | undefined) {
 }
 
 function hasGraduacion(o: OpticaOrden) {
-  return [o.lejos_od_esfera, o.lejos_oi_esfera, o.cerca_od_esfera, o.cerca_oi_esfera, o.adicion].some(v => v !== null)
+  return [o.lejos_od_esfera, o.lejos_od_cilindro, o.lejos_od_eje, o.lejos_oi_esfera, o.lejos_oi_cilindro, o.lejos_oi_eje, o.cerca_od_esfera, o.cerca_od_cilindro, o.cerca_od_eje, o.cerca_oi_esfera, o.cerca_oi_cilindro, o.cerca_oi_eje, o.adicion, o.dp].some(v => v !== null)
 }
 
 const ESTADOS: { value: string; label: string }[] = [
