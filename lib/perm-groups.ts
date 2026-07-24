@@ -58,6 +58,12 @@ export const PERM_MODULES: PermMod[] = [
         { id: 'inventario.proveedores.editar',     label: 'Editar proveedor' },
         { id: 'inventario.proveedores.desactivar', label: 'Desactivar proveedor' },
       ]},
+      { id: 'inventario.importar', label: 'Importaciones', ops: [
+        { id: 'inventario.importar.articulos',   label: 'Importar artículos' },
+        { id: 'inventario.importar.stock',       label: 'Importar stock' },
+        { id: 'inventario.importar.proveedores', label: 'Importar proveedores' },
+        { id: 'inventario.importar.optica',      label: 'Importar óptica' },
+      ]},
     ],
   },
   {
@@ -130,6 +136,9 @@ export const PERM_MODULES: PermMod[] = [
         { id: 'optica.medicos.crear',   label: 'Crear médico' },
         { id: 'optica.medicos.editar',  label: 'Editar médico' },
         { id: 'optica.medicos.eliminar', label: 'Eliminar médico' },
+      ]},
+      { id: 'optica.importar', label: 'Importaciones', ops: [
+        { id: 'optica.importar.clientes', label: 'Importar clientes' },
       ]},
     ],
   },
@@ -265,6 +274,10 @@ export const ROUTE_TO_PERM: [string, string][] = [
   ['/dashboard/admin/vendedores',             'altas.vendedores.ver'],
   ['/dashboard/admin/formas-pago',            'altas.formas_pago.ver'],
   ['/dashboard/admin/parametros',             'admin.parametros.ver'],
-  ['/dashboard/inventario/importar-optica',    'optica.ordenes.ver'],
+  ['/dashboard/inventario/importar-optica',    'inventario.importar.optica'],
+  ['/dashboard/inventario/importar-articulos', 'inventario.importar.articulos'],
+  ['/dashboard/inventario/importar-stock',     'inventario.importar.stock'],
+  ['/dashboard/inventario/importar-proveedores', 'inventario.importar.proveedores'],
   ['/dashboard/inventario/actualizar-precios','inventario.articulos.ver'],
+  ['/dashboard/optica/importar-clientes',      'optica.importar.clientes'],
 ]

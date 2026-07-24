@@ -100,8 +100,8 @@ const navGroups: NavGroup[] = [
       { label: 'Proveedores',      href: '/dashboard/inventario/proveedores',       Icon: Truck,             permKey: 'inventario.proveedores.ver' },
       { label: 'Ajustes de stock',     href: '/dashboard/inventario/remitos/ajustes',      Icon: SlidersHorizontal, permKey: 'inventario.ajustes.ver' },
       { label: 'Actualizar precios',   href: '/dashboard/inventario/actualizar-precios',  Icon: TrendingUp,        permKey: 'inventario.articulos.ver' },
-      { label: 'Importar artículos',    href: '/dashboard/inventario/importar-articulos',   Icon: FileUp,            permKey: 'inventario.articulos.crear' },
-      { label: 'Importar stock',       href: '/dashboard/inventario/importar-stock',       Icon: FileUp,            permKey: 'inventario.articulos.crear' },
+      { label: 'Importar artículos',    href: '/dashboard/inventario/importar-articulos',   Icon: FileUp,            permKey: 'inventario.importar.articulos' },
+      { label: 'Importar stock',       href: '/dashboard/inventario/importar-stock',       Icon: FileUp,            permKey: 'inventario.importar.stock' },
     ],
   },
   {
@@ -163,8 +163,8 @@ const navGroups: NavGroup[] = [
       { label: 'Órdenes de trabajo', href: '/dashboard/optica/ordenes',              Icon: ClipboardList, permKey: 'optica.ordenes.ver' },
       { label: 'Servicios',          href: '/dashboard/optica/servicios',            Icon: Wrench,        permKey: 'optica.servicios.ver' },
       { label: 'Médicos',            href: '/dashboard/optica/medicos',              Icon: Stethoscope,   permKey: 'optica.medicos.ver' },
-      { label: 'Importar clientes',  href: '/dashboard/optica/importar-clientes',    Icon: Users,         permKey: 'optica.ordenes.ver' },
-      { label: 'Importar óptica',    href: '/dashboard/inventario/importar-optica', Icon: FileUp,        permKey: 'optica.ordenes.ver' },
+      { label: 'Importar clientes',  href: '/dashboard/optica/importar-clientes',    Icon: Users,         permKey: 'optica.importar.clientes' },
+      { label: 'Importar óptica',    href: '/dashboard/inventario/importar-optica', Icon: FileUp,        permKey: 'inventario.importar.optica' },
     ],
   },
   {

@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 import { usePathname } from 'next/navigation'
-import { Building2, ShoppingCart, Glasses, ReceiptText, Wrench, Search, Package, LogOut, BookOpen } from 'lucide-react'
+import { Building2, ShoppingCart, Glasses, ReceiptText, Wrench, Search, Package, LogOut, BookOpen, Wallet } from 'lucide-react'
 import Link from 'next/link'
 import { signOut } from 'next-auth/react'
 import {
@@ -171,6 +171,7 @@ const QUICK_ACTIONS: QuickAction[] = [
   { href: '/dashboard/optica/servicios/nueva',   label: 'Nuevo servicio',   Icon: Wrench,       module: 'optica',     permKey: 'optica.servicios.ver'    },
   { href: '/dashboard/consultas/stock',          label: 'Stock y precios',  Icon: Search,       module: 'consultas',  permKey: 'consultas.stock.ver'     },
   { href: '/dashboard/inventario/articulos',     label: 'Artículos',        Icon: Package,      module: 'inventario', permKey: 'inventario.articulos.ver'},
+  { href: '/dashboard/fondos',                  label: 'Caja',             Icon: Wallet,       module: 'fondos',     permKey: 'fondos.caja.ver'         },
 ]
 
 function hexToRgba(hex: string, alpha: number): string {
