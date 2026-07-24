@@ -71,7 +71,7 @@ function AbrirCajaDialog({ open, saving, onClose, onConfirm }: {
               <SelectTrigger><SelectValue placeholder="Seleccionar vendedor…" /></SelectTrigger>
               <SelectContent>
                 {vendedores.map((v: VendedorOption) => (
-                  <SelectItem key={v.id} value={v.id.toString()}>{v.nombre}</SelectItem>
+                  <SelectItem key={v.id} value={v.id.toString()} label={v.nombre}>{v.nombre}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -300,7 +300,7 @@ function MovimientoDialog({ open, sesionId, tipo, onClose, onSaved }: {
               <SelectTrigger><SelectValue placeholder="Seleccionar vendedor…" /></SelectTrigger>
               <SelectContent>
                 {vendedores.map((v: VendedorOption) => (
-                  <SelectItem key={v.id} value={v.id.toString()}>{v.nombre}</SelectItem>
+                  <SelectItem key={v.id} value={v.id.toString()} label={v.nombre}>{v.nombre}</SelectItem>
                 ))}
               </SelectContent>
             </Select>

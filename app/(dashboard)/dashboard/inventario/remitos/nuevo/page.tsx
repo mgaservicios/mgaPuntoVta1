@@ -349,7 +349,7 @@ export default function NuevoRemitoPage() {
                 </SelectTrigger>
                 <SelectContent>
                   {vendedores.map(v => (
-                    <SelectItem key={v.id} value={v.id.toString()}>{v.nombre}</SelectItem>
+                    <SelectItem key={v.id} value={v.id.toString()} label={v.nombre}>{v.nombre}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
