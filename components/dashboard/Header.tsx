@@ -165,10 +165,10 @@ export default function DashboardHeader({
 type QuickAction = { href: string; label: string; Icon: LucideIcon; module?: string; permKey?: string }
 
 const QUICK_ACTIONS: QuickAction[] = [
-  { href: '/dashboard/ventas/pos',               label: 'Ticket de Venta',  Icon: ShoppingCart, module: 'ventas',     permKey: 'ventas.pos.cobrar'       },
-  { href: '/dashboard/optica/ordenes/nueva',     label: 'Nueva OT',         Icon: Glasses,      module: 'optica',     permKey: 'optica.ordenes.ver'      },
-  { href: '/dashboard/inventario/remitos/nuevo', label: 'Nuevo remito',     Icon: ReceiptText,  module: 'inventario', permKey: 'inventario.remitos.ver'  },
-  { href: '/dashboard/optica/servicios/nueva',   label: 'Nuevo servicio',   Icon: Wrench,       module: 'optica',     permKey: 'optica.servicios.ver'    },
+  { href: '/dashboard/ventas',                  label: 'Ticket de Venta',  Icon: ShoppingCart, module: 'ventas',     permKey: 'ventas.historial.ver'    },
+  { href: '/dashboard/optica/ordenes',          label: 'Órdenes Trabajo',  Icon: Glasses,      module: 'optica',     permKey: 'optica.ordenes.ver'      },
+  { href: '/dashboard/inventario/remitos',      label: 'Remitos',          Icon: ReceiptText,  module: 'inventario', permKey: 'inventario.remitos.ver'  },
+  { href: '/dashboard/optica/servicios',        label: 'Servicios',        Icon: Wrench,       module: 'optica',     permKey: 'optica.servicios.ver'    },
   { href: '/dashboard/consultas/stock',          label: 'Stock y precios',  Icon: Search,       module: 'consultas',  permKey: 'consultas.stock.ver'     },
   { href: '/dashboard/inventario/articulos',     label: 'Artículos',        Icon: Package,      module: 'inventario', permKey: 'inventario.articulos.ver'},
   { href: '/dashboard/fondos',                  label: 'Caja',             Icon: Wallet,       module: 'fondos',     permKey: 'fondos.caja.ver'         },
