@@ -111,7 +111,7 @@ function VentasPOSTab({ canWrite }: { canWrite: boolean }) {
         {canWrite && can('ventas.pos.cobrar') && (
           <div className="ml-auto">
             <Link href="/dashboard/ventas/pos" className={buttonVariants()}>
-              Ir al POS
+              + Ticket venta
             </Link>
           </div>
         )}
