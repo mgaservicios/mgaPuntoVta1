@@ -345,11 +345,13 @@ export default function NuevoRemitoPage() {
               <span className="text-sm text-gray-500 shrink-0">Vendedor</span>
               <Select value={vendedorId?.toString() ?? ''} onValueChange={v => setVendedorId(Number(v))}>
                 <SelectTrigger className="w-44 h-8 text-sm">
-                  <SelectValue placeholder="Seleccionar…" />
+                  <SelectValue placeholder="Seleccionar…">
+                    {(val) => vendedores.find(v => v.id.toString() === val)?.nombre || 'Seleccionar…'}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {vendedores.map(v => (
-                    <SelectItem key={v.id} value={v.id.toString()} label={v.nombre}>{v.nombre}</SelectItem>
+                    <SelectItem key={v.id} value={v.id.toString()}>{v.nombre}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

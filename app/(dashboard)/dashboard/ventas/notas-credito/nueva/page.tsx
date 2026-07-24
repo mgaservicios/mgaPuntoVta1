@@ -69,10 +69,14 @@ export default function NuevaNotaCreditoPage() {
         <div className="space-y-1.5">
           <Label>Vendedor</Label>
           <Select value={vendedorId?.toString() ?? ''} onValueChange={v => setVendedorId(Number(v))}>
-            <SelectTrigger><SelectValue placeholder="Seleccionar vendedor…" /></SelectTrigger>
+            <SelectTrigger>
+              <SelectValue placeholder="Seleccionar vendedor…">
+                {(val) => vendedores.find(v => v.id.toString() === val)?.nombre || 'Seleccionar vendedor…'}
+              </SelectValue>
+            </SelectTrigger>
             <SelectContent>
               {vendedores.map(v => (
-                <SelectItem key={v.id} value={v.id.toString()} label={v.nombre}>{v.nombre}</SelectItem>
+                <SelectItem key={v.id} value={v.id.toString()}>{v.nombre}</SelectItem>
               ))}
             </SelectContent>
           </Select>

@@ -753,11 +753,13 @@ export default function OpticaOrdenPage({ params }: { params: Promise<{ id: stri
                       onValueChange={v => setVendedorId(Number(v))}
                     >
                       <SelectTrigger className="h-8 text-sm">
-                        <SelectValue placeholder="Seleccionar vendedor…" />
+                        <SelectValue placeholder="Seleccionar vendedor…">
+                          {(val) => vendedores.find(v => v.id.toString() === val)?.nombre || 'Seleccionar vendedor…'}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         {vendedores.map(v => (
-                          <SelectItem key={v.id} value={v.id.toString()} label={v.nombre}>{v.nombre}</SelectItem>
+                          <SelectItem key={v.id} value={v.id.toString()}>{v.nombre}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
