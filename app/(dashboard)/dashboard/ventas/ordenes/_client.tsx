@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { Plus, Eye, Pencil, CreditCard, Trash2, Printer } from 'lucide-react'
+import { Plus, Eye, Pencil, CreditCard, Trash2, Printer, Ban } from 'lucide-react'
 import { useSelectedSucursal } from '@/hooks/useSelectedSucursal'
 import { usePermissions } from '@/components/PermissionsProvider'
 import { toast } from 'sonner'
@@ -63,6 +63,10 @@ export default function OrdenesClient({ isAdmin }: { isAdmin: boolean }) {
   const [deletingOrden, setDeletingOrden] = useState<OrdenRow | null>(null)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
 
+  // Anular orden
+  const [anulandoOrden, setAnulandoOrden] = useState<OrdenRow | null>(null)
+  const [confirmingAnular, setConfirmingAnular] = useState(false)
+
   const fetchOrdenes = useCallback(async () => {
     setLoading(true)
     setError(null)
@@ -122,6 +126,17 @@ export default function OrdenesClient({ isAdmin }: { isAdmin: boolean }) {
     if (!res.ok) { const d = await res.json(); toast.error(d.error ?? 'Error al eliminar'); setDeletingOrden(null); return }
     toast.success(`Orden ${deletingOrden.numero} eliminada`)
     setDeletingOrden(null)
+    fetchOrdenes()
+  }
+
+  async function handleAnular() {
+    if (!anulandoOrden) return
+    setConfirmingAnular(true)
+    const res = await fetch(`/api/dashboard/ordenes/${anulandoOrden.id}/anular`, { method: 'POST' })
+    setConfirmingAnular(false)
+    if (!res.ok) { const d = await res.json(); toast.error(d.error ?? 'Error al anular'); setAnulandoOrden(null); return }
+    toast.success(`Orden ${anulandoOrden.numero} anulada`)
+    setAnulandoOrden(null)
     fetchOrdenes()
   }
 
@@ -272,6 +287,15 @@ export default function OrdenesClient({ isAdmin }: { isAdmin: boolean }) {
                         <Trash2 className="w-4 h-4" />
                       </button>
                     )}
+                    {canWrite && can('ventas.ordenes.anular') && !['borrador', 'anulada'].includes(o.estado) && (
+                      <button
+                        onClick={() => setAnulandoOrden(o)}
+                        title="Anular orden"
+                        className="p-1.5 rounded-md text-gray-400 hover:text-orange-600 hover:bg-orange-50 transition-colors"
+                      >
+                        <Ban className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                 </TableCell>
               </TableRow>
@@ -293,6 +317,24 @@ export default function OrdenesClient({ isAdmin }: { isAdmin: boolean }) {
             <Button variant="outline" onClick={() => setDeletingOrden(null)} disabled={confirmingDelete}>Cancelar</Button>
             <Button variant="destructive" onClick={handleEliminar} disabled={confirmingDelete}>
               {confirmingDelete ? 'Eliminando...' : 'Eliminar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirmar anulación */}
+      <Dialog open={!!anulandoOrden} onOpenChange={open => { if (!open) setAnulandoOrden(null) }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Anular orden — {anulandoOrden?.numero}</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-gray-600 py-1">
+            Se revertirán los stocks, pagos y movimientos de caja asociados. ¿Confirmás que querés anular la orden <span className="font-mono font-medium">{anulandoOrden?.numero}</span>?
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAnulandoOrden(null)} disabled={confirmingAnular}>Cancelar</Button>
+            <Button variant="destructive" onClick={handleAnular} disabled={confirmingAnular}>
+              {confirmingAnular ? 'Anulando...' : 'Anular'}
             </Button>
           </DialogFooter>
         </DialogContent>

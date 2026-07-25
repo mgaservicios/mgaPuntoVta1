@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { Eye, Printer, Plus, CreditCard, Trash2, Pencil } from 'lucide-react'
+import { Eye, Printer, Plus, CreditCard, Trash2, Pencil, Ban } from 'lucide-react'
 import { usePermissions } from '@/components/PermissionsProvider'
 import { buttonVariants, Button } from '@/components/ui/button'
 import { useSelectedSucursal } from '@/hooks/useSelectedSucursal'
@@ -69,7 +69,7 @@ function FiltrosFecha({ desde, setDesde, hasta, setHasta }: {
 
 // ── Tab Ventas POS ────────────────────────────────────────────────────────────
 
-function VentasPOSTab({ canWrite }: { canWrite: boolean }) {
+function VentasPOSTab({ isAdmin, canWrite }: { isAdmin: boolean; canWrite: boolean }) {
   const { can } = usePermissions()
   const [ventas, setVentas] = useState<VentaRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -90,6 +90,36 @@ function VentasPOSTab({ canWrite }: { canWrite: boolean }) {
   }, [estado, desde, hasta])
 
   useEffect(() => { fetchVentas() }, [fetchVentas])
+
+  // Anular venta
+  const [anulandoVenta, setAnulandoVenta] = useState<VentaRow | null>(null)
+  const [confirmingAnular, setConfirmingAnular] = useState(false)
+
+  // Eliminar venta
+  const [eliminandoVenta, setEliminandoVenta] = useState<VentaRow | null>(null)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+
+  async function handleAnular() {
+    if (!anulandoVenta) return
+    setConfirmingAnular(true)
+    const res = await fetch(`/api/dashboard/ventas/${anulandoVenta.id}/anular`, { method: 'POST' })
+    setConfirmingAnular(false)
+    if (!res.ok) { const d = await res.json(); toast.error(d.error ?? 'Error al anular'); setAnulandoVenta(null); return }
+    toast.success(`Venta ${anulandoVenta.numero} anulada`)
+    setAnulandoVenta(null)
+    fetchVentas()
+  }
+
+  async function handleEliminar() {
+    if (!eliminandoVenta) return
+    setConfirmingDelete(true)
+    const res = await fetch(`/api/dashboard/ventas/${eliminandoVenta.id}`, { method: 'DELETE' })
+    setConfirmingDelete(false)
+    if (!res.ok) { const d = await res.json(); toast.error(d.error ?? 'Error al eliminar'); setEliminandoVenta(null); return }
+    toast.success(`Venta ${eliminandoVenta.numero} eliminada`)
+    setEliminandoVenta(null)
+    fetchVentas()
+  }
 
   const totalPeriodo = ventas.filter(v => v.estado === 'completada').reduce((acc, v) => acc + v.total, 0)
   const showSucursal = ventas.some(v => v.nombre_sucursal)
@@ -166,6 +196,24 @@ function VentasPOSTab({ canWrite }: { canWrite: boolean }) {
                     <Link href={`/dashboard/ventas/${v.id}`} className={buttonVariants({ variant: 'ghost', size: 'icon' })} title="Ver detalle">
                       <Eye className="w-4 h-4" />
                     </Link>
+                    {canWrite && can('ventas.historial.anular') && v.estado === 'completada' && (
+                      <button
+                        onClick={() => setAnulandoVenta(v)}
+                        title="Anular venta"
+                        className="p-1.5 rounded-md text-gray-400 hover:text-orange-600 hover:bg-orange-50 transition-colors"
+                      >
+                        <Ban className="w-4 h-4" />
+                      </button>
+                    )}
+                    {isAdmin && canWrite && v.estado === 'anulada' && (
+                      <button
+                        onClick={() => setEliminandoVenta(v)}
+                        title="Eliminar venta"
+                        className="p-1.5 rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                 </TableCell>
               </TableRow>
@@ -173,6 +221,42 @@ function VentasPOSTab({ canWrite }: { canWrite: boolean }) {
           </TableBody>
         </Table>
       </div>
+
+      {/* Confirmar anulación */}
+      <Dialog open={!!anulandoVenta} onOpenChange={open => { if (!open) setAnulandoVenta(null) }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Anular venta — {anulandoVenta?.numero}</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-gray-600 py-1">
+            Se revertirán el stock, los pagos y los movimientos de caja. ¿Confirmás que querés anular la venta <span className="font-mono font-medium">{anulandoVenta?.numero}</span>?
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAnulandoVenta(null)} disabled={confirmingAnular}>Cancelar</Button>
+            <Button variant="destructive" onClick={handleAnular} disabled={confirmingAnular}>
+              {confirmingAnular ? 'Anulando...' : 'Anular'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirmar eliminación */}
+      <Dialog open={!!eliminandoVenta} onOpenChange={open => { if (!open) setEliminandoVenta(null) }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Eliminar venta — {eliminandoVenta?.numero}</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-gray-600 py-1">
+            Esta acción es irreversible. ¿Confirmás que querés eliminar la venta <span className="font-mono font-medium">{eliminandoVenta?.numero}</span>?
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEliminandoVenta(null)} disabled={confirmingDelete}>Cancelar</Button>
+            <Button variant="destructive" onClick={handleEliminar} disabled={confirmingDelete}>
+              {confirmingDelete ? 'Eliminando...' : 'Eliminar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
@@ -434,7 +518,7 @@ export default function HistorialClient({ isAdmin }: { isAdmin: boolean }) {
           <TabsTrigger value="ordenes">Órdenes de venta</TabsTrigger>
         </TabsList>
         <TabsContent value="pos">
-          <VentasPOSTab canWrite={canWrite} />
+          <VentasPOSTab isAdmin={isAdmin} canWrite={canWrite} />
         </TabsContent>
         <TabsContent value="ordenes">
           <OrdenesTab isAdmin={isAdmin} canWrite={canWrite} />

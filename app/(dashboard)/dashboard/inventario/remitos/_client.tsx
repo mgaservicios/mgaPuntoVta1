@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { Plus, Eye, Pencil, Check, Trash2, Printer } from 'lucide-react'
+import { Plus, Eye, Pencil, Check, Trash2, Printer, Ban } from 'lucide-react'
 import { useSelectedSucursal } from '@/hooks/useSelectedSucursal'
 import { usePermissions } from '@/components/PermissionsProvider'
 import { buttonVariants, Button } from '@/components/ui/button'
@@ -38,6 +38,10 @@ export default function RemitosClient({ isAdmin }: { isAdmin: boolean }) {
   // Eliminar remito
   const [deletingRemito, setDeletingRemito] = useState<RemitoRow | null>(null)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+
+  // Anular remito
+  const [anulandoRemito, setAnulandoRemito] = useState<RemitoRow | null>(null)
+  const [confirmingAnular, setConfirmingAnular] = useState(false)
 
   const fetchRemitos = useCallback(async () => {
     setLoading(true)
@@ -75,6 +79,17 @@ export default function RemitosClient({ isAdmin }: { isAdmin: boolean }) {
     if (!res.ok) { const d = await res.json(); toast.error(d.error ?? 'Error al eliminar'); setDeletingRemito(null); return }
     toast.success(`Remito ${deletingRemito.numero} eliminado`)
     setDeletingRemito(null)
+    fetchRemitos()
+  }
+
+  async function handleAnular() {
+    if (!anulandoRemito) return
+    setConfirmingAnular(true)
+    const res = await fetch(`/api/dashboard/stock/remitos/${anulandoRemito.id}/anular`, { method: 'POST' })
+    setConfirmingAnular(false)
+    if (!res.ok) { const d = await res.json(); toast.error(d.error ?? 'Error al anular'); setAnulandoRemito(null); return }
+    toast.success(`Remito ${anulandoRemito.numero} anulado`)
+    setAnulandoRemito(null)
     fetchRemitos()
   }
 
@@ -202,6 +217,15 @@ export default function RemitosClient({ isAdmin }: { isAdmin: boolean }) {
                         {confirmandoId === r.id ? '…' : 'Confirmar'}
                       </Button>
                     )}
+                    {canWrite && can('inventario.remitos.anular') && r.estado === 'confirmado' && (
+                      <button
+                        onClick={() => setAnulandoRemito(r)}
+                        title="Anular remito"
+                        className="p-1.5 rounded-md text-gray-400 hover:text-orange-600 hover:bg-orange-50 transition-colors"
+                      >
+                        <Ban className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                     {isAdmin && canWrite && ['borrador', 'anulado'].includes(r.estado) && (
                       <button
                         onClick={() => setDeletingRemito(r)}
@@ -232,6 +256,24 @@ export default function RemitosClient({ isAdmin }: { isAdmin: boolean }) {
             <Button variant="outline" onClick={() => setDeletingRemito(null)} disabled={confirmingDelete}>Cancelar</Button>
             <Button variant="destructive" onClick={handleEliminar} disabled={confirmingDelete}>
               {confirmingDelete ? 'Eliminando...' : 'Eliminar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirmar anulación */}
+      <Dialog open={!!anulandoRemito} onOpenChange={open => { if (!open) setAnulandoRemito(null) }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Anular remito — {anulandoRemito?.numero}</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-gray-600 py-1">
+            Se revertirá el stock y los movimientos asociados. ¿Confirmás que querés anular el remito <span className="font-mono font-medium">{anulandoRemito?.numero}</span>?
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAnulandoRemito(null)} disabled={confirmingAnular}>Cancelar</Button>
+            <Button variant="destructive" onClick={handleAnular} disabled={confirmingAnular}>
+              {confirmingAnular ? 'Anulando...' : 'Anular'}
             </Button>
           </DialogFooter>
         </DialogContent>

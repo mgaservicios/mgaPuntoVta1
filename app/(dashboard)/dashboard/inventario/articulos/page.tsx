@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { Plus, Search, Eye, Pencil, PowerOff, Layers } from 'lucide-react'
+import { Plus, Search, Eye, Pencil, PowerOff, Layers, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { usePermissions } from '@/components/PermissionsProvider'
@@ -76,6 +76,11 @@ export default function ArticulosPage() {
   const [confirmId, setConfirmId] = useState<number | null>(null)
   const [desactivando, setDesactivando] = useState(false)
 
+  // Eliminar permanentemente
+  const [deleteId, setDeleteId] = useState<number | null>(null)
+  const [deleteNombre, setDeleteNombre] = useState('')
+  const [eliminando, setEliminando] = useState(false)
+
   useEffect(() => {
     Promise.all([
       fetch('/api/dashboard/proveedores').then(r => r.json()),
@@ -132,6 +137,26 @@ export default function ArticulosPage() {
     }
     setDesactivando(false)
     setConfirmId(null)
+  }
+
+  function clickEliminar(a: ArticuloRow) {
+    setDeleteNombre(a.nombre)
+    setDeleteId(a.id)
+  }
+
+  async function handleEliminar() {
+    if (!deleteId) return
+    setEliminando(true)
+    const res = await fetch(`/api/dashboard/articulos/${deleteId}/permanent`, { method: 'DELETE' })
+    setEliminando(false)
+    if (res.ok) {
+      toast.success(`Artículo "${deleteNombre}" eliminado`)
+      setArticulos(prev => prev.filter(a => a.id !== deleteId))
+    } else {
+      const d = await res.json()
+      toast.error(d.error ?? 'Error al eliminar')
+    }
+    setDeleteId(null)
   }
 
   const colCount = 8
@@ -289,6 +314,17 @@ export default function ArticulosPage() {
                             <PowerOff className="w-4 h-4" />
                           </Button>
                         )}
+                        {a.activo && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-gray-400 hover:text-red-600 hover:bg-red-50"
+                            title="Eliminar permanentemente"
+                            onClick={() => clickEliminar(a)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -337,6 +373,16 @@ export default function ArticulosPage() {
         loading={desactivando}
         onConfirm={handleDesactivar}
         onCancel={() => setConfirmId(null)}
+      />
+
+      <ConfirmDialog
+        open={deleteId !== null}
+        title="Eliminar artículo"
+        description={`¿Eliminar permanentemente "${deleteNombre}"? Esta acción no se puede deshacer. Solo funciona si el artículo no tiene remitos, ventas u órdenes asociadas.`}
+        confirmLabel="Eliminar"
+        loading={eliminando}
+        onConfirm={handleEliminar}
+        onCancel={() => setDeleteId(null)}
       />
     </div>
   )

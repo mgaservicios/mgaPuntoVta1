@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { Plus, Search, RefreshCw, CreditCard, Eye, Pencil, Trash2, Printer, CheckCircle2, PackageCheck } from 'lucide-react'
+import { Plus, Search, RefreshCw, CreditCard, Eye, Pencil, Trash2, Printer, CheckCircle2, PackageCheck, Ban } from 'lucide-react'
 import { useSelectedSucursal } from '@/hooks/useSelectedSucursal'
 import { usePermissions } from '@/components/PermissionsProvider'
 import { toast } from 'sonner'
@@ -377,7 +377,7 @@ export default function OpticaOrdenesClient({ isAdmin }: { isAdmin: boolean }) {
     fetchOrdenes()
   }
 
-  async function handleCambiarEstado(orden: OrdenRow, estado: 'terminado' | 'entregado') {
+  async function handleCambiarEstado(orden: OrdenRow, estado: 'terminado' | 'entregado' | 'anulado') {
     setChangingEstado(orden.id)
     try {
       const res = await fetch(`/api/dashboard/optica/ordenes/${orden.id}/cambiar-estado`, {
@@ -390,7 +390,7 @@ export default function OpticaOrdenesClient({ isAdmin }: { isAdmin: boolean }) {
         toast.error(d.error ?? 'Error al cambiar estado')
         return
       }
-      const label = estado === 'terminado' ? 'Terminada' : 'Entregada'
+      const label = estado === 'terminado' ? 'Terminada' : estado === 'entregado' ? 'Entregada' : 'Anulada'
       toast.success(`OT ${orden.numero} marcada como ${label}`)
       fetchOrdenes()
     } catch {
@@ -569,6 +569,16 @@ export default function OpticaOrdenesClient({ isAdmin }: { isAdmin: boolean }) {
                             className="p-1.5 rounded-md text-gray-500 hover:text-blue-600 hover:bg-blue-50 transition-colors disabled:opacity-40"
                           >
                             <PackageCheck className="w-4 h-4" />
+                          </button>
+                        )}
+                        {canWrite && can('optica.ordenes.cambiar-estado') && !['entregado', 'anulado'].includes(orden.estado) && (
+                          <button
+                            onClick={() => handleCambiarEstado(orden, 'anulado')}
+                            title="Anular OT"
+                            disabled={changingEstado === orden.id}
+                            className="p-1.5 rounded-md text-gray-400 hover:text-orange-600 hover:bg-orange-50 transition-colors disabled:opacity-40"
+                          >
+                            <Ban className="w-4 h-4" />
                           </button>
                         )}
                         {canWrite && can('optica.ordenes.pagar') && saldo > 0.005 && !['anulado', 'entregado'].includes(orden.estado) && (

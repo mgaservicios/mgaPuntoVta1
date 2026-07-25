@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { Plus, Search, RefreshCw, CreditCard, Eye, Pencil, Trash2, Printer, CheckCircle2, PackageCheck } from 'lucide-react'
+import { Plus, Search, RefreshCw, CreditCard, Eye, Pencil, Trash2, Printer, CheckCircle2, PackageCheck, Ban } from 'lucide-react'
 import { useSelectedSucursal } from '@/hooks/useSelectedSucursal'
 import { usePermissions } from '@/components/PermissionsProvider'
 import { toast } from 'sonner'
@@ -275,7 +275,7 @@ export default function OpticaServiciosClient({ isAdmin }: { isAdmin: boolean })
     fetchServicios()
   }
 
-  async function handleCambiarEstado(s: ServicioRow, estado: 'terminado' | 'entregado') {
+  async function handleCambiarEstado(s: ServicioRow, estado: 'terminado' | 'entregado' | 'anulado') {
     setChangingEstado(s.id)
     try {
       const res = await fetch(`/api/dashboard/optica/servicios/${s.id}/cambiar-estado`, {
@@ -288,7 +288,7 @@ export default function OpticaServiciosClient({ isAdmin }: { isAdmin: boolean })
         toast.error(d.error ?? `Error al cambiar estado`)
         return
       }
-      const label = estado === 'terminado' ? 'Terminado' : 'Entregado'
+      const label = estado === 'terminado' ? 'Terminado' : estado === 'entregado' ? 'Entregado' : 'Anulado'
       toast.success(`${s.numero} marcado como ${label}`)
       fetchServicios()
     } catch {
@@ -458,6 +458,16 @@ export default function OpticaServiciosClient({ isAdmin }: { isAdmin: boolean })
                             className="p-1.5 rounded-md text-gray-500 hover:text-blue-600 hover:bg-blue-50 transition-colors disabled:opacity-40"
                           >
                             <PackageCheck className="w-4 h-4" />
+                          </button>
+                        )}
+                        {canWrite && can('optica.servicios.editar') && !['entregado', 'anulado'].includes(s.estado) && (
+                          <button
+                            onClick={() => handleCambiarEstado(s, 'anulado')}
+                            title="Anular servicio"
+                            disabled={changingEstado === s.id}
+                            className="p-1.5 rounded-md text-gray-400 hover:text-orange-600 hover:bg-orange-50 transition-colors disabled:opacity-40"
+                          >
+                            <Ban className="w-4 h-4" />
                           </button>
                         )}
                         {canWrite && can('optica.servicios.editar') && saldo > 0.005 && !['anulado', 'entregado'].includes(s.estado) && (
