@@ -79,6 +79,7 @@ export default function ArticuloFormPage({ params }: { params: Promise<{ id: str
   const { id } = use(params)
   const isNew = id === 'nuevo'
   const router = useRouter()
+  const [isAdmin, setIsAdmin] = useState(false)
 
   const [loading, setLoading] = useState(!isNew)
   const [saving, setSaving] = useState(false)
@@ -103,6 +104,8 @@ export default function ArticuloFormPage({ params }: { params: Promise<{ id: str
   const [listasTodas, setListasTodas] = useState<ListaPrecio[]>([])
   const [pendingPrecios, setPendingPrecios] = useState<Record<number, string>>({})
   const [manejaVariantes, setManejaVariantes] = useState(true)
+  const [sucursales, setSucursales] = useState<{ id: number; nombre: string }[]>([])
+  const [stockInicial, setStockInicial] = useState<Record<number, string>>({})
 
   const [stockSucursales, setStockSucursales] = useState<{
     sucursal_id: number
@@ -114,6 +117,12 @@ export default function ArticuloFormPage({ params }: { params: Promise<{ id: str
   }[]>([])
 
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    fetch('/api/dashboard/me').then(r => r.json()).then(d => {
+      if (d.role === 'Administrador') setIsAdmin(true)
+    }).catch(() => {})
+  }, [])
 
   const { register, handleSubmit, setValue, watch, reset, formState: { errors } } =
     useForm<FormValues>({
@@ -181,6 +190,13 @@ export default function ArticuloFormPage({ params }: { params: Promise<{ id: str
       fetch('/api/dashboard/articulos/next-code')
         .then((r) => r.json())
         .then(({ codigo }) => setValue('codigo', codigo))
+      if (isAdmin) {
+        fetch('/api/dashboard/sucursales')
+          .then(r => r.json())
+          .then(data => {
+            if (Array.isArray(data)) setSucursales(data)
+          })
+      }
       return
     }
     fetch(`/api/dashboard/articulos/${id}`)
@@ -208,7 +224,7 @@ export default function ArticuloFormPage({ params }: { params: Promise<{ id: str
         cargarPreciosVariantes(data.articulo_variantes ?? [])
       })
       .finally(() => setLoading(false))
-  }, [id, isNew, reset, loadCatalogos, cargarPreciosVariantes])
+  }, [id, isNew, reset, loadCatalogos, cargarPreciosVariantes, isAdmin])
 
   function handlePendingPrecioChange(listaId: number, value: string) {
     setPendingPrecios(prev => {
@@ -283,7 +299,25 @@ export default function ArticuloFormPage({ params }: { params: Promise<{ id: str
           )
           setPendingVariantes([])
         }
-        toast.success('Artículo creado')
+        const stockEntries = Object.entries(stockInicial)
+          .filter(([, v]) => Number(v) > 0)
+          .map(([sucursalId, cantidad]) => ({ sucursal_id: Number(sucursalId), cantidad: Number(cantidad) }))
+        if (stockEntries.length > 0) {
+          const stockRes = await fetch(`/api/dashboard/articulos/${created.id}/initial-stock`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ stock: stockEntries }),
+          })
+          if (stockRes.ok) {
+            const stockData = await stockRes.json()
+            toast.success(`Artículo creado — ${stockData.remitos} remito(s) generado(s)`)
+          } else {
+            toast.success('Artículo creado')
+            toast.error('Error al generar remitos de stock')
+          }
+        } else {
+          toast.success('Artículo creado')
+        }
         setShowAddAnother(true)
       } else {
         if (pendingVariantes.length > 0) {
@@ -334,6 +368,7 @@ export default function ArticuloFormPage({ params }: { params: Promise<{ id: str
     setValue('codigo', codigo)
     setPendingPrecios({})
     setPendingVariantes([])
+    setStockInicial({})
     setShowAddAnother(false)
   }
 
@@ -799,6 +834,35 @@ export default function ArticuloFormPage({ params }: { params: Promise<{ id: str
               <Input {...register('stock_minimo')} type="number" step="1" className="w-32" />
             </div>
           </section>
+
+          {/* Carga inicial de stock — solo admin, solo artículo nuevo */}
+          {isNew && isAdmin && sucursales.length > 0 && (
+            <section className="bg-white rounded-xl border border-indigo-100 p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <Warehouse className="w-4 h-4 text-indigo-500" />
+                <h3 className="text-xs font-semibold text-indigo-700 uppercase tracking-wide">Carga inicial de stock</h3>
+              </div>
+              <p className="text-xs text-gray-500">
+                Cargá el stock por sucursal. Se generará un remito de entrada confirmado por cada una.
+              </p>
+              <div className="grid gap-2">
+                {sucursales.map(s => (
+                  <div key={s.id} className="flex items-center gap-3">
+                    <span className="w-44 shrink-0 text-sm text-gray-700 font-medium truncate">{s.nombre}</span>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="1"
+                      placeholder="0"
+                      className="w-28 text-sm"
+                      value={stockInicial[s.id] ?? ''}
+                      onChange={e => setStockInicial(prev => ({ ...prev, [s.id]: e.target.value }))}
+                    />
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
 
           {/* Stock por sucursal — artículos simples */}
           {!isNew && tipoArticulo === 'simple' && (
