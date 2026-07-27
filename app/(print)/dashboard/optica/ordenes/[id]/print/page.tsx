@@ -112,11 +112,11 @@ export default function PrintOrdenPage({ params }: { params: Promise<{ id: strin
         </div>
       </div>
 
-      {/* Documento imprimible — ocupa mitad de A4 (~140mm de alto) */}
+      {/* Documento imprimible — mitad de A4 (~140mm) */}
       <div className="print:pt-0 pt-16 bg-white min-h-screen">
         <div className="max-w-[190mm] mx-auto px-5 py-3 print:px-0 print:py-0 text-gray-900">
 
-          {/* ══ ENCABEZADO ══ */}
+          {/* ══ ENCABEZADO (conservado) ══ */}
           <div className="flex items-center gap-2 border-b-2 border-gray-800 pb-1.5 mb-1.5">
             <div className="w-11 h-11 bg-white rounded border border-gray-200 flex items-center justify-center overflow-hidden shrink-0">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -167,49 +167,63 @@ export default function PrintOrdenPage({ params }: { params: Promise<{ id: strin
           </div>
 
           {/* ══ LÍNEA DE CORTE ══ */}
-          <div className="flex items-center gap-2 my-1.5">
+          <div className="flex items-center gap-2 my-1">
             <div className="flex-1 border-t border-dashed border-gray-400" />
             <span className="text-[11px] text-gray-400 uppercase tracking-widest">✂</span>
             <div className="flex-1 border-t border-dashed border-gray-400" />
           </div>
 
-          {/* ══ NÚMERO DE OT (copia óptica) ══ */}
-          <div className="flex items-center justify-between mb-1.5">
-            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Copia Óptica</p>
-            <p className="text-xs text-gray-600">{formatFecha(orden.fecha)}</p>
-            <p className="font-mono font-bold text-gray-900 text-base border border-gray-300 px-1.5 py-0.5 rounded bg-gray-50">{orden.numero}</p>
+          {/* ══ COPIA ÓPTICA — Encabezado compacto ══ */}
+          <div className="flex items-center gap-3 mb-1">
+            <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wide shrink-0">Copia Óptica</p>
+            <p className="text-[11px] text-gray-600 shrink-0">{formatFecha(orden.fecha)}</p>
+            <p className="font-mono font-bold text-gray-900 text-[11px] border border-gray-300 px-1.5 py-0.5 rounded bg-gray-50 shrink-0">{orden.numero}</p>
           </div>
 
-          {/* ══ DATOS DEL CLIENTE Y MÉDICO ══ */}
-          <div className="grid grid-cols-2 gap-2 mb-1.5">
-            <div className="border border-gray-200 rounded p-1.5">
-              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Paciente</p>
-              <p className="text-sm font-semibold leading-tight">{orden.clientes?.nombre ?? '—'}</p>
-              {orden.clientes?.telefono && <p className="text-xs text-gray-500">{orden.clientes.telefono}</p>}
-              {orden.vendedores?.nombre && (
-                <p className="text-xs text-gray-500">Vendedor: <span className="font-medium text-gray-700">{orden.vendedores.nombre}</span></p>
-              )}
-            </div>
-            <div className="border border-gray-200 rounded p-1.5">
-              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Médico / Receta</p>
-              <p className="text-sm font-semibold leading-tight">{medicoDisplay ?? '—'}</p>
-              {orden.optica_medicos?.matricula && (
-                <p className="text-xs text-gray-500">Mat. {orden.optica_medicos.matricula}</p>
-              )}
-              {orden.receta_url && (
-                <p className="text-xs text-blue-600">Receta adjunta en sistema</p>
-              )}
-            </div>
+          {/* ══ COPIA ÓPTICA — Paciente + Tel ══ */}
+          <div className="flex items-baseline gap-1 text-[11px] leading-tight mb-0.5">
+            <span className="text-gray-400 font-semibold uppercase text-[11px]">Paciente:</span>
+            <span className="font-semibold text-gray-900">{orden.clientes?.nombre ?? '—'}</span>
+            {orden.clientes?.telefono && (
+              <>
+                <span className="text-gray-300 mx-0.5">·</span>
+                <span className="text-gray-500">Tel: {orden.clientes.telefono}</span>
+              </>
+            )}
+          </div>
+
+          {/* ══ COPIA ÓPTICA — Vendedor + Médico + Receta ══ */}
+          <div className="flex items-baseline gap-1 text-[11px] leading-tight mb-1">
+            {orden.vendedores?.nombre && (
+              <>
+                <span className="text-gray-400 font-semibold uppercase text-[11px]">Vendedor:</span>
+                <span className="font-medium text-gray-700">{orden.vendedores.nombre}</span>
+                <span className="text-gray-300 mx-0.5">·</span>
+              </>
+            )}
+            <span className="text-gray-400 font-semibold uppercase text-[11px]">Médico:</span>
+            <span className="font-medium text-gray-700">{medicoDisplay ?? '—'}</span>
+            {orden.optica_medicos?.matricula && (
+              <>
+                <span className="text-gray-300 mx-0.5">·</span>
+                <span className="text-gray-500">Mat. {orden.optica_medicos.matricula}</span>
+              </>
+            )}
+            {orden.receta_url && (
+              <>
+                <span className="text-gray-300 mx-0.5">·</span>
+                <span className="text-blue-600">Receta adjunta</span>
+              </>
+            )}
           </div>
 
           {/* ══ GRADUACIÓN ══ */}
           {hasGraduacion(orden) && (
-            <div className="mb-1.5">
-              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Graduación</p>
-              <table className="w-full text-[11px] border border-gray-200 rounded overflow-hidden">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="text-left px-2 py-0.5 font-semibold text-gray-600 w-16"></th>
+            <div className="mb-1">
+              <table className="w-full text-[11px] border border-gray-200">
+                <thead>
+                  <tr className="border-b border-gray-200">
+                    <th className="text-left px-2 py-0.5 font-semibold text-gray-600 whitespace-nowrap">Graduación</th>
                     <th className="text-center px-1 py-0.5 font-semibold text-gray-600">Esfera</th>
                     <th className="text-center px-1 py-0.5 font-semibold text-gray-600">Cilindro</th>
                     <th className="text-center px-1 py-0.5 font-semibold text-gray-600">Eje</th>
@@ -218,20 +232,20 @@ export default function PrintOrdenPage({ params }: { params: Promise<{ id: strin
                     )}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody>
                   {[
                     { label: 'Lejos OD', esf: orden.lejos_od_esfera, cil: orden.lejos_od_cilindro, eje: orden.lejos_od_eje },
                     { label: 'Lejos OI', esf: orden.lejos_oi_esfera, cil: orden.lejos_oi_cilindro, eje: orden.lejos_oi_eje },
                     { label: 'Cerca OD', esf: orden.cerca_od_esfera, cil: orden.cerca_od_cilindro, eje: orden.cerca_od_eje },
                     { label: 'Cerca OI', esf: orden.cerca_oi_esfera, cil: orden.cerca_oi_cilindro, eje: orden.cerca_oi_eje },
                   ].filter(r => r.esf !== null || r.cil !== null || r.eje !== null).map((row, i) => (
-                    <tr key={row.label}>
-                      <td className="px-2 py-1 font-semibold text-gray-700">{row.label}</td>
-                      <td className="px-1 py-1 text-center font-mono">{fmt(row.esf)}</td>
-                      <td className="px-1 py-1 text-center font-mono">{fmt(row.cil)}</td>
-                      <td className="px-1 py-1 text-center font-mono">{row.eje ?? '—'}</td>
+                    <tr key={row.label} className="border-b border-gray-100 last:border-0">
+                      <td className="px-2 py-0.5 font-semibold text-gray-700 whitespace-nowrap">{row.label}</td>
+                      <td className="px-1 py-0.5 text-center font-mono">{fmt(row.esf)}</td>
+                      <td className="px-1 py-0.5 text-center font-mono">{fmt(row.cil)}</td>
+                      <td className="px-1 py-0.5 text-center font-mono">{row.eje ?? '—'}</td>
                       {(orden.adicion !== null || orden.dp !== null) && (
-                        <td className="px-1 py-1 text-center text-gray-500">
+                        <td className="px-1 py-0.5 text-center text-gray-500">
                           {i === 0 && orden.adicion !== null ? `Add ${fmt(orden.adicion)}` : ''}
                           {i === 1 && orden.dp !== null ? `DP ${orden.dp}mm` : ''}
                         </td>
@@ -245,11 +259,11 @@ export default function PrintOrdenPage({ params }: { params: Promise<{ id: strin
 
           {/* ══ ARTÍCULOS ══ */}
           {items.length > 0 && (
-            <div className="mb-1.5">
+            <div className="mb-1">
               <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Artículos</p>
-              <table className="w-full text-[11px] border border-gray-200 rounded overflow-hidden">
-                <thead className="bg-gray-50">
-                  <tr>
+              <table className="w-full text-[11px] border border-gray-200">
+                <thead>
+                  <tr className="border-b border-gray-200">
                     <th className="text-left px-2 py-0.5 font-semibold text-gray-600">Artículo</th>
                     <th className="text-left px-1 py-0.5 font-semibold text-gray-600">Tipo/Uso</th>
                     <th className="text-center px-1 py-0.5 font-semibold text-gray-600">Cant.</th>
@@ -257,22 +271,22 @@ export default function PrintOrdenPage({ params }: { params: Promise<{ id: strin
                     <th className="text-right px-2 py-0.5 font-semibold text-gray-600">Subtotal</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody>
                   {items.map(item => (
-                    <tr key={item.id}>
-                      <td className="px-2 py-1 font-medium leading-tight">
+                    <tr key={item.id} className="border-b border-gray-100 last:border-0">
+                      <td className="px-2 py-0.5 font-medium leading-tight">
                         {item.nombre}
                         {item.armazon_propio && <span className="ml-1 text-gray-400 font-normal">(propio)</span>}
                       </td>
-                      <td className="px-1 py-1 text-gray-500 whitespace-nowrap">
+                      <td className="px-1 py-0.5 text-gray-500 whitespace-nowrap">
                         {TIPO_ITEM_LABELS[item.tipo]}{item.uso ? ` · ${USO_ITEM_LABELS[item.uso]}` : ''}
                       </td>
-                      <td className="px-1 py-1 text-center">{item.cantidad}</td>
-                      <td className="px-1 py-1 text-right">
+                      <td className="px-1 py-0.5 text-center">{item.cantidad}</td>
+                      <td className="px-1 py-0.5 text-right">
                         {item.armazon_propio ? '—' : formatARS(item.precio_unitario)}
                         {item.descuento_pct > 0 && <span className="block text-gray-400">-{item.descuento_pct}%</span>}
                       </td>
-                      <td className="px-2 py-1 text-right font-medium">
+                      <td className="px-2 py-0.5 text-right font-medium">
                         {item.armazon_propio ? '—' : formatARS(item.subtotal)}
                       </td>
                     </tr>
@@ -282,11 +296,11 @@ export default function PrintOrdenPage({ params }: { params: Promise<{ id: strin
             </div>
           )}
 
-          {/* ══ TOTALES + PAGOS (en fila) ══ */}
-          <div className="flex gap-4 mb-1.5">
+          {/* ══ TOTALES + PAGOS ══ */}
+          <div className="flex gap-3 mb-1">
             {/* Totales */}
             <div className="flex-1">
-              <div className="space-y-0 text-xs">
+              <div className="space-y-0 text-[11px]">
                 {orden.costo_trabajo > 0 && (
                   <div className="flex justify-between text-gray-500">
                     <span>Costo de trabajo</span><span>{formatARS(orden.costo_trabajo)}</span>
@@ -304,7 +318,7 @@ export default function PrintOrdenPage({ params }: { params: Promise<{ id: strin
                     <span className="text-amber-600">+{formatARS((orden as unknown as { recargo_monto: number }).recargo_monto)}</span>
                   </div>
                 )}
-                <div className="flex justify-between font-bold text-sm border-t border-gray-300 pt-0.5 mt-0.5">
+                <div className="flex justify-between font-bold border-t border-gray-300 pt-0.5 mt-0.5">
                   <span>TOTAL</span><span>{formatARS(orden.total)}</span>
                 </div>
                 {pagado > 0 && (
@@ -312,7 +326,7 @@ export default function PrintOrdenPage({ params }: { params: Promise<{ id: strin
                     <span>Pagado</span><span className="text-green-600">{formatARS(pagado)}</span>
                   </div>
                 )}
-                <div className="flex justify-between font-bold text-sm border-t border-gray-300 pt-0.5 mt-0.5">
+                <div className="flex justify-between font-bold border-t border-gray-300 pt-0.5 mt-0.5">
                   <span>Saldo</span>
                   <span className={saldo > 0.005 ? 'text-red-600' : 'text-green-600'}>
                     {saldo > 0.005 ? formatARS(saldo) : 'Cancelado'}
@@ -325,13 +339,13 @@ export default function PrintOrdenPage({ params }: { params: Promise<{ id: strin
             {pagos.length > 0 && (
               <div className="flex-1">
                 <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Señas / Pagos</p>
-                <table className="w-full text-[11px] border border-gray-200 rounded overflow-hidden">
-                  <tbody className="divide-y divide-gray-100">
+                <table className="w-full text-[11px] border border-gray-200">
+                  <tbody>
                     {pagos.map(p => (
-                      <tr key={p.id} className={p.monto < 0 ? 'bg-red-50' : ''}>
-                        <td className="px-1.5 py-1 text-gray-600 whitespace-nowrap">{formatFecha(p.fecha_pago)}</td>
-                        <td className="px-1 py-1 text-gray-500 whitespace-nowrap">{METODO_OPTICA_LABELS[p.metodo]}</td>
-                        <td className={`px-1.5 py-1 text-right font-medium ${p.monto < 0 ? 'text-red-600' : ''}`}>
+                      <tr key={p.id} className={`border-b border-gray-100 last:border-0 ${p.monto < 0 ? 'bg-red-50' : ''}`}>
+                        <td className="px-1.5 py-0.5 text-gray-600 whitespace-nowrap">{formatFecha(p.fecha_pago)}</td>
+                        <td className="px-1 py-0.5 text-gray-500 whitespace-nowrap">{METODO_OPTICA_LABELS[p.metodo]}</td>
+                        <td className={`px-1.5 py-0.5 text-right font-medium ${p.monto < 0 ? 'text-red-600' : ''}`}>
                           {formatARS(p.monto)}
                         </td>
                       </tr>
@@ -344,19 +358,19 @@ export default function PrintOrdenPage({ params }: { params: Promise<{ id: strin
 
           {/* ══ OBSERVACIONES ══ */}
           {orden.observaciones && (
-            <div className="border border-gray-200 rounded px-2 py-1">
-              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-0">Observaciones</p>
-              <p className="text-xs text-gray-700 whitespace-pre-wrap">{orden.observaciones}</p>
+            <div className="border border-gray-200 rounded px-2 py-0.5">
+              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Observaciones</p>
+              <p className="text-[11px] text-gray-700 whitespace-pre-wrap">{orden.observaciones}</p>
             </div>
           )}
 
         </div>
       </div>
 
-      {/* Estilos de impresión — A4, contenido ocupa ~mitad de la hoja */}
+      {/* Estilos de impresión — A4, contenido en mitad de hoja */}
       <style>{`
         @media print {
-          @page { size: A4 portrait; margin: 8mm 10mm 0 10mm; }
+          @page { size: A4 portrait; margin: 5mm 8mm 0 8mm; }
           body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         }
       `}</style>
