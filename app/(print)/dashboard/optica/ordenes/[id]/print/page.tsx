@@ -134,7 +134,7 @@ export default function PrintOrdenPage({ params }: { params: Promise<{ id: strin
             <div className="flex-1 min-w-0">
               <div className="flex items-start justify-between gap-1">
                 <div className="min-w-0">
-                  <p className="text-lg font-bold text-gray-900 leading-tight truncate">{orden.clientes?.nombre ?? 'Sin cliente'}</p>
+                  <p className="text-sm font-bold text-gray-900 leading-tight truncate">{orden.clientes?.nombre ?? 'Sin cliente'}</p>
                   {orden.clientes?.telefono && <p className="text-xs text-gray-500">{orden.clientes.telefono}</p>}
                 </div>
                 <div className="shrink-0 text-right">
@@ -148,18 +148,18 @@ export default function PrintOrdenPage({ params }: { params: Promise<{ id: strin
               <div className="flex items-baseline gap-3 mt-0.5">
                 <div>
                   <span className="text-[11px] text-gray-400 uppercase">Total</span>
-                  <p className="text-lg font-bold text-blue-700 leading-tight">{formatARS(orden.total)}</p>
+                  <p className="text-sm font-bold text-blue-700 leading-tight">{formatARS(orden.total)}</p>
                 </div>
                 <div className="w-px h-5 bg-gray-200" />
                 {saldo > 0.005 ? (
                   <div>
                     <span className="text-[11px] text-gray-400 uppercase">Saldo</span>
-                    <p className="text-lg font-bold text-red-600 leading-tight">{formatARS(saldo)}</p>
+                    <p className="text-sm font-bold text-red-600 leading-tight">{formatARS(saldo)}</p>
                   </div>
                 ) : (
                   <div>
                     <span className="text-[11px] text-gray-400 uppercase">Saldo</span>
-                    <p className="text-lg font-bold text-green-600 leading-tight">Cancelado</p>
+                    <p className="text-sm font-bold text-green-600 leading-tight">Cancelado</p>
                   </div>
                 )}
               </div>
