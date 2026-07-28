@@ -68,9 +68,6 @@ async function fetchAll(supabase: SupabaseClient, table: string): Promise<Record
 export async function GET() {
   const session = await auth()
   if (!session) return new Response(JSON.stringify({ error: 'No autorizado' }), { status: 401 })
-  if (session.user.role !== 'Administrador') {
-    return new Response(JSON.stringify({ error: 'Acceso denegado' }), { status: 403 })
-  }
 
   const supabase = await getTenantClient(session)
 

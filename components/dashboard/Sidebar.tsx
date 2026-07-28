@@ -32,6 +32,7 @@ import {
   Wrench,
   BookOpen,
   Tag,
+  Upload,
   FolderOpen,
   Layers,
   History,
@@ -289,7 +290,7 @@ export default function Sidebar({ userName, userRole, userModules, userPermissio
             priority
           />
         )}
-        {userRole === 'Administrador' && (
+        <div className="space-y-1.5">
           <button
             onClick={() => setBackupConfirmOpen(true)}
             disabled={backupInProgress}
@@ -298,7 +299,16 @@ export default function Sidebar({ userName, userRole, userModules, userPermissio
             <Download className="w-4 h-4 flex-shrink-0" />
             Descargar backup
           </button>
-        )}
+          {userRole === 'Administrador' && (
+            <Link
+              href="/dashboard/admin/backup/restore"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white/70 border border-white/15 hover:bg-white/10 hover:text-white hover:border-white/25 transition-colors w-full justify-center"
+            >
+              <Upload className="w-4 h-4 flex-shrink-0" />
+              Restaurar backup
+            </Link>
+          )}
+        </div>
       </div>
 
       <nav className="flex-1 overflow-y-auto py-3 px-3">

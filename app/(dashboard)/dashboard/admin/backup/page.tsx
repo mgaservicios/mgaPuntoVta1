@@ -3,7 +3,8 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { Download, Database } from 'lucide-react'
+import Link from 'next/link'
+import { Download, Database, Upload } from 'lucide-react'
 
 export default function BackupPage() {
   const [loading, setLoading] = useState(false)
@@ -73,6 +74,26 @@ export default function BackupPage() {
             Esto puede demorar unos segundos según la cantidad de datos…
           </p>
         )}
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+        <div className="flex items-start gap-3">
+          <div className="p-2 bg-orange-50 rounded-lg">
+            <Upload className="w-5 h-5 text-orange-600" />
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-medium text-gray-800">Restaurar backup</p>
+            <p className="text-xs text-gray-500 mt-1">
+              Subí un archivo Excel de backup para reemplazar todos los datos actuales.
+            </p>
+          </div>
+        </div>
+        <Link href="/dashboard/admin/backup/restore">
+          <Button variant="outline" className="gap-2">
+            <Upload className="w-4 h-4" />
+            Restaurar backup
+          </Button>
+        </Link>
       </div>
     </div>
   )
