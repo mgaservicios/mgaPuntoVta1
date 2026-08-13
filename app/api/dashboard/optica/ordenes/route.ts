@@ -14,8 +14,43 @@ export async function GET(req: NextRequest) {
   const desde = searchParams.get('desde')
   const hasta = searchParams.get('hasta')
   const q = searchParams.get('q')
+  const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10) || 1)
+  const pageSize = Math.min(200, Math.max(1, parseInt(searchParams.get('pageSize') ?? '50', 10) || 50))
 
   const { sucursalId, verTodas } = await getSucursalFilter()
+
+  let clienteIds: number[] = []
+  if (q) {
+    const { data: clientesMatch } = await supabase
+      .from('clientes')
+      .select('id')
+      .ilike('nombre', `%${q}%`)
+      .limit(200)
+    clienteIds = (clientesMatch ?? []).map(c => c.id)
+  }
+
+  // Totales sobre todos los resultados filtrados
+  let totalsQuery = supabase
+    .from('optica_ordenes')
+    .select('id, total, optica_orden_pagos(monto)')
+  if (!verTodas && sucursalId) totalsQuery = totalsQuery.eq('sucursal_id', sucursalId)
+  if (estado && estado !== 'todos') totalsQuery = totalsQuery.eq('estado', estado)
+  if (desde) totalsQuery = totalsQuery.gte('fecha', desde)
+  if (hasta) totalsQuery = totalsQuery.lte('fecha', hasta)
+  if (q) {
+    totalsQuery = clienteIds.length > 0
+      ? totalsQuery.or(`numero.ilike.%${q}%,cliente_id.in.(${clienteIds.join(',')})`)
+      : totalsQuery.ilike('numero', `%${q}%`)
+  }
+
+  const { data: allRows } = await totalsQuery
+  const rows = allRows ?? []
+  const total = rows.length
+  const totalMonto = rows.reduce((s: number, r: { total: number }) => s + Number(r.total ?? 0), 0)
+  const totalSaldo = rows.reduce((s: number, r: { total: number; optica_orden_pagos?: { monto: number }[] }) => {
+    const pagado = (r.optica_orden_pagos ?? []).reduce((p: number, x: { monto: number }) => p + Number(x.monto), 0)
+    return s + Number(r.total ?? 0) - pagado
+  }, 0)
 
   let query = supabase
     .from('optica_ordenes')
@@ -27,29 +62,23 @@ export async function GET(req: NextRequest) {
     `)
     .order('fecha', { ascending: false })
     .order('created_at', { ascending: false })
-    .limit(200)
 
   if (!verTodas && sucursalId) query = query.eq('sucursal_id', sucursalId)
   if (estado && estado !== 'todos') query = query.eq('estado', estado)
   if (desde) query = query.gte('fecha', desde)
   if (hasta) query = query.lte('fecha', hasta)
   if (q) {
-    const { data: clientesMatch } = await supabase
-      .from('clientes')
-      .select('id')
-      .ilike('nombre', `%${q}%`)
-      .limit(200)
-    const clienteIds = (clientesMatch ?? []).map(c => c.id)
-    if (clienteIds.length > 0) {
-      query = query.or(`numero.ilike.%${q}%,cliente_id.in.(${clienteIds.join(',')})`)
-    } else {
-      query = query.ilike('numero', `%${q}%`)
-    }
+    query = clienteIds.length > 0
+      ? query.or(`numero.ilike.%${q}%,cliente_id.in.(${clienteIds.join(',')})`)
+      : query.ilike('numero', `%${q}%`)
   }
+
+  const from = (page - 1) * pageSize
+  query = query.range(from, from + pageSize - 1)
 
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json(data ?? [])
+  return NextResponse.json({ data: data ?? [], total, totalMonto, totalSaldo })
 }
 
 export async function POST(req: NextRequest) {

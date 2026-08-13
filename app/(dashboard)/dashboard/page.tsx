@@ -46,7 +46,7 @@ export default async function DashboardPage() {
 
   if (session && (sucursalId || verTodas)) {
     const supabase = await getTenantClient(session)
-    const today = new Date().toISOString().slice(0, 10)
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' })
 
     // ── Queries paralelas ────────────────────────────────────────────────────
     let qPOS          = supabase.from('ventas').select('total').eq('fecha', today).neq('estado', 'anulada')

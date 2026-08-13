@@ -56,6 +56,12 @@ function formatFecha(iso: string) {
   return new Date(iso + 'T00:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
+function fechaLocal(d: Date) {
+  return d.toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' })
+}
+
+const PAGE_SIZE = 50
+
 function fmt(v: number | null | undefined) {
   if (v === null || v === undefined) return '—'
   return v > 0 ? `+${v}` : String(v)
@@ -286,8 +292,14 @@ export default function OpticaOrdenesClient({ isAdmin }: { isAdmin: boolean }) {
   const [loading, setLoading] = useState(true)
   const [q, setQ] = useState('')
   const [estado, setEstado] = useState('todos')
-  const [desde, setDesde] = useState('')
+  const [desde, setDesde] = useState(() => fechaLocal(new Date(Date.now() - 7 * 86_400_000)))
   const [hasta, setHasta] = useState('')
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
+  const [totalMonto, setTotalMonto] = useState(0)
+  const [totalSaldo, setTotalSaldo] = useState(0)
+
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
   // Modal vista completa
   const [viewOrden, setViewOrden] = useState<OpticaOrden | null>(null)
@@ -310,17 +322,27 @@ export default function OpticaOrdenesClient({ isAdmin }: { isAdmin: boolean }) {
     if (estado !== 'todos') params.set('estado', estado)
     if (desde) params.set('desde', desde)
     if (hasta) params.set('hasta', hasta)
+    params.set('page', String(page))
+    params.set('pageSize', String(PAGE_SIZE))
 
     const res = await fetch(`/api/dashboard/optica/ordenes?${params}`)
     const data = await res.json()
-    setOrdenes(Array.isArray(data) ? data : [])
+    setOrdenes(Array.isArray(data.data) ? data.data : [])
+    setTotal(Number(data.total) || 0)
+    setTotalMonto(Number(data.totalMonto) || 0)
+    setTotalSaldo(Number(data.totalSaldo) || 0)
     setLoading(false)
-  }, [q, estado, desde, hasta])
+  }, [q, estado, desde, hasta, page])
 
   useEffect(() => {
     const t = setTimeout(fetchOrdenes, 300)
     return () => clearTimeout(t)
   }, [fetchOrdenes])
+
+  function cambiarFiltro(actualizar: () => void) {
+    setPage(1)
+    actualizar()
+  }
 
   async function handleVerOrden(id: number) {
     setLoadingView(true)
@@ -411,7 +433,13 @@ export default function OpticaOrdenesClient({ isAdmin }: { isAdmin: boolean }) {
       <div className="flex items-center justify-between px-6 py-4 border-b bg-white">
         <div>
           <h1 className="text-xl font-semibold text-gray-900">Órdenes de trabajo óptica</h1>
-          <p className="text-sm text-gray-500">{ordenes.length} resultado{ordenes.length !== 1 ? 's' : ''}</p>
+          <p className="text-sm text-gray-500 flex items-center gap-2 flex-wrap">
+            <span>{total} resultado{total !== 1 ? 's' : ''}</span>
+            <span className="text-gray-300">|</span>
+            <span>Total: <span className="font-medium text-gray-900">{formatARS(totalMonto)}</span></span>
+            <span className="text-gray-300">|</span>
+            <span>Saldo: <span className={`font-medium ${totalSaldo > 0 ? 'text-red-600' : 'text-green-600'}`}>{formatARS(totalSaldo)}</span></span>
+          </p>
         </div>
         {canWrite && can('optica.ordenes.crear') && (
           <Link href="/dashboard/optica/ordenes/nueva">
@@ -431,11 +459,11 @@ export default function OpticaOrdenesClient({ isAdmin }: { isAdmin: boolean }) {
             placeholder="Buscar por número o cliente..."
             className="pl-9 h-9"
             value={q}
-            onChange={e => setQ(e.target.value)}
+            onChange={e => cambiarFiltro(() => setQ(e.target.value))}
           />
         </div>
 
-        <Select value={estado} onValueChange={v => setEstado(v ?? 'todos')}>
+        <Select value={estado} onValueChange={v => cambiarFiltro(() => setEstado(v ?? 'todos'))}>
           <SelectTrigger className="w-52 h-9">
             <SelectValue />
           </SelectTrigger>
@@ -450,14 +478,14 @@ export default function OpticaOrdenesClient({ isAdmin }: { isAdmin: boolean }) {
           type="date"
           className="w-38 h-9"
           value={desde}
-          onChange={e => setDesde(e.target.value)}
+          onChange={e => cambiarFiltro(() => setDesde(e.target.value))}
           placeholder="Desde"
         />
         <Input
           type="date"
           className="w-38 h-9"
           value={hasta}
-          onChange={e => setHasta(e.target.value)}
+          onChange={e => cambiarFiltro(() => setHasta(e.target.value))}
           placeholder="Hasta"
         />
 
@@ -611,6 +639,24 @@ export default function OpticaOrdenesClient({ isAdmin }: { isAdmin: boolean }) {
           </table>
         )}
       </div>
+
+      {/* Paginación */}
+      {total > 0 && (
+        <div className="flex items-center justify-between px-6 py-3 border-t bg-white">
+          <p className="text-sm text-gray-500">
+            Mostrando {total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} de {total}
+          </p>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" disabled={page <= 1 || loading} onClick={() => setPage(p => p - 1)}>
+              Anterior
+            </Button>
+            <span className="text-sm text-gray-500">Página {page} de {totalPages}</span>
+            <Button variant="outline" size="sm" disabled={page >= totalPages || loading} onClick={() => setPage(p => p + 1)}>
+              Siguiente
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Modal vista completa */}
       <OrdenViewDialog orden={viewOrden} onClose={() => setViewOrden(null)} canEdit={canWrite} />
