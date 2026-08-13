@@ -13,6 +13,7 @@ export async function GET(req: NextRequest) {
   const marca_id = searchParams.get('marca_id')
   const categoria_id = searchParams.get('categoria_id')
   const subcategoria_id = searchParams.get('subcategoria_id')
+  const proveedor_id = searchParams.get('proveedor_id')
   const codigo = searchParams.get('codigo')
 
   if (!lista_precio_id) return NextResponse.json({ error: 'lista_precio_id requerido' }, { status: 400 })
@@ -26,6 +27,7 @@ export async function GET(req: NextRequest) {
   if (marca_id) query = query.eq('marca_id', Number(marca_id))
   if (categoria_id) query = query.eq('categoria_id', Number(categoria_id))
   if (subcategoria_id) query = query.eq('subcategoria_id', Number(subcategoria_id))
+  if (proveedor_id) query = query.eq('proveedor_id', Number(proveedor_id))
   if (codigo?.trim()) query = query.ilike('codigo', `%${codigo.trim()}%`)
 
   const { data: articulos, error: artError } = await query

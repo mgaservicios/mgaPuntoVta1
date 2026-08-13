@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { ArrowLeft, Search, X, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, Search, X, Plus, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -20,7 +20,9 @@ import type { ContraparteTipo, TipoRemito } from '@/types/stock'
 import type { ListaPrecio } from '@/types/precios'
 import { useSucursalActiva } from '@/hooks/useSucursalActiva'
 import { useVendedores } from '@/hooks/useVendedores'
+import { usePermissions } from '@/components/PermissionsProvider'
 import ProveedorSearch from '@/components/dashboard/ProveedorSearch'
+import ArticuloQuickCreateDialog from '../../articulos/_components/ArticuloQuickCreateDialog'
 
 type ArticuloResult = {
   id: number
@@ -86,8 +88,11 @@ export default function NuevoRemitoPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<ArticuloResult[]>([])
   const [showResults, setShowResults] = useState(false)
+  const [showNewArticulo, setShowNewArticulo] = useState(false)
   const searchRef = useRef<HTMLDivElement>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+
+  const { can } = usePermissions()
 
   useEffect(() => {
     fetch('/api/dashboard/sucursales').then(r => r.json()).then(d => setSucursales(Array.isArray(d) ? d : []))
@@ -249,6 +254,11 @@ export default function NuevoRemitoPage() {
             variante_id: i.variante_id,
             cantidad: i.cantidad,
             costo_unitario: tipo === 'entrada' ? costoVal : null,
+            precios_extras: tipo === 'entrada'
+              ? Object.entries(i.precios)
+                  .filter(([lid, v]) => v.trim() !== '' && Number(v) > 0 && Number(lid) !== compraLista?.id)
+                  .map(([lid, precio]) => ({ lista_precio_id: Number(lid), precio: Number(precio) }))
+              : [],
           }
         }),
       }),
@@ -432,30 +442,38 @@ export default function NuevoRemitoPage() {
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <h3 className="text-sm font-medium text-gray-700 mb-3">Ítems</h3>
 
-          <div ref={searchRef} className="relative mb-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-              <Input
-                value={searchQuery}
-                onChange={e => handleSearchChange(e.target.value)}
-                placeholder="Buscar artículo por nombre o código…"
-                className="pl-9"
-              />
-            </div>
-            {showResults && searchResults.length > 0 && (
-              <div className="absolute z-10 top-full left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg mt-1 max-h-56 overflow-y-auto">
-                {searchResults.map(art => (
-                  <button
-                    key={art.id}
-                    type="button"
-                    onMouseDown={() => addArticulo(art)}
-                    className="w-full text-left px-4 py-2.5 hover:bg-gray-50 flex items-center justify-between text-sm border-b border-gray-100 last:border-0"
-                  >
-                    <span className="font-medium text-gray-800">{art.nombre}</span>
-                    <span className="text-gray-400 text-xs font-mono ml-2">{art.codigo ?? ''}</span>
-                  </button>
-                ))}
+          <div className="flex gap-2 mb-4">
+            <div ref={searchRef} className="relative flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                <Input
+                  value={searchQuery}
+                  onChange={e => handleSearchChange(e.target.value)}
+                  placeholder="Buscar artículo por nombre o código…"
+                  className="pl-9"
+                />
               </div>
+              {showResults && searchResults.length > 0 && (
+                <div className="absolute z-10 top-full left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg mt-1 max-h-56 overflow-y-auto">
+                  {searchResults.map(art => (
+                    <button
+                      key={art.id}
+                      type="button"
+                      onMouseDown={() => addArticulo(art)}
+                      className="w-full text-left px-4 py-2.5 hover:bg-gray-50 flex items-center justify-between text-sm border-b border-gray-100 last:border-0"
+                    >
+                      <span className="font-medium text-gray-800">{art.nombre}</span>
+                      <span className="text-gray-400 text-xs font-mono ml-2">{art.codigo ?? ''}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            {can('inventario.articulos.crear') && (
+              <Button type="button" variant="outline" onClick={() => setShowNewArticulo(true)} className="shrink-0">
+                <Plus className="w-4 h-4 mr-1.5" />
+                Agregar nuevo
+              </Button>
             )}
           </div>
 
@@ -640,6 +658,14 @@ export default function NuevoRemitoPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {showNewArticulo && (
+        <ArticuloQuickCreateDialog
+          open={showNewArticulo}
+          onOpenChange={setShowNewArticulo}
+          onCreated={(art) => { setShowNewArticulo(false); addArticulo(art) }}
+        />
+      )}
 
     </div>
   )

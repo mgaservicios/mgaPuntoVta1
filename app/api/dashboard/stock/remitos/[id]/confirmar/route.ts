@@ -27,7 +27,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   const { data: remito, error } = await supabase
     .from('remitos')
     .select(`id, numero, tipo, sucursal_id, contraparte_tipo, contraparte_sucursal_id, contraparte_proveedor_id, estado,
-      remito_items(articulo_id, variante_id, cantidad, costo_unitario)`)
+      remito_items(articulo_id, variante_id, cantidad, costo_unitario, precios_extras)`)
     .eq('id', id)
     .single()
 
@@ -94,11 +94,16 @@ export async function POST(req: NextRequest, { params }: Ctx) {
           )
         }
 
-        // Precios adicionales pasados en el body del request
+        // Precios adicionales guardados en el remito + los pasados en el body del request (dedup por lista)
         const extrasItem = preciosExtrasBody.find(
           e => e.articulo_id === item.articulo_id && (e.variante_id ?? null) === (item.variante_id ?? null)
         )
-        const extras = extrasItem?.precios ?? []
+        const extrasGuardados = Array.isArray(item.precios_extras) ? item.precios_extras : []
+        const extrasMap = new Map<number, number>()
+        for (const extra of [...extrasGuardados, ...(extrasItem?.precios ?? [])]) {
+          if (extra && extra.precio > 0) extrasMap.set(extra.lista_precio_id, extra.precio)
+        }
+        const extras = [...extrasMap.entries()].map(([lista_precio_id, precio]) => ({ lista_precio_id, precio }))
         for (const extra of extras) {
           if (extra.precio > 0) {
             await registrarPrecio(

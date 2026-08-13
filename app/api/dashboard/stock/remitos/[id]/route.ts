@@ -19,7 +19,7 @@ export async function GET(_: NextRequest, { params }: Ctx) {
     .select(`
       *,
       remito_items(
-        id, articulo_id, variante_id, cantidad, costo_unitario,
+        id, articulo_id, variante_id, cantidad, costo_unitario, precios_extras,
         articulos(codigo, nombre),
         articulo_variantes(sku)
       )
@@ -78,7 +78,7 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
 
   if (!Array.isArray(items)) return NextResponse.json({ ok: true })
 
-  type ItemInput = { articulo_id: number; variante_id?: number | null; cantidad: number; costo_unitario?: number | null }
+  type ItemInput = { articulo_id: number; variante_id?: number | null; cantidad: number; costo_unitario?: number | null; precios_extras?: Array<{ lista_precio_id: number; precio: number }> | null }
   const newItems = items as ItemInput[]
 
   // ── Confirmado: ajustar stock diferencial ────────────────────────────────
@@ -180,6 +180,7 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
               variante_id: item.variante_id ?? null,
               cantidad: item.cantidad,
               costo_unitario: item.costo_unitario ?? null,
+              precios_extras: item.precios_extras ?? null,
             }))
           )
         }
@@ -197,6 +198,7 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
         variante_id: item.variante_id ?? null,
         cantidad: item.cantidad,
         costo_unitario: item.costo_unitario ?? null,
+        precios_extras: item.precios_extras ?? null,
       }))
     )
   }

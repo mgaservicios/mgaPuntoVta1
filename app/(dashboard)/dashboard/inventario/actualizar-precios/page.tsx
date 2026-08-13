@@ -16,7 +16,8 @@ import {
 
 interface Marca { id: number; nombre: string }
 interface Categoria { id: number; nombre: string; subcategorias: { id: number; nombre: string }[] }
-interface ListaPrecio { id: number; nombre: string; tipo: string }
+interface Proveedor { id: number; nombre: string }
+interface ListaPrecio { id: number; nombre: string; tipo: string; activo: boolean }
 interface PreviewItem {
   articulo_id: number
   variante_id: number | null
@@ -51,6 +52,7 @@ export default function ActualizarPreciosPage() {
 
   const [marcas, setMarcas] = useState<Marca[]>([])
   const [categorias, setCategorias] = useState<Categoria[]>([])
+  const [proveedores, setProveedores] = useState<Proveedor[]>([])
   const [listas, setListas] = useState<ListaPrecio[]>([])
 
   // Filters
@@ -58,6 +60,7 @@ export default function ActualizarPreciosPage() {
   const [marcaId, setMarcaId] = useState('')
   const [categoriaId, setCategoriaId] = useState('')
   const [subcategoriaId, setSubcategoriaId] = useState('')
+  const [proveedorId, setProveedorId] = useState('')
 
   // Update config
   const [listaId, setListaId] = useState('')
@@ -89,11 +92,13 @@ export default function ActualizarPreciosPage() {
     Promise.all([
       fetch('/api/dashboard/marcas').then(r => r.json()),
       fetch('/api/dashboard/categorias').then(r => r.json()),
+      fetch('/api/dashboard/proveedores').then(r => r.json()),
       fetch('/api/dashboard/listas-precio').then(r => r.json()),
-    ]).then(([m, c, l]) => {
+    ]).then(([m, c, prov, l]) => {
       setMarcas((m as Marca[]) ?? [])
       setCategorias((c as Categoria[]) ?? [])
-      setListas(((l as ListaPrecio[]) ?? []).filter(p => p.tipo === 'manual'))
+      setProveedores(((prov as Proveedor[]) ?? []).filter(pr => pr.nombre))
+      setListas(((l as ListaPrecio[]) ?? []).filter(p => p.tipo === 'manual' && p.activo))
     })
     cargarLotes()
   }, [cargarLotes])
@@ -133,6 +138,7 @@ export default function ActualizarPreciosPage() {
     if (marcaId) params.set('marca_id', marcaId)
     if (categoriaId) params.set('categoria_id', categoriaId)
     if (subcategoriaId) params.set('subcategoria_id', subcategoriaId)
+    if (proveedorId) params.set('proveedor_id', proveedorId)
     if (codigo.trim()) params.set('codigo', codigo.trim())
 
     setLoading(true)
@@ -220,7 +226,7 @@ export default function ActualizarPreciosPage() {
   }
 
   function limpiarFiltros() {
-    setCodigo(''); setMarcaId(''); setCategoriaId(''); setSubcategoriaId('')
+    setCodigo(''); setMarcaId(''); setCategoriaId(''); setSubcategoriaId(''); setProveedorId('')
     setPreview(null); setSelected(new Set())
   }
 
@@ -235,13 +241,13 @@ export default function ActualizarPreciosPage() {
         <div>
           <div className="flex items-center justify-between mb-2">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Filtros</p>
-            {(codigo || marcaId || categoriaId || subcategoriaId) && (
+            {(codigo || marcaId || categoriaId || subcategoriaId || proveedorId) && (
               <button className="text-xs text-gray-400 hover:text-gray-600 underline underline-offset-2" onClick={limpiarFiltros}>
                 Limpiar
               </button>
             )}
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
             <div className="space-y-1">
               <Label className="text-xs">Código</Label>
               <Input placeholder="Ej: ART001" value={codigo} onChange={e => setCodigo(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleBuscar()} />
@@ -282,6 +288,18 @@ export default function ActualizarPreciosPage() {
                 <SelectContent>
                   <SelectItem value="_all">Todos</SelectItem>
                   {subcategorias.map(s => <SelectItem key={s.id} value={String(s.id)}>{s.nombre}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Proveedor</Label>
+              <Select value={proveedorId || '_all'} onValueChange={v => v !== null && setProveedorId(v === '_all' ? '' : v)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue>{proveedorId ? (proveedores.find(pr => String(pr.id) === proveedorId)?.nombre ?? '—') : 'Todos'}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_all">Todos</SelectItem>
+                  {proveedores.map(pr => <SelectItem key={pr.id} value={String(pr.id)}>{pr.nombre}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>

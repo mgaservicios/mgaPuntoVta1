@@ -113,6 +113,7 @@ export async function POST(req: NextRequest) {
     variante_id?: number | null
     cantidad: number
     costo_unitario?: number | null
+    precios_extras?: Array<{ lista_precio_id: number; precio: number }> | null
   }
   const rows = (items as ItemInput[]).map(item => ({
     remito_id: remito.id,
@@ -120,6 +121,7 @@ export async function POST(req: NextRequest) {
     variante_id: item.variante_id ?? null,
     cantidad: item.cantidad,
     costo_unitario: item.costo_unitario ?? null,
+    precios_extras: item.precios_extras ?? null,
   }))
 
   const { error: errItems } = await supabase.from('remito_items').insert(rows)
