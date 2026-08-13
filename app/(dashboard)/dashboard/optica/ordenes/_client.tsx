@@ -478,7 +478,7 @@ export default function OpticaOrdenesClient({ isAdmin }: { isAdmin: boolean }) {
             <p className="text-sm mt-1">Creá la primera con el botón &quot;Nueva OT&quot;</p>
           </div>
         ) : (
-          <table className="w-full text-sm">
+          <table className="w-full text-xs">
             <thead>
               <tr className="border-b text-left text-gray-500 text-xs uppercase tracking-wide">
                 <th className="pb-2 pr-4 font-medium">N°</th>
@@ -502,7 +502,7 @@ export default function OpticaOrdenesClient({ isAdmin }: { isAdmin: boolean }) {
                 return (
                   <tr key={orden.id} className="hover:bg-gray-50 transition-colors">
                     <td className="py-3 pr-4">
-                      <span className="font-mono font-medium text-gray-900">{orden.numero}</span>
+                      <span className="font-mono font-medium text-gray-900 whitespace-nowrap text-xs">{orden.numero}</span>
                     </td>
                     <td className="py-3 pr-4 text-gray-600">{formatFecha(orden.fecha)}</td>
                     <td className="py-3 pr-4 font-medium">
