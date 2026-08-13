@@ -347,7 +347,7 @@ export default function Sidebar({ userName, userRole, userModules, userPermissio
                   )}
                 >
                   <group.Icon className="w-4 h-4 flex-shrink-0" />
-                  <span className="flex-1 text-left text-sm font-bold uppercase tracking-wide">{group.label}</span>
+                  <span className="flex-1 text-left text-[13px] font-bold uppercase tracking-wide">{group.label}</span>
                   <ChevronDown
                     className={cn(
                       'w-3.5 h-3.5 text-white/30 transition-transform duration-200',
