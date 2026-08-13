@@ -135,7 +135,7 @@ export async function GET(req: NextRequest) {
       if (!v || v.estado !== 'completada') continue
       all.push({
         id: p.id, tipo: 'ingreso',
-        concepto: `Venta #${v.numero}`,
+        concepto: `${v.numero}`,
         monto: Number(p.monto),
         metodo: METODO_LABELS[p.metodo] ?? p.metodo,
         fuente: 'venta', referencia: null,
@@ -164,7 +164,7 @@ export async function GET(req: NextRequest) {
       if (!o || o.estado === 'anulada') continue
       all.push({
         id: p.id, tipo: 'ingreso',
-        concepto: `OV #${o.numero}`,
+        concepto: `${o.numero}`,
         monto: Number(p.monto),
         metodo: METODO_LABELS[p.metodo] ?? p.metodo,
         fuente: 'ov', referencia: null,
@@ -193,7 +193,7 @@ export async function GET(req: NextRequest) {
       if (!o) continue
       all.push({
         id: p.id, tipo: 'ingreso',
-        concepto: `OT #${o.numero}`,
+        concepto: `${o.numero}`,
         monto: Number(p.monto),
         metodo: METODO_LABELS[p.metodo] ?? p.metodo,
         fuente: 'ot', referencia: p.referencia ?? null,
@@ -222,7 +222,7 @@ export async function GET(req: NextRequest) {
       if (!s) continue
       all.push({
         id: p.id, tipo: 'ingreso',
-        concepto: `SV #${s.numero}`,
+        concepto: `${s.numero}`,
         monto: Number(p.monto),
         metodo: METODO_LABELS[p.metodo] ?? p.metodo,
         fuente: 'sv', referencia: p.referencia ?? null,
