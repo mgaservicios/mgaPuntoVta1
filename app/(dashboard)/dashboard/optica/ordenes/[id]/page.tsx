@@ -190,18 +190,18 @@ export default function OpticaOrdenPage({ params }: { params: Promise<{ id: stri
       setMedicoNombre(data.medico_nombre ?? '')
       setRecetaUrl(data.receta_url ?? '')
       setGrad({
-        lejos_od_esfera: data.lejos_od_esfera?.toString() ?? '',
-        lejos_od_cilindro: data.lejos_od_cilindro?.toString() ?? '',
-        lejos_od_eje: data.lejos_od_eje?.toString() ?? '',
-        lejos_oi_esfera: data.lejos_oi_esfera?.toString() ?? '',
-        lejos_oi_cilindro: data.lejos_oi_cilindro?.toString() ?? '',
-        lejos_oi_eje: data.lejos_oi_eje?.toString() ?? '',
-        cerca_od_esfera: data.cerca_od_esfera?.toString() ?? '',
-        cerca_od_cilindro: data.cerca_od_cilindro?.toString() ?? '',
-        cerca_od_eje: data.cerca_od_eje?.toString() ?? '',
-        cerca_oi_esfera: data.cerca_oi_esfera?.toString() ?? '',
-        cerca_oi_cilindro: data.cerca_oi_cilindro?.toString() ?? '',
-        cerca_oi_eje: data.cerca_oi_eje?.toString() ?? '',
+        lejos_od_esfera: fmtGrad(data.lejos_od_esfera?.toString() ?? '', 'esfera'),
+        lejos_od_cilindro: fmtGrad(data.lejos_od_cilindro?.toString() ?? '', 'cilindro'),
+        lejos_od_eje: fmtGrad(data.lejos_od_eje?.toString() ?? '', 'eje'),
+        lejos_oi_esfera: fmtGrad(data.lejos_oi_esfera?.toString() ?? '', 'esfera'),
+        lejos_oi_cilindro: fmtGrad(data.lejos_oi_cilindro?.toString() ?? '', 'cilindro'),
+        lejos_oi_eje: fmtGrad(data.lejos_oi_eje?.toString() ?? '', 'eje'),
+        cerca_od_esfera: fmtGrad(data.cerca_od_esfera?.toString() ?? '', 'esfera'),
+        cerca_od_cilindro: fmtGrad(data.cerca_od_cilindro?.toString() ?? '', 'cilindro'),
+        cerca_od_eje: fmtGrad(data.cerca_od_eje?.toString() ?? '', 'eje'),
+        cerca_oi_esfera: fmtGrad(data.cerca_oi_esfera?.toString() ?? '', 'esfera'),
+        cerca_oi_cilindro: fmtGrad(data.cerca_oi_cilindro?.toString() ?? '', 'cilindro'),
+        cerca_oi_eje: fmtGrad(data.cerca_oi_eje?.toString() ?? '', 'eje'),
         adicion: data.adicion?.toString() ?? '',
         dp: data.dp?.toString() ?? '',
       })
@@ -342,6 +342,50 @@ export default function OpticaOrdenPage({ params }: { params: Promise<{ id: stri
 
   // ── Graduación ────────────────────────────────────────────────────────────────
 
+  const GRAD_CFG = {
+    esfera: { paso: 0.25, min: -30, max: 30 },
+    cilindro: { paso: 0.25, min: -10, max: 10 },
+    eje: { paso: 1, min: 0, max: 180 },
+  } as const
+
+  function gradKindOf(k: string): 'esfera' | 'cilindro' | 'eje' {
+    if (k.endsWith('esfera')) return 'esfera'
+    if (k.endsWith('cilindro')) return 'cilindro'
+    return 'eje'
+  }
+
+  function fmtGrad(v: string, kind: 'esfera' | 'cilindro' | 'eje') {
+    if (!v.trim()) return ''
+    const n = Number(v)
+    if (isNaN(n)) return v
+    if (kind === 'eje') return String(Math.round(n))
+    if (n === 0) return ''
+    const sign = n > 0 ? '+' : ''
+    return `${sign}${Math.abs(n).toFixed(2)}`
+  }
+
+  function isStepValido(n: number, paso: number) {
+    const q = n / paso
+    return Math.abs(q - Math.round(q)) < 1e-6
+  }
+
+  function gradFieldError(k: string): string | null {
+    const v = grad[k as keyof typeof grad] as string
+    if (!v.trim()) return null
+    const n = Number(v)
+    if (isNaN(n)) return 'Valor inválido'
+    const kind = gradKindOf(k)
+    const cfg = GRAD_CFG[kind]
+    const label = kind === 'esfera' ? 'Esfera' : kind === 'cilindro' ? 'Cilindro' : 'Eje'
+    if (n < cfg.min || n > cfg.max) return `${label}: entre ${cfg.min} y ${cfg.max}`
+    if (kind === 'eje') {
+      if (!Number.isInteger(n)) return 'Eje: valores enteros'
+    } else if (!isStepValido(n, cfg.paso)) {
+      return `${label}: pasos de ${cfg.paso}`
+    }
+    return null
+  }
+
   function toNum(v: string) {
     const n = parseFloat(v)
     return isNaN(n) ? null : n
@@ -408,6 +452,17 @@ export default function OpticaOrdenPage({ params }: { params: Promise<{ id: stri
       setClienteError(true)
       setSaving(false)
       return
+    }
+
+    // Validar graduación
+    const gradKeys = Object.keys(grad).filter(k => k.endsWith('_esfera') || k.endsWith('_cilindro') || k.endsWith('_eje')) as (keyof typeof grad)[]
+    for (const k of gradKeys) {
+      const err = gradFieldError(k)
+      if (err) {
+        toast.error(`Graduación inválida — ${err}`)
+        setSaving(false)
+        return
+      }
     }
 
 
@@ -851,13 +906,16 @@ export default function OpticaOrdenPage({ params }: { params: Promise<{ id: stri
                         <td className="py-0.5 pr-2 font-medium text-xs text-gray-600">{label}</td>
                         {(['esfera', 'cilindro', 'eje'] as const).map(field => {
                           const k = `${prefix}_${field}` as keyof typeof grad
+                          const err = gradFieldError(k)
                           return (
                             <td key={field} className="py-0.5 px-1">
                               <Input
-                                className="h-7 text-center text-xs"
+                                className={`h-7 text-center text-xs ${err ? 'border-red-400 focus:ring-red-400' : ''}`}
                                 placeholder={field === 'eje' ? '0' : '0.00'}
+                                inputMode={field === 'eje' ? 'numeric' : 'decimal'}
                                 value={grad[k]}
                                 onChange={e => setGrad(g => ({ ...g, [k]: e.target.value }))}
+                                onBlur={e => setGrad(g => ({ ...g, [k]: fmtGrad(e.target.value, field) }))}
                                 disabled={disabledEdit}
                               />
                             </td>
