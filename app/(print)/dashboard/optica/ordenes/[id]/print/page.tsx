@@ -139,9 +139,13 @@ export default function PrintOrdenPage({ params }: { params: Promise<{ id: strin
                 </div>
                 <div className="shrink-0 text-right">
                   <p className="font-mono font-bold text-gray-900 text-base border border-gray-300 px-1.5 py-0.5 rounded bg-gray-50">{orden.numero}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">{formatFecha(orden.fecha)}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    <span className="text-gray-400 font-semibold uppercase">Fecha:</span> {formatFecha(orden.fecha)}
+                  </p>
                   {orden.fecha_prometida && (
-                    <p className="text-xs text-gray-500">Entrega: {formatFecha(orden.fecha_prometida)}</p>
+                    <p className="text-xs mt-0.5">
+                      <span className="text-gray-400 font-semibold uppercase">Entrega:</span> <span className="font-bold text-gray-800">{formatFecha(orden.fecha_prometida)}</span>
+                    </p>
                   )}
                 </div>
               </div>
@@ -176,8 +180,15 @@ export default function PrintOrdenPage({ params }: { params: Promise<{ id: strin
           {/* ══ COPIA ÓPTICA — Encabezado compacto ══ */}
           <div className="flex items-center gap-3 mb-1">
             <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wide shrink-0">Copia Óptica</p>
-            <p className="text-[11px] text-gray-600 shrink-0">{formatFecha(orden.fecha)}</p>
-            <p className="font-mono font-bold text-gray-900 text-[11px] border border-gray-300 px-1.5 py-0.5 rounded bg-gray-50 shrink-0">{orden.numero}</p>
+            <span className="text-[11px] text-gray-600 shrink-0">
+              <span className="text-gray-400 font-semibold uppercase">Fecha:</span> {formatFecha(orden.fecha)}
+            </span>
+            {orden.fecha_prometida && (
+              <span className="text-[11px] shrink-0">
+                <span className="text-gray-400 font-semibold uppercase">Entrega:</span> <span className="font-bold text-gray-900">{formatFecha(orden.fecha_prometida)}</span>
+              </span>
+            )}
+            <p className="font-mono font-bold text-gray-900 text-[11px] border border-gray-300 px-1.5 py-0.5 rounded bg-gray-50 shrink-0 ml-auto">{orden.numero}</p>
           </div>
 
           {/* ══ COPIA ÓPTICA — Paciente + Tel ══ */}
