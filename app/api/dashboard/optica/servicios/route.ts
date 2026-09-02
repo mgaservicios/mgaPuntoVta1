@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth'
 import { requirePermission } from '@/lib/require-permission'
 import { getTenantClient } from '@/services/supabase-tenant'
 import { getHomeSucursalId, getSucursalFilter, assertActiveSucursalIsHome } from '@/lib/sucursal'
+import { normalizarBusquedaNumero } from '@/lib/busqueda-numero'
 
 function derivarEstado(tipos: { estado: string }[]): string {
   if (!tipos.length) return 'pendiente'
@@ -21,6 +22,7 @@ export async function GET(req: NextRequest) {
   const desde  = searchParams.get('desde')
   const hasta  = searchParams.get('hasta')
   const q      = searchParams.get('q')
+  const qNumero = normalizarBusquedaNumero(q) ?? q
 
   const { sucursalId, verTodas } = await getSucursalFilter()
 
@@ -48,9 +50,9 @@ export async function GET(req: NextRequest) {
       .limit(200)
     const clienteIds = (clientesMatch ?? []).map((c: { id: number }) => c.id)
     if (clienteIds.length > 0) {
-      query = query.or(`numero.ilike.%${q}%,cliente_id.in.(${clienteIds.join(',')})`)
+      query = query.or(`numero.ilike.%${qNumero}%,cliente_id.in.(${clienteIds.join(',')})`)
     } else {
-      query = query.ilike('numero', `%${q}%`)
+      query = query.ilike('numero', `%${qNumero}%`)
     }
   }
 

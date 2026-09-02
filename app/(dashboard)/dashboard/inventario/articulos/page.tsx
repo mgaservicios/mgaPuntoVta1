@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { Plus, Search, Eye, Pencil, PowerOff, Layers, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -46,6 +46,31 @@ type ArticuloRow = Pick<Articulo, 'id' | 'codigo' | 'nombre' | 'tipo_articulo' |
 
 type ListaCol = { id: number; nombre: string; tipo: 'manual' | 'calculada'; categoria: 'costo' | 'venta' }
 
+const FILTROS_KEY = 'articulos_filtros_v1'
+const SCROLL_KEY = 'articulos_scroll_v1'
+
+function loadFiltros(): { q: string; proveedor: string; marca: string; categoria: string } {
+  try {
+    const raw = localStorage.getItem(FILTROS_KEY)
+    if (!raw) return { q: '', proveedor: '', marca: '', categoria: '' }
+    const parsed = JSON.parse(raw)
+    return {
+      q: typeof parsed.q === 'string' ? parsed.q : '',
+      proveedor: typeof parsed.proveedor === 'string' ? parsed.proveedor : '',
+      marca: typeof parsed.marca === 'string' ? parsed.marca : '',
+      categoria: typeof parsed.categoria === 'string' ? parsed.categoria : '',
+    }
+  } catch {
+    return { q: '', proveedor: '', marca: '', categoria: '' }
+  }
+}
+
+function saveFiltros(f: { q: string; proveedor: string; marca: string; categoria: string }) {
+  try {
+    localStorage.setItem(FILTROS_KEY, JSON.stringify(f))
+  } catch { /* localStorage no disponible */ }
+}
+
 function formatPrecio(v: number | null) {
   if (v == null) return '—'
   return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(v)
@@ -66,10 +91,11 @@ export default function ArticulosPage() {
   const [articulos, setArticulos] = useState<ArticuloRow[]>([])
   const [listas, setListas] = useState<ListaCol[]>([])
   const [loading, setLoading] = useState(true)
-  const [q, setQ] = useState('')
-  const [filtroProveedor, setFiltroProveedor] = useState('')
-  const [filtroMarca, setFiltroMarca] = useState('')
-  const [filtroCategoria, setFiltroCategoria] = useState('')
+  const initialFiltros = useMemo(() => loadFiltros(), [])
+  const [q, setQ] = useState(initialFiltros.q)
+  const [filtroProveedor, setFiltroProveedor] = useState(initialFiltros.proveedor)
+  const [filtroMarca, setFiltroMarca] = useState(initialFiltros.marca)
+  const [filtroCategoria, setFiltroCategoria] = useState(initialFiltros.categoria)
   const [proveedoresList, setProveedoresList] = useState<FiltroItem[]>([])
   const [marcasList, setMarcasList] = useState<FiltroItem[]>([])
   const [categoriasList, setCategoriasList] = useState<FiltroItem[]>([])
@@ -91,6 +117,33 @@ export default function ArticulosPage() {
       setMarcasList((marcas ?? []).filter((m: FiltroItem) => m.nombre))
       setCategoriasList((cats ?? []).filter((c: FiltroItem) => c.nombre))
     })
+  }, [])
+
+  // Persistir filtros en localStorage para restaurarlos al volver de editar
+  useEffect(() => {
+    saveFiltros({ q, proveedor: filtroProveedor, marca: filtroMarca, categoria: filtroCategoria })
+  }, [q, filtroProveedor, filtroMarca, filtroCategoria])
+
+  // Guardar posición de scroll antes de navegar a editar/ver
+  const guardarScroll = useCallback(() => {
+    try {
+      sessionStorage.setItem(SCROLL_KEY, String(window.scrollY))
+    } catch { /* noop */ }
+  }, [])
+
+  // Restaurar posición de scroll al volver de editar/ver
+  useEffect(() => {
+    let raf = 0
+    try {
+      const saved = sessionStorage.getItem(SCROLL_KEY)
+      if (saved) {
+        sessionStorage.removeItem(SCROLL_KEY)
+        raf = window.requestAnimationFrame(() => {
+          window.scrollTo(0, Number(saved) || 0)
+        })
+      }
+    } catch { /* noop */ }
+    return () => window.cancelAnimationFrame(raf)
   }, [])
 
   const fetchArticulos = useCallback(async () => {
@@ -291,6 +344,7 @@ export default function ArticulosPage() {
                         <Link
                           href={`/dashboard/inventario/articulos/${a.id}`}
                           title="Ver / Editar"
+                          onClick={guardarScroll}
                           className={buttonVariants({ variant: 'ghost', size: 'icon' })}
                         >
                           <Eye className="w-4 h-4" />
@@ -299,6 +353,7 @@ export default function ArticulosPage() {
                           <Link
                             href={`/dashboard/inventario/articulos/${a.id}`}
                             title="Editar"
+                            onClick={guardarScroll}
                             className={buttonVariants({ variant: 'ghost', size: 'icon' })}
                           >
                             <Pencil className="w-4 h-4" />

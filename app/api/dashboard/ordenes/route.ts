@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth'
 import { requirePermission } from '@/lib/require-permission'
 import { getTenantClient } from '@/services/supabase-tenant'
 import { getHomeSucursalId, assertActiveSucursalIsHome, getSucursalFilter } from '@/lib/sucursal'
+import { normalizarBusquedaNumero } from '@/lib/busqueda-numero'
 
 export async function GET(req: NextRequest) {
   const session = await auth()
@@ -17,6 +18,7 @@ export async function GET(req: NextRequest) {
   const desde = searchParams.get('desde')
   const hasta = searchParams.get('hasta')
   const q = searchParams.get('q')
+  const qNumero = normalizarBusquedaNumero(q) ?? q
 
   let query = supabase
     .from('ordenes_venta')
@@ -29,7 +31,7 @@ export async function GET(req: NextRequest) {
   if (estado && estado !== 'todos') query = query.eq('estado', estado)
   if (desde) query = query.gte('fecha', desde)
   if (hasta) query = query.lte('fecha', hasta)
-  if (q) query = query.ilike('numero', `%${q}%`)
+  if (qNumero) query = query.ilike('numero', `%${qNumero}%`)
 
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

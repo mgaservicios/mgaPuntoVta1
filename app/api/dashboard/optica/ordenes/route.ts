@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth'
 import { requirePermission } from '@/lib/require-permission'
 import { getTenantClient } from '@/services/supabase-tenant'
 import { getHomeSucursalId, getSucursalFilter, assertActiveSucursalIsHome } from '@/lib/sucursal'
+import { normalizarBusquedaNumero } from '@/lib/busqueda-numero'
 
 export async function GET(req: NextRequest) {
   const session = await auth()
@@ -14,6 +15,7 @@ export async function GET(req: NextRequest) {
   const desde = searchParams.get('desde')
   const hasta = searchParams.get('hasta')
   const q = searchParams.get('q')
+  const qNumero = normalizarBusquedaNumero(q) ?? q
   const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10) || 1)
   const pageSize = Math.min(200, Math.max(1, parseInt(searchParams.get('pageSize') ?? '50', 10) || 50))
 
@@ -37,10 +39,10 @@ export async function GET(req: NextRequest) {
   if (estado && estado !== 'todos') totalsQuery = totalsQuery.eq('estado', estado)
   if (desde) totalsQuery = totalsQuery.gte('fecha', desde)
   if (hasta) totalsQuery = totalsQuery.lte('fecha', hasta)
-  if (q) {
+  if (qNumero) {
     totalsQuery = clienteIds.length > 0
-      ? totalsQuery.or(`numero.ilike.%${q}%,cliente_id.in.(${clienteIds.join(',')})`)
-      : totalsQuery.ilike('numero', `%${q}%`)
+      ? totalsQuery.or(`numero.ilike.%${qNumero}%,cliente_id.in.(${clienteIds.join(',')})`)
+      : totalsQuery.ilike('numero', `%${qNumero}%`)
   }
 
   const { data: allRows } = await totalsQuery
@@ -67,10 +69,10 @@ export async function GET(req: NextRequest) {
   if (estado && estado !== 'todos') query = query.eq('estado', estado)
   if (desde) query = query.gte('fecha', desde)
   if (hasta) query = query.lte('fecha', hasta)
-  if (q) {
+  if (qNumero) {
     query = clienteIds.length > 0
-      ? query.or(`numero.ilike.%${q}%,cliente_id.in.(${clienteIds.join(',')})`)
-      : query.ilike('numero', `%${q}%`)
+      ? query.or(`numero.ilike.%${qNumero}%,cliente_id.in.(${clienteIds.join(',')})`)
+      : query.ilike('numero', `%${qNumero}%`)
   }
 
   const from = (page - 1) * pageSize
