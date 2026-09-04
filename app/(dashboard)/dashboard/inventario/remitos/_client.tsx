@@ -41,7 +41,7 @@ export default function RemitosClient({ isAdmin }: { isAdmin: boolean }) {
   const [contraparteTipo, setContraparteTipo] = useState('todos')
   const [buscar, setBuscar] = useState('')
   const [fechaDesde, setFechaDesde] = useState('')
-  const [fechaHasta, setFechaHasta] = useState('')
+  const [fechaHasta, setFechaHasta] = useState(() => new Date().toISOString().slice(0, 10))
   const [confirmandoId, setConfirmandoId] = useState<number | null>(null)
 
   // Eliminar remito
