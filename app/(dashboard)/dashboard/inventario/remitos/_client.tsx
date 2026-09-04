@@ -7,6 +7,7 @@ import { useSelectedSucursal } from '@/hooks/useSelectedSucursal'
 import { usePermissions } from '@/components/PermissionsProvider'
 import { buttonVariants, Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
@@ -19,11 +20,15 @@ import {
 import { toast } from 'sonner'
 import type { Remito } from '@/types/stock'
 
-type RemitoRow = Remito & { contraparte_display: string; nombre_sucursal?: string | null }
+type RemitoRow = Remito & { contraparte_display: string; nombre_sucursal?: string | null; total: number }
 
 const TIPO_LABELS: Record<string, string> = { entrada: 'Entrada', salida: 'Salida' }
 const ESTADO_LABELS: Record<string, string> = { borrador: 'Borrador', confirmado: 'Confirmado', anulado: 'Anulado' }
 const CONTRAPARTE_LABELS: Record<string, string> = { sucursal: 'Sucursal', proveedor: 'Proveedor', persona: 'Persona' }
+
+function formatARS(n: number) {
+  return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(n)
+}
 
 export default function RemitosClient({ isAdmin }: { isAdmin: boolean }) {
   const { isHome } = useSelectedSucursal()
@@ -33,6 +38,8 @@ export default function RemitosClient({ isAdmin }: { isAdmin: boolean }) {
   const [loading, setLoading] = useState(true)
   const [tipo, setTipo] = useState('todos')
   const [estado, setEstado] = useState('todos')
+  const [contraparteTipo, setContraparteTipo] = useState('todos')
+  const [buscar, setBuscar] = useState('')
   const [confirmandoId, setConfirmandoId] = useState<number | null>(null)
 
   // Eliminar remito
@@ -48,11 +55,13 @@ export default function RemitosClient({ isAdmin }: { isAdmin: boolean }) {
     const params = new URLSearchParams()
     if (tipo !== 'todos') params.set('tipo', tipo)
     if (estado !== 'todos') params.set('estado', estado)
+    if (contraparteTipo !== 'todos') params.set('contraparte_tipo', contraparteTipo)
+    if (buscar.trim()) params.set('buscar', buscar.trim())
     const res = await fetch(`/api/dashboard/stock/remitos?${params}`)
     const data = await res.json()
     setRemitos(Array.isArray(data) ? data : [])
     setLoading(false)
-  }, [tipo, estado])
+  }, [tipo, estado, contraparteTipo, buscar])
 
   useEffect(() => { fetchRemitos() }, [fetchRemitos])
 
@@ -97,22 +106,107 @@ export default function RemitosClient({ isAdmin }: { isAdmin: boolean }) {
     return new Date(iso).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
   }
 
+  const grandTotal = remitos.reduce((acc, r) => acc + (r.total || 0), 0)
+
+  async function handlePrintList() {
+    let sucursalNombre = ''
+    let sucursalLogo: string | null = null
+    try {
+      const res = await fetch('/api/dashboard/sucursales/selected')
+      const data = await res.json()
+      sucursalNombre = data?.nombre ?? ''
+      sucursalLogo = data?.logo_url ?? null
+    } catch {}
+
+    const filtros: string[] = []
+    if (tipo !== 'todos') filtros.push(`Tipo: ${TIPO_LABELS[tipo]}`)
+    if (estado !== 'todos') filtros.push(`Estado: ${ESTADO_LABELS[estado]}`)
+    if (contraparteTipo !== 'todos') filtros.push(`Origen/Destino: ${CONTRAPARTE_LABELS[contraparteTipo]}`)
+    if (buscar.trim()) filtros.push(`Buscar: ${buscar.trim()}`)
+
+    const logoSrc = sucursalLogo || '/logos/logo blanco.png'
+    const hoy = new Date().toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+
+    const rows = remitos.map(r => `
+      <tr>
+        <td style="padding:6px 10px;border-bottom:1px solid #e5e7eb;font-family:monospace;font-size:12px">${r.numero}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #e5e7eb;font-size:12px">${formatFecha(r.fecha)}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #e5e7eb;font-size:12px">${TIPO_LABELS[r.tipo]}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #e5e7eb;font-size:12px">${r.contraparte_display}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #e5e7eb;font-size:12px">${ESTADO_LABELS[r.estado]}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;text-align:right">${r.total > 0 ? formatARS(r.total) : '—'}</td>
+      </tr>
+    `).join('')
+
+    const filtrosHtml = filtros.length
+      ? `<p style="margin:4px 0 0;color:#374151;font-size:12px">${filtros.join(' · ')}</p>`
+      : ''
+
+    const html = `<!DOCTYPE html>
+<html><head><title>Listado Remitos</title></head>
+<body style="font-family:sans-serif;padding:20px;color:#1f2937">
+  <div style="display:flex;align-items:center;gap:14px;margin-bottom:12px">
+    <img src="${logoSrc}" alt="Logo" style="width:48px;height:48px;object-fit:contain;border-radius:6px;border:1px solid #e5e7eb" onerror="this.style.display='none'" />
+    <div>
+      <h2 style="margin:0">Listado Remitos</h2>
+      ${sucursalNombre ? `<p style="margin:2px 0 0;color:#6b7280;font-size:13px">${sucursalNombre}</p>` : ''}
+    </div>
+    <div style="margin-left:auto;text-align:right">
+      <p style="margin:0;color:#6b7280;font-size:13px">${hoy}</p>
+      <p style="margin:2px 0 0;color:#9ca3af;font-size:11px">${remitos.length} remito(s)</p>
+    </div>
+  </div>
+  ${filtrosHtml}
+  <table style="width:100%;border-collapse:collapse;margin-top:12px">
+    <thead>
+      <tr style="background:#f3f4f6">
+        <th style="padding:8px 10px;text-align:left;font-size:12px;border-bottom:2px solid #d1d5db">N°</th>
+        <th style="padding:8px 10px;text-align:left;font-size:12px;border-bottom:2px solid #d1d5db">Fecha</th>
+        <th style="padding:8px 10px;text-align:left;font-size:12px;border-bottom:2px solid #d1d5db">Tipo</th>
+        <th style="padding:8px 10px;text-align:left;font-size:12px;border-bottom:2px solid #d1d5db">Origen / Destino</th>
+        <th style="padding:8px 10px;text-align:left;font-size:12px;border-bottom:2px solid #d1d5db">Estado</th>
+        <th style="padding:8px 10px;text-align:right;font-size:12px;border-bottom:2px solid #d1d5db">Total</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+    <tfoot>
+      <tr>
+        <td colspan="5" style="padding:10px;text-align:right;font-weight:bold;font-size:13px;border-top:2px solid #374151">TOTAL</td>
+        <td style="padding:10px;text-align:right;font-weight:bold;font-size:13px;border-top:2px solid #374151">${grandTotal > 0 ? formatARS(grandTotal) : '—'}</td>
+      </tr>
+    </tfoot>
+  </table>
+  <script>window.onload=function(){window.print();window.onafterprint=function(){window.close()}}</script>
+</body></html>`
+    const w = window.open('', '_blank')
+    if (w) { w.document.write(html); w.document.close() }
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-lg font-semibold text-gray-800">Stock — Remitos</h2>
-        {canWrite && can('inventario.remitos.crear') && (
-          <Link href="/dashboard/inventario/remitos/nuevo" className={buttonVariants()}>
-            <Plus className="w-4 h-4 mr-2" />
-            Nuevo remito
-          </Link>
-        )}
+        <div className="flex items-center gap-2">
+          {remitos.length > 0 && (
+            <Button variant="outline" size="sm" onClick={handlePrintList}>
+              <Printer className="w-4 h-4 mr-1" />
+              Imprimir listado
+            </Button>
+          )}
+          {canWrite && can('inventario.remitos.crear') && (
+            <Link href="/dashboard/inventario/remitos/nuevo" className={buttonVariants()}>
+              <Plus className="w-4 h-4 mr-2" />
+              Nuevo remito
+            </Link>
+          )}
+        </div>
       </div>
 
-      <div className="flex gap-3 mb-4">
-        <div className="w-44">
+      <div className="flex items-end gap-4 mb-4">
+        <div className="flex items-center gap-2">
+          <label className="text-sm font-medium text-gray-600 whitespace-nowrap">Tipo</label>
           <Select value={tipo} onValueChange={(v) => { if (v) setTipo(v) }}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="todos">Todos los tipos</SelectItem>
               <SelectItem value="entrada">Entrada</SelectItem>
@@ -120,9 +214,10 @@ export default function RemitosClient({ isAdmin }: { isAdmin: boolean }) {
             </SelectContent>
           </Select>
         </div>
-        <div className="w-48">
+        <div className="flex items-center gap-2">
+          <label className="text-sm font-medium text-gray-600 whitespace-nowrap">Estado</label>
           <Select value={estado} onValueChange={(v) => { if (v) setEstado(v) }}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="todos">Todos los estados</SelectItem>
               <SelectItem value="borrador">Borrador</SelectItem>
@@ -130,6 +225,24 @@ export default function RemitosClient({ isAdmin }: { isAdmin: boolean }) {
               <SelectItem value="anulado">Anulado</SelectItem>
             </SelectContent>
           </Select>
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-sm font-medium text-gray-600 whitespace-nowrap">Origen / Destino</label>
+          <Select value={contraparteTipo} onValueChange={(v) => { if (v) setContraparteTipo(v) }}>
+            <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos</SelectItem>
+              <SelectItem value="sucursal">Sucursal</SelectItem>
+              <SelectItem value="proveedor">Proveedor</SelectItem>
+              <SelectItem value="persona">Persona</SelectItem>
+            </SelectContent>
+          </Select>
+          <Input
+            placeholder="Buscar nombre…"
+            value={buscar}
+            onChange={e => setBuscar(e.target.value)}
+            className="w-52"
+          />
         </div>
       </div>
 
@@ -142,6 +255,7 @@ export default function RemitosClient({ isAdmin }: { isAdmin: boolean }) {
               <TableHead className="w-32">Fecha</TableHead>
               {showSucursal && <TableHead className="w-40">Sucursal</TableHead>}
               <TableHead>Origen / Destino</TableHead>
+              <TableHead className="w-32 text-right">Total</TableHead>
               <TableHead className="w-32">Estado</TableHead>
               <TableHead className="w-36"></TableHead>
             </TableRow>
@@ -149,11 +263,11 @@ export default function RemitosClient({ isAdmin }: { isAdmin: boolean }) {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={showSucursal ? 7 : 6} className="text-center py-8 text-gray-400">Cargando…</TableCell>
+                <TableCell colSpan={showSucursal ? 8 : 7} className="text-center py-8 text-gray-400">Cargando…</TableCell>
               </TableRow>
             ) : remitos.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={showSucursal ? 7 : 6} className="text-center py-8 text-gray-400">Sin remitos</TableCell>
+                <TableCell colSpan={showSucursal ? 8 : 7} className="text-center py-8 text-gray-400">Sin remitos</TableCell>
               </TableRow>
             ) : remitos.map(r => (
               <TableRow key={r.id}>
@@ -170,6 +284,9 @@ export default function RemitosClient({ isAdmin }: { isAdmin: boolean }) {
                 <TableCell className="text-sm">
                   <span className="text-gray-400 text-xs mr-1">{CONTRAPARTE_LABELS[r.contraparte_tipo]}</span>
                   <span className="text-gray-700">{r.contraparte_display}</span>
+                </TableCell>
+                <TableCell className="text-sm text-right font-medium">
+                  {r.total > 0 ? formatARS(r.total) : '—'}
                 </TableCell>
                 <TableCell>
                   <Badge
@@ -239,6 +356,13 @@ export default function RemitosClient({ isAdmin }: { isAdmin: boolean }) {
                 </TableCell>
               </TableRow>
             ))}
+            {remitos.length > 0 && (
+              <TableRow className="bg-gray-50 font-semibold">
+                <TableCell colSpan={showSucursal ? 6 : 5} className="text-right text-sm">TOTAL</TableCell>
+                <TableCell className="text-right text-sm">{formatARS(grandTotal)}</TableCell>
+                <TableCell></TableCell>
+              </TableRow>
+            )}
           </TableBody>
         </Table>
       </div>

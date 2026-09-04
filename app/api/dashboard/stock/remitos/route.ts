@@ -15,20 +15,52 @@ export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl
   const tipo = searchParams.get('tipo')
   const estado = searchParams.get('estado')
+  const contraparteTipo = searchParams.get('contraparte_tipo')
+  const buscar = searchParams.get('buscar')?.trim() || null
+
+  let buscarProvIds: number[] | null = null
+  let buscarSucIds: number[] | null = null
+  let buscarPersona = false
+
+  if (buscar) {
+    const like = `%${buscar}%`
+    if (!contraparteTipo || contraparteTipo === 'todos' || contraparteTipo === 'proveedor') {
+      const { data } = await supabase.from('proveedores').select('id').ilike('nombre', like)
+      buscarProvIds = (data ?? []).map(p => p.id)
+    }
+    if (!contraparteTipo || contraparteTipo === 'todos' || contraparteTipo === 'sucursal') {
+      const { data } = await supabase.from('sucursales').select('id').ilike('nombre', like)
+      buscarSucIds = (data ?? []).map(s => s.id)
+    }
+    if (!contraparteTipo || contraparteTipo === 'todos' || contraparteTipo === 'persona') {
+      buscarPersona = true
+    }
+  }
 
   let query = supabase
     .from('remitos')
-    .select('id, numero, tipo, sucursal_id, contraparte_tipo, contraparte_nombre, contraparte_sucursal_id, contraparte_proveedor_id, fecha, estado, created_at')
+    .select('id, numero, tipo, sucursal_id, contraparte_tipo, contraparte_nombre, contraparte_sucursal_id, contraparte_proveedor_id, fecha, estado, created_at, remito_items(cantidad, costo_unitario)')
     .order('created_at', { ascending: false })
     .limit(verTodas ? 500 : 200)
   if (!verTodas && sucursalId) query = query.eq('sucursal_id', sucursalId)
   if (tipo && tipo !== 'todos') query = query.eq('tipo', tipo)
   if (estado && estado !== 'todos') query = query.eq('estado', estado)
+  if (contraparteTipo && contraparteTipo !== 'todos') query = query.eq('contraparte_tipo', contraparteTipo)
 
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  const list = data ?? []
+  let list = data ?? []
+
+  if (buscar) {
+    const like = buscar.toLowerCase()
+    list = list.filter(r => {
+      if (buscarProvIds && buscarProvIds.length && r.contraparte_tipo === 'proveedor' && r.contraparte_proveedor_id && buscarProvIds.includes(r.contraparte_proveedor_id)) return true
+      if (buscarSucIds && buscarSucIds.length && r.contraparte_tipo === 'sucursal' && r.contraparte_sucursal_id && buscarSucIds.includes(r.contraparte_sucursal_id)) return true
+      if (buscarPersona && r.contraparte_tipo === 'persona' && r.contraparte_nombre?.toLowerCase().includes(like)) return true
+      return false
+    })
+  }
 
   const provIds = [...new Set(list.filter(r => r.contraparte_proveedor_id).map(r => r.contraparte_proveedor_id as number))]
   // Collect both contraparte sucursal ids AND origin sucursal ids (for verTodas)
@@ -48,14 +80,21 @@ export async function GET(req: NextRequest) {
   const provMap = Object.fromEntries((provsRes.data ?? []).map(p => [p.id, p.nombre]))
   const sucMap = Object.fromEntries((sucsRes.data ?? []).map(s => [s.id, s.nombre]))
 
-  const enriched = list.map(r => ({
-    ...r,
-    nombre_sucursal: verTodas ? (sucMap[r.sucursal_id] ?? null) : undefined,
-    contraparte_display:
-      r.contraparte_tipo === 'persona' ? (r.contraparte_nombre ?? '—') :
-      r.contraparte_tipo === 'proveedor' ? (provMap[r.contraparte_proveedor_id!] ?? '—') :
-      r.contraparte_tipo === 'sucursal' ? (sucMap[r.contraparte_sucursal_id!] ?? '—') : '—',
-  }))
+  const enriched = list.map(r => {
+    const items = Array.isArray(r.remito_items) ? r.remito_items : []
+    const total = items.reduce((acc: number, it: { cantidad: number; costo_unitario: number | null }) =>
+      acc + (it.costo_unitario != null ? Number(it.costo_unitario) * Number(it.cantidad) : 0), 0)
+    return {
+      ...r,
+      remito_items: undefined,
+      total,
+      nombre_sucursal: verTodas ? (sucMap[r.sucursal_id] ?? null) : undefined,
+      contraparte_display:
+        r.contraparte_tipo === 'persona' ? (r.contraparte_nombre ?? '—') :
+        r.contraparte_tipo === 'proveedor' ? (provMap[r.contraparte_proveedor_id!] ?? '—') :
+        r.contraparte_tipo === 'sucursal' ? (sucMap[r.contraparte_sucursal_id!] ?? '—') : '—',
+    }
+  })
 
   return NextResponse.json(enriched)
 }
