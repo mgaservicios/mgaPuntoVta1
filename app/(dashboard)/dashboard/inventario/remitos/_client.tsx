@@ -40,6 +40,8 @@ export default function RemitosClient({ isAdmin }: { isAdmin: boolean }) {
   const [estado, setEstado] = useState('todos')
   const [contraparteTipo, setContraparteTipo] = useState('todos')
   const [buscar, setBuscar] = useState('')
+  const [fechaDesde, setFechaDesde] = useState('')
+  const [fechaHasta, setFechaHasta] = useState('')
   const [confirmandoId, setConfirmandoId] = useState<number | null>(null)
 
   // Eliminar remito
@@ -57,11 +59,13 @@ export default function RemitosClient({ isAdmin }: { isAdmin: boolean }) {
     if (estado !== 'todos') params.set('estado', estado)
     if (contraparteTipo !== 'todos') params.set('contraparte_tipo', contraparteTipo)
     if (buscar.trim()) params.set('buscar', buscar.trim())
+    if (fechaDesde) params.set('fecha_desde', fechaDesde)
+    if (fechaHasta) params.set('fecha_hasta', fechaHasta)
     const res = await fetch(`/api/dashboard/stock/remitos?${params}`)
     const data = await res.json()
     setRemitos(Array.isArray(data) ? data : [])
     setLoading(false)
-  }, [tipo, estado, contraparteTipo, buscar])
+  }, [tipo, estado, contraparteTipo, buscar, fechaDesde, fechaHasta])
 
   useEffect(() => { fetchRemitos() }, [fetchRemitos])
 
@@ -123,6 +127,11 @@ export default function RemitosClient({ isAdmin }: { isAdmin: boolean }) {
     if (estado !== 'todos') filtros.push(`Estado: ${ESTADO_LABELS[estado]}`)
     if (contraparteTipo !== 'todos') filtros.push(`Origen/Destino: ${CONTRAPARTE_LABELS[contraparteTipo]}`)
     if (buscar.trim()) filtros.push(`Buscar: ${buscar.trim()}`)
+    if (fechaDesde || fechaHasta) {
+      const d = fechaDesde || '…'
+      const h = fechaHasta || '…'
+      filtros.push(`Período: ${d} al ${h}`)
+    }
 
     const logoSrc = sucursalLogo || '/logos/logo blanco.png'
     const hoy = new Date().toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
@@ -199,6 +208,27 @@ export default function RemitosClient({ isAdmin }: { isAdmin: boolean }) {
               Nuevo remito
             </Link>
           )}
+        </div>
+      </div>
+
+      <div className="flex items-end gap-4 mb-3">
+        <div className="flex items-center gap-2">
+          <label className="text-sm font-medium text-gray-600 whitespace-nowrap">Desde</label>
+          <Input
+            type="date"
+            value={fechaDesde}
+            onChange={e => setFechaDesde(e.target.value)}
+            className="w-40"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-sm font-medium text-gray-600 whitespace-nowrap">Hasta</label>
+          <Input
+            type="date"
+            value={fechaHasta}
+            onChange={e => setFechaHasta(e.target.value)}
+            className="w-40"
+          />
         </div>
       </div>
 

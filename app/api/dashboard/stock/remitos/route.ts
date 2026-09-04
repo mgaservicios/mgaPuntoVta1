@@ -17,6 +17,8 @@ export async function GET(req: NextRequest) {
   const estado = searchParams.get('estado')
   const contraparteTipo = searchParams.get('contraparte_tipo')
   const buscar = searchParams.get('buscar')?.trim() || null
+  const fechaDesde = searchParams.get('fecha_desde')
+  const fechaHasta = searchParams.get('fecha_hasta')
 
   let buscarProvIds: number[] | null = null
   let buscarSucIds: number[] | null = null
@@ -46,6 +48,8 @@ export async function GET(req: NextRequest) {
   if (tipo && tipo !== 'todos') query = query.eq('tipo', tipo)
   if (estado && estado !== 'todos') query = query.eq('estado', estado)
   if (contraparteTipo && contraparteTipo !== 'todos') query = query.eq('contraparte_tipo', contraparteTipo)
+  if (fechaDesde) query = query.gte('fecha', `${fechaDesde}T00:00:00.000Z`)
+  if (fechaHasta) query = query.lte('fecha', `${fechaHasta}T23:59:59.999Z`)
 
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
