@@ -389,7 +389,7 @@ Sistema completo para gestionar pedidos de lentes recetados y armazones.
 
 1. Seleccioná o creá el **cliente** (paciente).
 2. Seleccioná el **médico** derivante *(opcional, de la lista de médicos)*.
-3. Cargá la **graduación** completa — lejos y cerca — para ojo derecho (OD) e izquierdo (OI): esfera, cilindro, eje, adición, distancia pupilar (DP), altura.
+3. Cargá la **graduación** completa — lejos y cerca — para ojo derecho (OD) e izquierdo (OI): esfera, cilindro, eje, adición, distancia pupilar (DP), altura. Podés guardar valores en `0` (ej. cilindro 0 o eje 0): se conservan y se imprimen.
 4. Agregá los **ítems**:
    - **Armazón**: seleccioná del catálogo o cargá uno propio.
    - **Cristal**: tipo de lente.
@@ -405,7 +405,7 @@ Sistema completo para gestionar pedidos de lentes recetados y armazones.
 - **Pagos**: se pueden registrar pagos parciales o totales en cualquier estado, excepto anulado.
 - **Cambiar estado**: según el avance real del trabajo.
 - **Anular**: si hay saldo pendiente, se genera automáticamente un asiento de reversión.
-- **Imprimir**: comprobante A4 con código de barras, graduación completa, desglose de ítems y pagos.
+- **Imprimir**: comprobante A4 con código de barras, graduación completa, desglose de ítems y pagos. La tabla de graduación (lejos/cerca × OD/OI) se imprime **siempre**, mostrando el valor `0` cuando corresponde y `—` en los campos vacíos.
 - **Subir receta**: imagen de la receta médica desde el detalle de la OT.
 - **Selector de lista de precios**: permite elegir qué lista usar para los precios al crear la OT.
 
