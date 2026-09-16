@@ -359,7 +359,7 @@ export default function OpticaOrdenPage({ params }: { params: Promise<{ id: stri
     const n = Number(v)
     if (isNaN(n)) return v
     if (kind === 'eje') return String(Math.round(n))
-    if (n === 0) return ''
+    if (n === 0) return '0.00'
     const sign = n > 0 ? '+' : '-'
     return `${sign}${Math.abs(n).toFixed(2)}`
   }
@@ -391,12 +391,17 @@ export default function OpticaOrdenPage({ params }: { params: Promise<{ id: stri
     return isNaN(n) ? null : n
   }
 
+  function toNumEje(v: string) {
+    if (!v.trim()) return null
+    return parseInt(v)
+  }
+
   function gradPayload() {
     return {
-      lejos_od_esfera: toNum(grad.lejos_od_esfera), lejos_od_cilindro: toNum(grad.lejos_od_cilindro), lejos_od_eje: grad.lejos_od_eje ? parseInt(grad.lejos_od_eje) : null,
-      lejos_oi_esfera: toNum(grad.lejos_oi_esfera), lejos_oi_cilindro: toNum(grad.lejos_oi_cilindro), lejos_oi_eje: grad.lejos_oi_eje ? parseInt(grad.lejos_oi_eje) : null,
-      cerca_od_esfera: toNum(grad.cerca_od_esfera), cerca_od_cilindro: toNum(grad.cerca_od_cilindro), cerca_od_eje: grad.cerca_od_eje ? parseInt(grad.cerca_od_eje) : null,
-      cerca_oi_esfera: toNum(grad.cerca_oi_esfera), cerca_oi_cilindro: toNum(grad.cerca_oi_cilindro), cerca_oi_eje: grad.cerca_oi_eje ? parseInt(grad.cerca_oi_eje) : null,
+      lejos_od_esfera: toNum(grad.lejos_od_esfera), lejos_od_cilindro: toNum(grad.lejos_od_cilindro), lejos_od_eje: toNumEje(grad.lejos_od_eje),
+      lejos_oi_esfera: toNum(grad.lejos_oi_esfera), lejos_oi_cilindro: toNum(grad.lejos_oi_cilindro), lejos_oi_eje: toNumEje(grad.lejos_oi_eje),
+      cerca_od_esfera: toNum(grad.cerca_od_esfera), cerca_od_cilindro: toNum(grad.cerca_od_cilindro), cerca_od_eje: toNumEje(grad.cerca_od_eje),
+      cerca_oi_esfera: toNum(grad.cerca_oi_esfera), cerca_oi_cilindro: toNum(grad.cerca_oi_cilindro), cerca_oi_eje: toNumEje(grad.cerca_oi_eje),
       adicion: toNum(grad.adicion), dp: toNum(grad.dp),
     }
   }

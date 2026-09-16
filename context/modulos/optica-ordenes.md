@@ -281,7 +281,7 @@ ENCABEZADO (una fila)
     Total (azul)
 
 DATOS DEL CLIENTE Y MÉDICO (grid 2 cols)
-GRADUACIÓN (tabla Lejos/Cerca × OD/OI × Esfera/Cilindro/Eje) — solo si hay datos
+GRADUACIÓN (tabla Lejos/Cerca × OD/OI × Esfera/Cilindro/Eje) — **siempre se imprime**, aun con valores en 0 o vacíos (los vacíos muestran "—")
 ARTÍCULOS (tabla con tipo, uso, precio unitario, subtotal)
 TOTALES (subtotal artículos, costo trabajo, descuento, TOTAL)
 SEÑAS / PAGOS (tabla + resumen pagado / saldo)
@@ -423,6 +423,11 @@ Interfaces principales: `OpticaOrden`, `OpticaOrdenItem`, `OpticaOrdenTarea`, `O
 
 7. **Selector de lista de precios:** El fetch a `/api/dashboard/articulos/{id}/precios` se hace en el momento de selección del artículo (no al buscar), por lo que hay un pequeño delay. El dropdown se cierra inmediatamente, el precio aparece al completarse el fetch. Si falla, usa `precio_venta` como fallback.
 
+8. **Graduaciones con valor 0:** El formulario conserva y guarda el `0` como valor real (no como null):
+   - `fmtGrad()` ya no borra el campo al escribir `0` (lo deja como `0.00` en esfera/cilindro y `0` en eje).
+   - `gradPayload()` usa `toNumEje()` en los ejes — antes `grad.x_eje ? parseInt(...) : null` convertía el 0 a null.
+   - La impresión (`[id]/print/page.tsx`) **siempre** muestra la tabla de graduación completa (Lejos/Cerca × OD/OI): se eliminó el gate `hasGraduacion()` y el `.filter(...)` de filas. Un valor 0 se imprime como `0`; un valor vacío/null se imprime como `—`.
+
 ---
 
-*Última actualización: 2026-07-14*
+*Última actualización: 2026-09-16*

@@ -23,10 +23,6 @@ function fmt(v: number | null | undefined) {
   return v > 0 ? `+${v}` : String(v)
 }
 
-function hasGraduacion(o: OpticaOrden) {
-  return [o.lejos_od_esfera, o.lejos_od_cilindro, o.lejos_od_eje, o.lejos_oi_esfera, o.lejos_oi_cilindro, o.lejos_oi_eje, o.cerca_od_esfera, o.cerca_od_cilindro, o.cerca_od_eje, o.cerca_oi_esfera, o.cerca_oi_cilindro, o.cerca_oi_eje, o.adicion, o.dp].some(v => v !== null)
-}
-
 // ── Barcode component ─────────────────────────────────────────────────────────
 
 function Barcode({ value }: { value: string }) {
@@ -229,8 +225,7 @@ export default function PrintOrdenPage({ params }: { params: Promise<{ id: strin
           </div>
 
           {/* ══ GRADUACIÓN ══ */}
-          {hasGraduacion(orden) && (
-            <div className="mb-1">
+          <div className="mb-1">
               <table className="w-full text-[11px] border border-gray-200">
                 <thead>
                   <tr className="border-b border-gray-200">
@@ -249,7 +244,7 @@ export default function PrintOrdenPage({ params }: { params: Promise<{ id: strin
                     { label: 'Lejos OI', esf: orden.lejos_oi_esfera, cil: orden.lejos_oi_cilindro, eje: orden.lejos_oi_eje },
                     { label: 'Cerca OD', esf: orden.cerca_od_esfera, cil: orden.cerca_od_cilindro, eje: orden.cerca_od_eje },
                     { label: 'Cerca OI', esf: orden.cerca_oi_esfera, cil: orden.cerca_oi_cilindro, eje: orden.cerca_oi_eje },
-                  ].filter(r => r.esf !== null || r.cil !== null || r.eje !== null).map((row, i) => (
+                  ].map((row, i) => (
                     <tr key={row.label} className="border-b border-gray-100 last:border-0">
                       <td className="px-2 py-0.5 font-semibold text-gray-700 whitespace-nowrap">{row.label}</td>
                       <td className="px-1 py-0.5 text-center font-mono">{fmt(row.esf)}</td>
@@ -266,7 +261,6 @@ export default function PrintOrdenPage({ params }: { params: Promise<{ id: strin
                 </tbody>
               </table>
             </div>
-          )}
 
           {/* ══ ARTÍCULOS ══ */}
           {items.length > 0 && (
