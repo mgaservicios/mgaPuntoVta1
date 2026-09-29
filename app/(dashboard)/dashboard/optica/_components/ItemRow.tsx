@@ -156,10 +156,13 @@ export default function ItemRow({
       </div>
 
       {/* Artículo de stock vinculado */}
-      {esArmazon && item.articulo_id && !disabled && (
+      {esArmazon && item.articulo_id && !item.armazon_propio && !disabled && (
         <div className="flex items-center gap-1.5 text-xs text-gray-500">
           <Package className="w-3 h-3" />
           Artículo de stock vinculado (id {item.articulo_id})
+          <span className="rounded border border-cyan-200 bg-cyan-50 px-1.5 py-0.5 text-[10px] text-cyan-700">
+            descuenta {item.cantidad} del stock
+          </span>
           <button
             className="ml-1 text-gray-400 hover:text-red-500"
             onClick={() => { onChange('articulo_id', null); onChange('variante_id', null) }}

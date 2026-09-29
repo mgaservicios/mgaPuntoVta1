@@ -188,6 +188,20 @@ export async function GET(req: NextRequest) {
   type EnrichedRow = { id: number; tipo_articulo: string; articulo_variantes?: Array<{ id: number }> } & Record<string, unknown>
   let enriched: EnrichedRow[]
 
+  // Artículos con stock en la sucursal activa.
+  // Antes este filtro solo se aplicaba al listado sin búsqueda, así que buscar por
+  // texto devolvía artículos sin stock. Se calcula una vez y se aplica a ambas ramas.
+  let idsConStock: number[] | null = null
+  if (conStock) {
+    const { data: stockIds } = await supabase
+      .from('articulo_stock')
+      .select('articulo_id')
+      .eq('sucursal_id', activeSucursalId)
+      .gt('stock_actual', 0)
+    idsConStock = [...new Set((stockIds ?? []).map((s: { articulo_id: number }) => s.articulo_id))]
+    if (idsConStock.length === 0) return NextResponse.json([])
+  }
+
   if (q?.trim()) {
     const term = q.trim()
     const SELECT_Q = `id, codigo, nombre, tipo_articulo, precio_venta, stock_actual, activo, imagen_url,
@@ -202,6 +216,7 @@ export async function GET(req: NextRequest) {
       .order('nombre')
       .limit(50)
     if (soloActivos) byCodeQ = byCodeQ.eq('activo', true)
+    if (idsConStock)  byCodeQ = byCodeQ.in('id', idsConStock)
     if (filtroProveedorId) byCodeQ = byCodeQ.eq('proveedor_id', filtroProveedorId)
     if (filtroMarcaId)     byCodeQ = byCodeQ.eq('marca_id', filtroMarcaId)
     if (filtroCategoriaId) byCodeQ = byCodeQ.eq('categoria_id', filtroCategoriaId)
@@ -220,6 +235,7 @@ export async function GET(req: NextRequest) {
         .order('nombre')
         .limit(50)
       if (soloActivos) byPartialQ = byPartialQ.eq('activo', true)
+      if (idsConStock)  byPartialQ = byPartialQ.in('id', idsConStock)
       if (filtroProveedorId) byPartialQ = byPartialQ.eq('proveedor_id', filtroProveedorId)
       if (filtroMarcaId)     byPartialQ = byPartialQ.eq('marca_id', filtroMarcaId)
       if (filtroCategoriaId) byPartialQ = byPartialQ.eq('categoria_id', filtroCategoriaId)
@@ -237,20 +253,10 @@ export async function GET(req: NextRequest) {
       .order('nombre')
 
     if (soloActivos) query = query.eq('activo', true)
+    if (idsConStock)  query = query.in('id', idsConStock)
     if (filtroProveedorId) query = query.eq('proveedor_id', filtroProveedorId)
     if (filtroMarcaId)     query = query.eq('marca_id', filtroMarcaId)
     if (filtroCategoriaId) query = query.eq('categoria_id', filtroCategoriaId)
-
-    if (conStock) {
-      const { data: stockIds } = await supabase
-        .from('articulo_stock')
-        .select('articulo_id')
-        .eq('sucursal_id', activeSucursalId)
-        .gt('stock_actual', 0)
-      const artIds = [...new Set((stockIds ?? []).map((s: { articulo_id: number }) => s.articulo_id))]
-      if (artIds.length === 0) return NextResponse.json([])
-      query = query.in('id', artIds)
-    }
 
     const { data, error } = await query
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })

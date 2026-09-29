@@ -29,18 +29,53 @@ export async function POST(_: NextRequest, { params }: Ctx) {
 
   const items = Array.isArray(venta.venta_items) ? venta.venta_items : []
 
-  // Revertir stock por sucursal
+  // Revertir stock por sucursal + registrar el movimiento de devolución.
+  // Espejo de ordenes/[id]/anular: sin esta fila el historial mostraba la salida
+  // de la venta pero nunca la devolución, y los stock_antes siguientes quedaban desfasados.
   const articuloIdsSet = new Set<number>()
   for (const item of items) {
+    const vid = item.variante_id ?? null
+    const cant = Number(item.cantidad)
+
+    let sqQ = supabase
+      .from('articulo_stock')
+      .select('stock_actual')
+      .eq('articulo_id', item.articulo_id)
+      .eq('sucursal_id', venta.sucursal_id)
+    sqQ = vid === null ? sqQ.is('variante_id', null) : sqQ.eq('variante_id', vid)
+    const { data: sqRow } = await sqQ.maybeSingle()
+    const stockAntes = Number(sqRow?.stock_actual ?? 0)
+
     const stockErr = await adjustArticuloStock(
       item.articulo_id,
-      item.variante_id ?? null,
+      vid,
       venta.sucursal_id,
-      item.cantidad,
+      cant,
       supabase,
     )
     if (stockErr) return NextResponse.json({ error: `Error revirtiendo stock: ${stockErr}` }, { status: 500 })
     articuloIdsSet.add(item.articulo_id)
+
+    const { error: movError } = await supabase.from('movimientos_stock').insert({
+      articulo_id: item.articulo_id,
+      variante_id: vid,
+      sucursal_id: venta.sucursal_id,
+      tipo: 'anulacion_venta',
+      cantidad: Math.abs(cant),
+      stock_antes: stockAntes,
+      stock_despues: stockAntes + cant,
+      venta_id: venta.id,
+      observaciones: `Anulación venta ${venta.numero}`,
+      usuario_id: session.user.id,
+    })
+    // El stock ya fue devuelto; si el movimiento no se guarda, el historial queda
+    // incompleto, así que se avisa en lugar de fallar en silencio.
+    if (movError) {
+      return NextResponse.json(
+        { error: `Stock revertido pero no se pudo registrar el movimiento: ${movError.message}` },
+        { status: 500 },
+      )
+    }
   }
   for (const aid of articuloIdsSet) await syncArticuloStock(aid, supabase)
 

@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth'
 import { requirePermission } from '@/lib/require-permission'
 import { getTenantClient } from '@/services/supabase-tenant'
 import { assertHomeSucursal } from '@/lib/sucursal'
+import { descontarItemsOptica, revertirItemsOptica } from '@/services/stock'
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -42,10 +43,11 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
 
   const { id } = await params
 
-  // Verificar estado y tareas actuales
+  // Verificar estado y tareas actuales.
+  // Los ítems previos se necesitan para restaurar el stock si el descuento nuevo falla.
   const { data: existing, error: fetchError } = await supabase
     .from('optica_ordenes')
-    .select('estado, sucursal_id, optica_orden_tareas(id), optica_orden_pagos(id)')
+    .select('estado, sucursal_id, stock_descontado_at, optica_orden_tareas(id), optica_orden_pagos(id), optica_orden_items(tipo, uso, nombre, armazon_propio, articulo_id, variante_id, cantidad, precio_unitario, descuento_pct, subtotal, notas)')
     .eq('id', id)
     .single()
 
@@ -106,6 +108,64 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
   )
   const total = Math.round((subtotal - descuento_monto) * 100) / 100
 
+  // ── Reconciliación de stock ────────────────────────────────────────────────
+  // La OT descuenta stock al crearse, así que cambiar los ítems implica
+  // revertir el descuento anterior (calculado sobre los ítems viejos, que
+  // todavía están en la base) y aplicar el nuevo.
+  // Orden de operaciones: primero ítems+stock (que deben quedar consistentes
+  // entre sí), recién después la cabecera de la OT. Si algo falla antes del
+  // descuento todavía no se tocó la cabecera, así que la OT queda como estaba.
+  const itemsPrevios = (existing.optica_orden_items ?? []) as typeof itemsConSubtotal
+  const habiaDescuento = existing.stock_descontado_at != null
+  const usuarioId = session.user.id
+
+  // Deja los ítems como estaban y reaplica el descuento que hubiera.
+  // Se usa en los dos caminos de error de abajo.
+  async function restaurarEstadoAnterior(): Promise<string | null> {
+    await supabase.from('optica_orden_items').delete().eq('orden_id', id)
+    if (itemsPrevios.length > 0) {
+      const { error: err } = await supabase
+        .from('optica_orden_items')
+        .insert(itemsPrevios.map(i => ({ ...i, orden_id: Number(id) })))
+      if (err) return `No se pudieron restaurar los ítems anteriores: ${err.message}`
+    }
+    if (habiaDescuento) {
+      const re = await descontarItemsOptica(Number(id), usuarioId, supabase)
+      if (!re.ok) return `No se pudo reaplicar el descuento anterior: ${re.error}`
+    }
+    return null
+  }
+
+  if (habiaDescuento) {
+    const rev = await revertirItemsOptica(Number(id), session.user.id, supabase)
+    if (!rev.ok) return NextResponse.json({ error: rev.error }, { status: 500 })
+  }
+
+  await supabase.from('optica_orden_items').delete().eq('orden_id', id)
+
+  if (itemsConSubtotal.length > 0) {
+    const { error: itemsError } = await supabase
+      .from('optica_orden_items')
+      .insert(itemsConSubtotal.map(i => ({ ...i, orden_id: Number(id) })))
+
+    if (itemsError) {
+      const fallo = await restaurarEstadoAnterior()
+      return NextResponse.json(
+        { error: fallo ? `${itemsError.message} — ${fallo}` : itemsError.message },
+        { status: 500 },
+      )
+    }
+  }
+
+  const stock = await descontarItemsOptica(Number(id), session.user.id, supabase)
+  if (!stock.ok) {
+    const fallo = await restaurarEstadoAnterior()
+    return NextResponse.json(
+      { error: fallo ? `${stock.error} — ${fallo}` : stock.error },
+      { status: 400 },
+    )
+  }
+
   const { error: updateError } = await supabase
     .from('optica_ordenes')
     .update({
@@ -142,16 +202,6 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
 
   if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 })
 
-  await supabase.from('optica_orden_items').delete().eq('orden_id', id)
-
-  if (itemsConSubtotal.length > 0) {
-    const { error: itemsError } = await supabase
-      .from('optica_orden_items')
-      .insert(itemsConSubtotal.map(i => ({ ...i, orden_id: Number(id) })))
-
-    if (itemsError) return NextResponse.json({ error: itemsError.message }, { status: 500 })
-  }
-
   return NextResponse.json({ ok: true })
 }
 
@@ -185,6 +235,11 @@ export async function DELETE(_: NextRequest, { params }: Ctx) {
       { status: 409 },
     )
   }
+
+  // Devolver el stock antes de borrar: los movimientos quedan en el historial
+  // (referencia = numero de la OT) y la fila de la OT desaparece.
+  const rev = await revertirItemsOptica(Number(id), session.user.id, supabase)
+  if (!rev.ok) return NextResponse.json({ error: rev.error }, { status: 500 })
 
   const { error } = await supabase.from('optica_ordenes').delete().eq('id', id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

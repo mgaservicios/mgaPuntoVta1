@@ -165,7 +165,7 @@ export async function GET(req: NextRequest) {
       .from('movimientos_stock')
       .select(`
         id, tipo, cantidad, stock_antes, stock_despues,
-        referencia, observaciones, created_at, variante_id,
+        referencia, observaciones, created_at, variante_id, remito_id,
         sucursales(nombre),
         ventas(numero),
         articulo_variantes(sku, variante_atributos(valor, atributo_tipos(nombre)))
@@ -235,11 +235,22 @@ export async function GET(req: NextRequest) {
   type MovRaw = {
     id: number; tipo: string; cantidad: number; stock_antes: number; stock_despues: number
     referencia: string | null; observaciones: string | null; created_at: string; variante_id: number | null
+    remito_id: number | null
     sucursales: { nombre: string } | null
     ventas: { numero: string } | null
     articulo_variantes: { sku: string | null; variante_atributos?: { valor: string; atributo_tipos: { nombre: string } | null }[] }[] | null
   }
-  const movimientos = ((movsResult.data ?? []) as unknown as MovRaw[]).map(m => ({
+  const rawMovs = (movsResult.data ?? []) as unknown as MovRaw[]
+
+  // Claves de los remitos que YA tienen movimiento en movimientos_stock.
+  // Desde la reconstrucción de stock, todo remito confirmado tiene su
+  // movimiento, así que sin esto cada remito aparecería dos veces en la
+  // pantalla: una por movimientos_stock y otra por remito_items.
+  const remitosConMovimiento = new Set(
+    rawMovs.filter(m => m.remito_id != null).map(m => `${m.remito_id}|${m.variante_id ?? ''}`)
+  )
+
+  const movimientos = rawMovs.map(m => ({
     id: `mov-${m.id}`,
     tipo: m.tipo,
     cantidad: m.cantidad,
@@ -254,8 +265,10 @@ export async function GET(req: NextRequest) {
   }))
 
   // ── Normalizar remito_items ──
+  // Solo los remitos sin movimiento propio, para no duplicar.
   const remitoMovimientos = remitoItems
     .filter(item => !!remitosMap[item.remito_id])
+    .filter(item => !remitosConMovimiento.has(`${item.remito_id}|${item.variante_id ?? ''}`))
     .map(item => {
       const r = remitosMap[item.remito_id]
       return {

@@ -54,6 +54,17 @@ export async function DELETE(_: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: 'Solo se pueden eliminar ventas anuladas' }, { status: 409 })
   }
 
+  // Borrar los movimientos de stock de la venta (el original y la reversa).
+  // Efecto neto 0 en articulo_stock: el anular ya devolvió el stock y :53
+  // garantiza que la venta estaba anulada. Sin esto quedaban huérfanos y,
+  // por la FK sin ON DELETE, el DELETE de la venta fallaba con 500.
+  const { error: movErr } = await supabase
+    .from('movimientos_stock')
+    .delete()
+    .eq('venta_id', id)
+
+  if (movErr) return NextResponse.json({ error: movErr.message }, { status: 500 })
+
   const { error } = await supabase.from('ventas').delete().eq('id', id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 

@@ -51,9 +51,11 @@ GRANT ALL ON SEQUENCE public.caja_movimientos_log_id_seq TO anon, authenticated,
 -- 4. Permiso fondos.caja.anular
 -- ============================================================
 
-INSERT INTO public.permisos (clave, nombre, modulo)
-VALUES ('fondos.caja.anular', 'Anular movimientos de caja', 'fondos')
-ON CONFLICT (clave) DO NOTHING;
+INSERT INTO public.role_permissions (role_id, operation, allowed)
+SELECT r.id, 'fondos.caja.anular',
+  CASE WHEN r.name = 'Administrador' THEN true ELSE false END
+FROM public.roles r
+ON CONFLICT (role_id, operation) DO NOTHING;
 
 -- ============================================================
 -- 5. Índices para mejorar performance

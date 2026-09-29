@@ -161,6 +161,7 @@ export async function POST(req: NextRequest) {
       descuento_monto,
       recargo_monto,
       total,
+      created_by: session.user.id,
       observaciones: body.observaciones || null,
     })
     .select()

@@ -26,7 +26,7 @@ type ArticuloRow = {
 // Tipo unificado que devuelve la API (combina movimientos_stock + remito_items)
 type Movimiento = {
   id: string
-  tipo: 'entrada' | 'salida' | 'ajuste' | 'venta' | 'devolucion' | 'orden'
+  tipo: 'entrada' | 'salida' | 'ajuste' | 'venta' | 'devolucion' | 'orden' | 'optica' | 'anulacion_venta' | 'anulacion_ot'
   cantidad: number
   stock_antes: number | null
   stock_despues: number | null
@@ -39,12 +39,15 @@ type Movimiento = {
 }
 
 const TIPO_CONFIG: Record<string, { label: string; cls: string; negative: boolean }> = {
-  venta:      { label: 'Venta',      cls: 'text-blue-700 bg-blue-50 border-blue-200',      negative: true  },
-  salida:     { label: 'Salida',     cls: 'text-red-700 bg-red-50 border-red-200',          negative: true  },
-  entrada:    { label: 'Entrada',    cls: 'text-green-700 bg-green-50 border-green-200',    negative: false },
-  ajuste:     { label: 'Ajuste',     cls: 'text-yellow-700 bg-yellow-50 border-yellow-200', negative: false },
-  devolucion: { label: 'Devolución', cls: 'text-purple-700 bg-purple-50 border-purple-200', negative: false },
-  orden:      { label: 'Orden',      cls: 'text-orange-700 bg-orange-50 border-orange-200', negative: true  },
+  venta:           { label: 'Venta',      cls: 'text-blue-700 bg-blue-50 border-blue-200',      negative: true  },
+  salida:          { label: 'Salida',     cls: 'text-red-700 bg-red-50 border-red-200',          negative: true  },
+  entrada:         { label: 'Entrada',    cls: 'text-green-700 bg-green-50 border-green-200',    negative: false },
+  ajuste:          { label: 'Ajuste',     cls: 'text-yellow-700 bg-yellow-50 border-yellow-200', negative: false },
+  devolucion:      { label: 'Devolución', cls: 'text-purple-700 bg-purple-50 border-purple-200', negative: false },
+  orden:           { label: 'Orden',      cls: 'text-orange-700 bg-orange-50 border-orange-200', negative: true  },
+  optica:          { label: 'OT Óptica',  cls: 'text-cyan-700 bg-cyan-50 border-cyan-200',       negative: true  },
+  anulacion_venta: { label: 'Anul. Venta',cls: 'text-sky-700 bg-sky-50 border-sky-200',          negative: false },
+  anulacion_ot:    { label: 'Anul. OT',   cls: 'text-teal-700 bg-teal-50 border-teal-200',       negative: false },
 }
 
 function formatPrecio(v: number | null) {

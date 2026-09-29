@@ -4,12 +4,21 @@ import { useState, useEffect, useRef } from 'react'
 import { Package } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 
+export interface StockSucursal {
+  sucursal_id: number
+  sucursal_nombre?: string
+  stock_actual: number
+  is_active: boolean
+}
+
 export interface ArticuloResult {
   id: number
   codigo: string | null
   nombre: string
   tipo_articulo: 'simple' | 'con_variantes'
   precio_venta: number | null
+  stock_sucursales?: StockSucursal[]
+  stock_sucursal_actual?: number
 }
 
 export interface VarianteResult {
@@ -17,7 +26,16 @@ export interface VarianteResult {
   sku: string | null
   precio_venta: number | null
   activo: boolean
+  stock_sucursales?: StockSucursal[]
+  stock_sucursal_actual?: number
   variante_atributos?: { valor: string; atributo_tipos?: { nombre: string } | null }[]
+}
+
+/** Stock de la sucursal activa. Es el único que se puede descontar con una OT. */
+function stockActivo(e: { stock_sucursales?: StockSucursal[]; stock_sucursal_actual?: number }): number {
+  if (typeof e.stock_sucursal_actual === 'number') return e.stock_sucursal_actual
+  const s = e.stock_sucursales?.find(x => x.is_active)
+  return s ? Number(s.stock_actual) : 0
 }
 
 export function varLabel(v: VarianteResult) {
@@ -58,7 +76,10 @@ export default function ArmazonSearch({
     if (!q.trim()) { setResults([]); return }
     clearTimeout(debounce.current)
     debounce.current = setTimeout(async () => {
-      const res = await fetch(`/api/dashboard/articulos?q=${encodeURIComponent(q)}`)
+      // con_stock=true: solo artículos con stock en la sucursal activa.
+      // El backend vuelve a validar al guardar, esto es solo para no ofrecer
+      // armazones que no se pueden usar.
+      const res = await fetch(`/api/dashboard/articulos?con_stock=true&q=${encodeURIComponent(q)}`)
       const data = await res.json()
       setResults(Array.isArray(data) ? data.slice(0, 10) : [])
     }, 250)
@@ -106,32 +127,46 @@ export default function ArmazonSearch({
         />
       </div>
       {open && results.length > 0 && (
-        <div className="absolute z-30 top-full mt-1 w-64 bg-white rounded-md border shadow-lg max-h-60 overflow-auto">
+        <div className="absolute z-30 top-full mt-1 w-72 bg-white rounded-md border shadow-lg max-h-60 overflow-auto">
           {results.map(a => (
             <div key={a.id}>
               <button
                 type="button"
-                className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center justify-between"
+                className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center justify-between gap-2"
                 onMouseDown={() => handleClick(a)}
               >
                 <span className="truncate">{a.nombre}</span>
-                {a.precio_venta != null && (
-                  <span className="text-xs text-gray-400 ml-2 flex-shrink-0">{formatARS(a.precio_venta)}</span>
-                )}
+                <span className="flex items-center gap-2 flex-shrink-0">
+                  {a.tipo_articulo === 'con_variantes' && (
+                    <span className="text-xs text-gray-500">{stockActivo(a)} disp.</span>
+                  )}
+                  {a.precio_venta != null && (
+                    <span className="text-xs text-gray-400">{formatARS(a.precio_venta)}</span>
+                  )}
+                </span>
               </button>
               {expandingId === a.id && variantesCache[a.id] && (
                 <div className="border-t bg-gray-50">
-                  {variantesCache[a.id].map(v => (
-                    <button
-                      key={v.id}
-                      type="button"
-                      className="w-full text-left pl-6 pr-3 py-1.5 text-xs hover:bg-blue-50 flex items-center justify-between"
-                      onMouseDown={() => handleSelectVariante(a, v)}
-                    >
-                      <span>{varLabel(v)}</span>
-                      {v.precio_venta != null && <span className="text-gray-400">{formatARS(v.precio_venta)}</span>}
-                    </button>
-                  ))}
+                  {variantesCache[a.id].map(v => {
+                    const st = stockActivo(v)
+                    return (
+                      <button
+                        key={v.id}
+                        type="button"
+                        disabled={st <= 0}
+                        className="w-full text-left pl-6 pr-3 py-1.5 text-xs hover:bg-blue-50 disabled:hover:bg-transparent disabled:text-gray-400 flex items-center justify-between gap-2"
+                        onMouseDown={() => handleSelectVariante(a, v)}
+                      >
+                        <span>{varLabel(v)}</span>
+                        <span className="flex items-center gap-2 flex-shrink-0">
+                          <span className={st > 0 ? 'text-gray-500' : 'text-red-500'}>
+                            {st} disp.
+                          </span>
+                          {v.precio_venta != null && <span className="text-gray-400">{formatARS(v.precio_venta)}</span>}
+                        </span>
+                      </button>
+                    )
+                  })}
                 </div>
               )}
             </div>

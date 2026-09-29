@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requirePermission } from '@/lib/require-permission'
 import { getTenantClient } from '@/services/supabase-tenant'
 import { getHomeSucursalId, assertHomeSucursal } from '@/lib/sucursal'
+import { revertirItemsOptica } from '@/services/stock'
 
 const ESTADOS_MANUALES = ['terminado', 'entregado', 'anulado'] as const
 
@@ -44,6 +45,14 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       { error: `No se puede cambiar de "${actual.estado}" a "${nuevo_estado}"` },
       { status: 403 },
     )
+  }
+
+  // Al anular: devolver el stock de los ítems de la OT.
+  // Va antes del cambio de estado para que un fallo no deje la OT anulada
+  // con el stock todavía descontado.
+  if (nuevo_estado === 'anulado') {
+    const rev = await revertirItemsOptica(Number(id), session.user.id, supabase)
+    if (!rev.ok) return NextResponse.json({ error: rev.error }, { status: 500 })
   }
 
   const { error } = await supabase

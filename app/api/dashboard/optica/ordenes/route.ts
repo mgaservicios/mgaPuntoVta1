@@ -4,6 +4,7 @@ import { requirePermission } from '@/lib/require-permission'
 import { getTenantClient } from '@/services/supabase-tenant'
 import { getHomeSucursalId, getSucursalFilter, assertActiveSucursalIsHome } from '@/lib/sucursal'
 import { normalizarBusquedaNumero } from '@/lib/busqueda-numero'
+import { descontarItemsOptica } from '@/services/stock'
 
 export async function GET(req: NextRequest) {
   const session = await auth()
@@ -180,6 +181,15 @@ export async function POST(req: NextRequest) {
       await supabase.from('optica_ordenes').delete().eq('id', orden.id)
       return NextResponse.json({ error: itemsError.message }, { status: 500 })
     }
+  }
+
+  // Descontar stock de los ítems con articulo_id (armazones del catálogo).
+  // Ocurre al crear la OT; después el PUT reconcilia si cambian los ítems.
+  // El RPC es transaccional: o descuenta todo o nada.
+  const stock = await descontarItemsOptica(orden.id, session.user.id, supabase)
+  if (!stock.ok) {
+    await supabase.from('optica_ordenes').delete().eq('id', orden.id)
+    return NextResponse.json({ error: stock.error }, { status: 400 })
   }
 
   // Crear pago de seña si se indicó anticipo con método

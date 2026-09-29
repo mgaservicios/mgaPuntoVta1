@@ -135,3 +135,63 @@ export async function syncArticuloStock(articulo_id: number, supabase: SupabaseC
     .update({ stock_actual: totalArticulo })
     .eq('id', articulo_id)
 }
+
+export type ResultadoStockOtica = {
+  ok: boolean
+  error: string | null
+  yaAplicado: boolean
+}
+
+/**
+ * Descuenta el stock de los ítems de una OT de óptica que tengan articulo_id.
+ * El descuento real ocurre dentro del RPC (transaccional: todo o nada).
+ * Acá solo se llama a syncArticuloStock para los agregados de display.
+ */
+export async function descontarItemsOptica(
+  ordenId: number,
+  usuarioId: string,
+  supabase: SupabaseClient,
+): Promise<ResultadoStockOtica> {
+  const { data, error } = await supabase.rpc('descontar_stock_optica_orden', {
+    p_orden_id: ordenId,
+    p_usuario_id: usuarioId,
+  })
+
+  if (error) return { ok: false, error: error.message, yaAplicado: false }
+
+  const res = data as { ok?: boolean; error?: string; ya_descontado?: boolean; articulo_ids?: number[] } | null
+  if (!res?.ok) return { ok: false, error: res?.error ?? 'Error desconocido al descontar stock', yaAplicado: false }
+
+  const ids = [...new Set(res.articulo_ids ?? [])]
+  for (const aid of ids) await syncArticuloStock(aid, supabase)
+
+  return { ok: true, error: null, yaAplicado: res.ya_descontado === true }
+}
+
+/**
+ * Devuelve el stock de los ítems de una OT y marca stock_descontado_at = NULL.
+ * Idempotente: si la OT no tiene descuento vigente no hace nada.
+ * Ambos movimientos quedan en el historial (a diferencia de ventas, donde el
+ * DELETE borra los movimientos) porque una OT puede tener varias generaciones
+ * de movimientos 'optica' si fue editada antes de tener tareas.
+ */
+export async function revertirItemsOptica(
+  ordenId: number,
+  usuarioId: string,
+  supabase: SupabaseClient,
+): Promise<ResultadoStockOtica> {
+  const { data, error } = await supabase.rpc('revertir_stock_optica_orden', {
+    p_orden_id: ordenId,
+    p_usuario_id: usuarioId,
+  })
+
+  if (error) return { ok: false, error: error.message, yaAplicado: false }
+
+  const res = data as { ok?: boolean; error?: string; ya_revertido?: boolean; articulo_ids?: number[] } | null
+  if (!res?.ok) return { ok: false, error: res?.error ?? 'Error desconocido al revertir stock', yaAplicado: false }
+
+  const ids = [...new Set(res.articulo_ids ?? [])]
+  for (const aid of ids) await syncArticuloStock(aid, supabase)
+
+  return { ok: true, error: null, yaAplicado: res.ya_revertido === true }
+}
