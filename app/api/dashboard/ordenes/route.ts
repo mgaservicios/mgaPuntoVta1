@@ -4,6 +4,7 @@ import { requirePermission } from '@/lib/require-permission'
 import { getTenantClient } from '@/services/supabase-tenant'
 import { getHomeSucursalId, assertActiveSucursalIsHome, getSucursalFilter } from '@/lib/sucursal'
 import { normalizarBusquedaNumero } from '@/lib/busqueda-numero'
+import { validarFechaDocumento } from '@/lib/fecha-documento'
 
 export async function GET(req: NextRequest) {
   const session = await auth()
@@ -79,11 +80,14 @@ export async function POST(req: NextRequest) {
   const { data: nextNum } = await supabase.rpc('next_numero_sucursal', { p_sucursal_id: sucursalId, p_tipo: 'orden_venta' })
   const numero = `OV-${String(sucursalId).padStart(2, '0')}-${String(nextNum).padStart(5, '0')}`
 
+  const fechaRes = validarFechaDocumento(body.fecha, () => new Date().toISOString().slice(0, 10))
+  if (!fechaRes.ok) return NextResponse.json({ error: fechaRes.error }, { status: 400 })
+
   const { data: orden, error: ordenError } = await supabase
     .from('ordenes_venta')
     .insert({
       numero,
-      fecha: body.fecha ?? new Date().toISOString().slice(0, 10),
+      fecha: fechaRes.valor,
       vencimiento: body.vencimiento || null,
       cliente_id: body.cliente_id ?? null,
       vendedor_id: body.vendedor_id ?? null,

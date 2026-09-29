@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth'
 import { requirePermission } from '@/lib/require-permission'
 import { getTenantClient } from '@/services/supabase-tenant'
 import { getSucursalFilter, getHomeSucursalId, assertActiveSucursalIsHome } from '@/lib/sucursal'
+import { validarFechaDocumento } from '@/lib/fecha-documento'
 
 export async function GET(req: NextRequest) {
   const session = await auth()
@@ -124,6 +125,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Datos incompletos' }, { status: 400 })
   }
 
+  const fechaRes = validarFechaDocumento(fecha, () => new Date().toISOString())
+  if (!fechaRes.ok) return NextResponse.json({ error: fechaRes.error }, { status: 400 })
+
   const prefix = tipo === 'entrada' ? 'E' : 'S'
   const tipoRemito = tipo === 'entrada' ? 'remito_entrada' : 'remito_salida'
   const { data: nextNum } = await supabase.rpc('next_numero_sucursal', { p_sucursal_id: sucursalId, p_tipo: tipoRemito })
@@ -139,7 +143,7 @@ export async function POST(req: NextRequest) {
       contraparte_sucursal_id: contraparte_sucursal_id ?? null,
       contraparte_proveedor_id: contraparte_proveedor_id ?? null,
       contraparte_nombre: contraparte_nombre?.trim() || null,
-      fecha: fecha || new Date().toISOString(),
+      fecha: fechaRes.valor,
       observaciones: observaciones?.trim() || null,
       nro_externo: nro_externo?.trim() || null,
       vendedor_id: vendedor_id ?? null,

@@ -10,12 +10,19 @@
 --   - orden_venta_items de ordenes de venta confirmadas
 --   - optica_orden_items de OT no anuladas (armazones de catálogo)
 --
--- Se ejecuta dentro de una transacción que termina en ROLLBACK: la tabla
--- temporal `_rb_fuentes` desaparece y no queda nada aplicado.
+-- `_rb_fuentes` es una tabla COMÚN, no temporal, a propósito.
+--
+-- El editor de Supabase va por PgBouncer en modo transaction pooling: la
+-- conexión al backend se libera al terminar cada transacción, así que una
+-- TEMP TABLE no sobrevive entre dos ejecuciones. Con una tabla común el
+-- reporte se puede correr en tres tramos (crear / consultar / borrar) y las
+-- secciones leen el mismo material.
+--
+-- No modifica datos de negocio. Lo único que escribe es esta tabla, que se
+-- borra al final. NO correr dentro de una transacción abierta: el `begin;`
+-- justamente provoca el cierre de la conexión.
 --
 -- Todas las consultas son de solo lectura.
-
-begin;
 
 -- ═══════════════════════════════════════════════════════════════════════════
 -- Fuente única normalizada. Las 5 se definen acá y todas las secciones de
@@ -25,7 +32,9 @@ begin;
 -- fecha, para que el saldo acumulado no muestre negativos intermedios falsos
 -- cuando en un mismo día entró y salió el mismo artículo.
 -- ═══════════════════════════════════════════════════════════════════════════
-create temp table _rb_fuentes on commit drop as
+drop table if exists _rb_fuentes;
+
+create table _rb_fuentes as
 select
   'remito_entrada'::text                      as doc_tipo,
   r.id                                         as doc_id,
@@ -201,31 +210,7 @@ limit 100;
 -- ═══ 5. Claves de documentos sin fila en articulo_stock ═══
 -- El rebuild las crea con el stock calculado. Si son muchas, es porque las
 -- ventas u OTs se registraron sin dar de alta el stock en esa sucursal.
-with saldos as (
-  select articulo_id, variante_id, sucursal_id, sum(delta) as calculado
-  from _rb_fuentes
-  group by articulo_id, variante_id, sucursal_id
-)
-select
-  s.sucursal_id,
-  a.codigo,
-  a.nombre,
-  s.variante_id,
-  s.calculado as stock_reconstruido,
-  (select count(*) from _rb_fuentes f
-    where f.articulo_id = s.articulo_id
-      and f.sucursal_id = s.sucursal_id
-      and f.variante_id is not distinct from s.variante_id) as documentos
-from saldos s
-join public.articulos a on a.id = s.articulo_id
-left join public.articulo_stock st
-  on st.articulo_id = s.articulo_id
- and st.sucursal_id = s.sucursal_id
- and st.variante_id is not distinct from s.variante_id
-where st.id is null
-order by abs(s.calculado) desc
-limit 100;
-
+ 
 
 -- ═══ 6. Claves que quedan en negativo ═══
 -- Saldo reconstruido menor que cero: se consumió más de lo que entró por
@@ -308,4 +293,4 @@ select
   (select coalesce(sum(calculado),0) from saldos) as unidades_reconstruidas,
   (select coalesce(sum(stock_actual),0) from public.articulo_stock) as unidades_hoy;
 
-rollback;
+drop table if exists _rb_fuentes;

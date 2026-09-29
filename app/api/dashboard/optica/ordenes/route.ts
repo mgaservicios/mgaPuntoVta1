@@ -4,6 +4,7 @@ import { requirePermission } from '@/lib/require-permission'
 import { getTenantClient } from '@/services/supabase-tenant'
 import { getHomeSucursalId, getSucursalFilter, assertActiveSucursalIsHome } from '@/lib/sucursal'
 import { normalizarBusquedaNumero } from '@/lib/busqueda-numero'
+import { validarFechaDocumento } from '@/lib/fecha-documento'
 import { descontarItemsOptica } from '@/services/stock'
 
 export async function GET(req: NextRequest) {
@@ -131,11 +132,14 @@ export async function POST(req: NextRequest) {
   const { data: nextNum } = await supabase.rpc('next_numero_sucursal', { p_sucursal_id: sucursalId, p_tipo: 'optica_orden' })
   const numero = `OT-${String(sucursalId).padStart(2, '0')}-${String(nextNum).padStart(5, '0')}`
 
+  const fechaRes = validarFechaDocumento(body.fecha, () => new Date().toISOString().slice(0, 10))
+  if (!fechaRes.ok) return NextResponse.json({ error: fechaRes.error }, { status: 400 })
+
   const { data: orden, error: ordenError } = await supabase
     .from('optica_ordenes')
     .insert({
       numero,
-      fecha: body.fecha ?? new Date().toISOString().slice(0, 10),
+      fecha: fechaRes.valor,
       fecha_prometida: body.fecha_prometida || null,
       cliente_id: body.cliente_id ?? null,
       medico_id: body.medico_id ?? null,

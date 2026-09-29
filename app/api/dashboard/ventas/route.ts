@@ -3,7 +3,8 @@ import { auth } from '@/lib/auth'
 import { requirePermission } from '@/lib/require-permission'
 import { getTenantClient } from '@/services/supabase-tenant'
 import { adjustArticuloStock, syncArticuloStock, validarStockSuficiente } from '@/services/stock'
-import { getActiveSucursalId, getHomeSucursalId, getSucursalFilter, assertActiveSucursalIsHome } from '@/lib/sucursal'
+import { getHomeSucursalId, getSucursalFilter, assertActiveSucursalIsHome } from '@/lib/sucursal'
+import { validarFechaDocumento } from '@/lib/fecha-documento'
 
 // GET — historial de ventas
 export async function GET(req: NextRequest) {
@@ -130,7 +131,7 @@ export async function POST(req: NextRequest) {
     .in('id', articuloIds)
 
   const varianteIds = items.map(i => i.variante_id).filter((v): v is number => v !== null)
-  let variantesMap: Record<number, string> = {}
+  const variantesMap: Record<number, string> = {}
   if (varianteIds.length > 0) {
     const { data: variantes } = await supabase
       .from('articulo_variantes')
@@ -147,11 +148,14 @@ export async function POST(req: NextRequest) {
   const articulosMap = Object.fromEntries((articulos ?? []).map(a => [a.id, a.nombre]))
 
   // Insertar venta
+  const fechaRes = validarFechaDocumento(body.fecha, () => new Date().toISOString().slice(0, 10))
+  if (!fechaRes.ok) return NextResponse.json({ error: fechaRes.error }, { status: 400 })
+
   const { data: venta, error: ventaError } = await supabase
     .from('ventas')
     .insert({
       numero,
-      fecha: body.fecha ?? new Date().toISOString().slice(0, 10),
+      fecha: fechaRes.valor,
       cliente_id: body.cliente_id ?? null,
       vendedor_id: body.vendedor_id ?? null,
       caja_sesion_id: cajaSesion.id,
@@ -199,7 +203,7 @@ export async function POST(req: NextRequest) {
   const { error: pagosError } = await supabase.rpc('registrar_pagos_venta', {
     p_venta_id:    venta.id,
     p_cliente_id:  body.cliente_id ?? null,
-    p_fecha:       body.fecha ?? new Date().toISOString().slice(0, 10),
+    p_fecha:       fechaRes.valor,
     p_numero:      numero,
     p_sucursal_id: sucursalId,
     p_usuario_id:  session.user.id,

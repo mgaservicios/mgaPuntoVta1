@@ -17,9 +17,13 @@
 --   3. supabase/stock_rebuild_auditoria.sql — correr y revisar el reporte
 --
 -- CÓMO CORRERLO:
---   1. Probalo con dry_run = true. Se aplica todo y se deshace al final.
---   2. Con dry_run = false, aplica de verdad.
---   3. Guardá el reporte que imprime al final: es la verificación.
+--   1. Pegar el archivo COMPLETO en un solo bloque. Es un solo trabajo
+--      transaccional: si lo partís, las tablas temporales `_rb_*` se pierden
+--      (el editor de Supabase usa transaction pooling) y el script revienta
+--      a la mitad.
+--   2. Probalo con dry_run = true. Se aplica todo y se deshace al final.
+--   3. Con dry_run = false, aplica de verdad.
+--   4. Guardá el reporte que imprime al final: es la verificación.
 --
 -- ROLLBACK: supabase/stock_rebuild_rollback.sql
 --
@@ -33,7 +37,7 @@ begin;
 create temp table _rb_config on commit drop as
 select
   'd4f5fc7d-710b-44fc-8299-60fab9587c05'::uuid as admin_uuid,
-  true::boolean as dry_run;   -- ← poné false cuando quieras aplicar de verdad
+  false::boolean as dry_run;   -- ← poné true para simular sin aplicar
 
 
 -- ═══════════════════════════════════════════════════════════════════════════
@@ -219,12 +223,24 @@ delete from public.movimientos_stock;
 -- dentro de la misma fecha para no generar negativos intermedios falsos.
 -- Se particiona por variante_id y NULL cae en su propia partición, que es lo
 -- correcto: las filas sin variante son una única serie.
+--
+-- El `id` se asigna a mano con OVERRIDING SYSTEM VALUE, con el MISMO criterio
+-- de orden que la ventana. Si se dejara al identity, PostgreSQL no garantiza
+-- que los ids sigan el ORDER BY (un plan paralelo los reparte entre workers),
+-- y la verificación de la cadena —que ordena por (created_at, id)— encontraría
+-- falsas roturas en todos los tramos donde el id no acompañó al orden real.
+--
+-- `_rb_fuentes` no tiene claves repetidas: (doc_tipo, doc_id, item_id) es único.
 insert into public.movimientos_stock
-  (articulo_id, variante_id, sucursal_id, tipo, cantidad, costo_unitario,
+  (id, articulo_id, variante_id, sucursal_id, tipo, cantidad, costo_unitario,
    stock_antes, stock_despues, usuario_id, referencia, observaciones,
    venta_id, venta_item_id, proveedor_id,
    remito_id, orden_venta_id, optica_orden_id, created_at)
+overriding system value
 select
+  row_number() over (
+    order by m.fecha, m.prioridad, m.doc_tipo, m.doc_id, m.item_id
+  ) as id,
   articulo_id,
   variante_id,
   sucursal_id,
@@ -249,14 +265,14 @@ from (
     coalesce(
       sum(f.delta) over (
         partition by f.articulo_id, f.variante_id, f.sucursal_id
-        order by f.fecha, f.prioridad, f.doc_id, f.item_id
+        order by f.fecha, f.prioridad, f.doc_tipo, f.doc_id, f.item_id
         rows between unbounded preceding and 1 preceding
       ),
       0
     ) as stock_antes
   from _rb_fuentes f
 ) m
-order by m.fecha, m.prioridad, m.doc_id, m.item_id;
+order by m.fecha, m.prioridad, m.doc_tipo, m.doc_id, m.item_id;
 
 -- created_at quedó explícito para conservar la fecha del documento. Se resetea
 -- la secuencia del identity para que los movimientos siguientes sigan la
@@ -313,14 +329,15 @@ update public.articulo_variantes v
 
 update public.articulos a
    set stock_actual = case
-     when exists (select 1 from public.articulo_stock st
-                   where st.articulo_id = a.id and st.variante_id is not null)
-       then coalesce((select sum(st.stock_actual) from public.articulo_stock st
-                       where st.articulo_id = a.id and st.variante_id is not null), 0)
-       else coalesce((select sum(st.stock_actual) from public.articulo_stock st
-                       where st.articulo_id = a.id and st.variante_id is null), 0)
-   end
- where exists (select 1 from public.articulo_stock st where st.articulo_id = a.id);
+      when exists (select 1 from public.articulo_stock st
+                    where st.articulo_id = a.id and st.variante_id is not null)
+        then coalesce((select sum(st.stock_actual) from public.articulo_stock st
+                        where st.articulo_id = a.id and st.variante_id is not null), 0)
+        else coalesce((select sum(st.stock_actual) from public.articulo_stock st
+                        where st.articulo_id = a.id and st.variante_id is null), 0)
+    end
+ where exists (select 1 from public.articulo_stock st where st.articulo_id = a.id)
+    or a.stock_actual <> 0;
 
 
 -- ═══════════════════════════════════════════════════════════════════════════
@@ -333,20 +350,20 @@ declare
   v_descuadre int;
   v_deriva_derivados int;
 begin
-  -- La cadena de saldos debe ser continua: el stock_despues de un movimiento
-  -- tiene que ser el stock_antes del siguiente, para la misma clave.
+  -- La cadena de saldos debe ser continua: el stock_antes de un movimiento
+  -- tiene que ser el stock_despues del movimiento anterior, para la misma clave.
   select count(*) into v_roto
   from (
     select
-      m.stock_despues,
-      lag(m.stock_antes) over (
+      m.stock_antes,
+      lag(m.stock_despues) over (
         partition by m.articulo_id, m.variante_id, m.sucursal_id
         order by m.created_at, m.id
-      ) as prev_antes
+      ) as prev_despues
     from public.movimientos_stock m
   ) x
-  where prev_antes is not null
-    and stock_despues is distinct from prev_antes;
+  where prev_despues is not null
+    and stock_antes is distinct from prev_despues;
 
   -- El último stock_despues de cada clave tiene que ser el stock_actual.
   with ultimo as (
@@ -380,22 +397,78 @@ begin
                      where st.articulo_id = a.id and st.variante_id is null)
           end), 0);
 
-  raise notice '── Verificación ──';
-  raise notice 'cadena rota:            %  (debe ser 0)', v_roto;
-  raise notice 'descuadre con stock:    %  (debe ser 0)', v_descuadre;
-  raise notice 'deriva en derivados:    %  (debe ser 0)', v_deriva_derivados;
-
+  -- Los NOTICE no se ven en el SQL Editor de Supabase, así que los números
+  -- van también en el texto del error: si algo falla, el editor lo muestra.
   if v_roto > 0 or v_descuadre > 0 or v_deriva_derivados > 0 then
-    raise exception 'Verificación fallida. Se aborta la transacción.';
+    raise exception
+      'Verificación fallida (se aborta todo). cadena rota: % | descuadre con stock: % | deriva en derivados: %',
+      v_roto, v_descuadre, v_deriva_derivados;
   end if;
 
-  raise notice 'Verificación OK';
+  raise notice 'Verificación OK: cadena 0, descuadre 0, derivados 0';
 end
 $$;
 
 
 -- ═══════════════════════════════════════════════════════════════════════════
 -- 7. Reporte final — guardalo: es la verificación de lo que se aplicó
+--
+-- El SQL Editor de Supabase muestra solo el ÚLTIMO resultado de un pegado, así
+-- que el resumen va al final. Para ver el detalle de las claves negativas
+-- corré la consulta de abajo por separado.
+-- ═══════════════════════════════════════════════════════════════════════════
+
+-- Detalle de las claves que quedaron negativas. Con `controla_stock` activo
+-- estas no se pueden vender hasta que se ajusten con un remito de entrada, así
+-- que guardá esta lista: es el pendiente de regularización.
+select
+  st.sucursal_id,
+  a.codigo,
+  a.nombre,
+  st.variante_id,
+  st.stock_actual as saldo_negativo
+from public.articulo_stock st
+join public.articulos a on a.id = st.articulo_id
+where st.stock_actual < 0
+order by st.stock_actual, a.codigo;
+
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- 8. Control de dry run
+--
+-- La excepción aborta la transacción, así que en un dry run el editor muestra
+-- ESTE mensaje y no los SELECT de arriba. Por eso los números van acá adentro:
+-- un solo pegado te dice si la reconstrucción habría quedado bien.
+-- ═══════════════════════════════════════════════════════════════════════════
+do $$
+declare
+  v_mov integer;
+  v_filas integer;
+  v_neg integer;
+  v_unidades numeric;
+begin
+  select
+    (select count(*) from public.movimientos_stock),
+    (select count(*) from public.articulo_stock),
+    (select count(*) from public.articulo_stock where stock_actual < 0),
+    (select coalesce(sum(stock_actual),0) from public.articulo_stock)
+  into v_mov, v_filas, v_neg, v_unidades;
+
+  if (select dry_run from _rb_config) then
+    raise exception
+      'DRY RUN — se deshace todo. Verificación OK (cadena 0, descuadre 0, derivados 0). Habría quedado: % movimientos, % filas de stock, % claves negativas, % unidades. Para aplicar de verdad: poné dry_run en false.',
+      v_mov, v_filas, v_neg, v_unidades;
+  end if;
+end
+$$;
+
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- 9. Resumen final (solo en la aplicación real; en dry run nunca se llega acá)
+--
+-- Va al final a propósito: el SQL Editor muestra el ÚLTIMO result set del
+-- pegado, así que esta fila es la que queda en pantalla al aplicar de verdad.
+-- Detalle de las claves negativas: corré aparte la consulta de la sección 7.
 -- ═══════════════════════════════════════════════════════════════════════════
 select
   (select count(*) from public.movimientos_stock)                      as movimientos,
@@ -407,18 +480,5 @@ select
   (select count(*) from public.articulo_stock)                         as filas_stock,
   (select count(*) from public.articulo_stock where stock_actual < 0)  as saldos_negativos,
   (select coalesce(sum(stock_actual),0) from public.articulo_stock)    as unidades_totales;
-
-
--- ═══════════════════════════════════════════════════════════════════════════
--- 8. Control de dry run
--- ═══════════════════════════════════════════════════════════════════════════
-do $$
-begin
-  if (select dry_run from _rb_config) then
-    raise exception
-      'DRY RUN — se deshace todo. Cambiá dry_run a false en _rb_config para aplicar de verdad.';
-  end if;
-end
-$$;
 
 commit;

@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth'
 import { requirePermission } from '@/lib/require-permission'
 import { getTenantClient } from '@/services/supabase-tenant'
 import { assertHomeSucursal } from '@/lib/sucursal'
+import { validarFechaDocumento } from '@/lib/fecha-documento'
 import { descontarItemsOptica, revertirItemsOptica } from '@/services/stock'
 
 type Ctx = { params: Promise<{ id: string }> }
@@ -61,6 +62,7 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
   }
 
   const body = await req.json()
+  const hoy = new Date().toISOString().slice(0, 10)
   const tieneTareas = (existing.optica_orden_tareas ?? []).length > 0
 
   // Con tareas en curso: solo se puede actualizar la fecha prometida
@@ -166,10 +168,13 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
     )
   }
 
+  const fechaRes = validarFechaDocumento(body.fecha, () => hoy)
+  if (!fechaRes.ok) return NextResponse.json({ error: fechaRes.error }, { status: 400 })
+
   const { error: updateError } = await supabase
     .from('optica_ordenes')
     .update({
-      fecha: body.fecha,
+      fecha: fechaRes.valor,
       fecha_prometida: body.fecha_prometida || null,
       cliente_id: body.cliente_id ?? null,
       medico_id: body.medico_id ?? null,
