@@ -21,6 +21,19 @@ export async function GET(req: NextRequest) {
 
   const VARIANTES_SELECT = 'id, sku, precio_venta, stock_actual, activo, articulo_id, variante_atributos(valor, atributo_tipos(nombre))'
 
+  const SELECT_BASE = `id, codigo, nombre, tipo_articulo, precio_venta, stock_actual, activo, imagen_url,
+    categorias(id, nombre), subcategorias(id, nombre), marcas(id, nombre), proveedores(id, nombre),
+    articulo_variantes(${VARIANTES_SELECT})`
+
+  // `con_stock` se resuelve con un embed !inner, no trayendo los ids a la app para
+  // filtrar con `in ()`. Con ~5.000 artículos con stock la lista de ids pasaba los
+  // 20 KB de URL y PostgREST respondía 400, así que la búsqueda no devolvía nada.
+  const SELECT_CON_STOCK = `${SELECT_BASE}, articulo_stock!inner(sucursal_id, variante_id, stock_actual)`
+
+  // El tipo del select se come el parser de postgrest-js, que no puede parsear un
+  // ternario entre dos literales. El resultado se castea a EnrichedRow más abajo.
+  const select: string = conStock ? SELECT_CON_STOCK : SELECT_BASE
+
   async function enrichVariantes(rows: { id: number; tipo_articulo: string }[]) {
     const ids = rows.filter(a => a.tipo_articulo === 'con_variantes').map(a => a.id)
     if (ids.length === 0) return rows.map(a => ({ ...a, articulo_variantes: [] }))
@@ -99,14 +112,31 @@ export async function GET(req: NextRequest) {
       return result
     }
 
-    return rows.map(a => ({
-      ...a,
-      stock_sucursales: withAll(byArticulo[a.id] ?? []),
-      articulo_variantes: (a.articulo_variantes ?? []).map((v) => ({
-        ...v,
-        stock_sucursales: withAll(byVariante[v.id] ?? []),
-      })),
-    }))
+    const deSucursalActiva = (entries: StockEntry[]) =>
+      entries.filter(e => e.sucursal_id === activeSucursalId)
+        .reduce((n, e) => n + Number(e.stock_actual), 0)
+
+    return rows.map(a => {
+      const stockArticulo = withAll(byArticulo[a.id] ?? [])
+      const articulo_variantes = (a.articulo_variantes ?? []).map((v) => {
+        const stockVariante = withAll(byVariante[v.id] ?? [])
+        return { ...v, stock_sucursales: stockVariante, stock_sucursal_actual: deSucursalActiva(stockVariante) }
+      })
+
+      return {
+        ...a,
+        // El embed !inner solo estaba para filtrar; el stock por sucursal sale
+        // de acá, ya normalizado con 0 en las sucursales sin fila.
+        articulo_stock: undefined,
+        stock_sucursales: stockArticulo,
+        // Un con_variantes no tiene fila de stock a nivel artículo: el stock vive
+        // en las variantes. Sumar solo la fila de artículo daría 0 siempre.
+        stock_sucursal_actual: a.tipo_articulo === 'con_variantes'
+          ? articulo_variantes.reduce((n, v) => n + v.stock_sucursal_actual, 0)
+          : deSucursalActiva(stockArticulo),
+        articulo_variantes,
+      }
+    })
   }
 
   async function enrichPrecios(rows: Array<{ id: number; articulo_variantes?: Array<{ id: number }> }>) {
@@ -188,79 +218,48 @@ export async function GET(req: NextRequest) {
   type EnrichedRow = { id: number; tipo_articulo: string; articulo_variantes?: Array<{ id: number }> } & Record<string, unknown>
   let enriched: EnrichedRow[]
 
-  // Artículos con stock en la sucursal activa.
-  // Antes este filtro solo se aplicaba al listado sin búsqueda, así que buscar por
-  // texto devolvía artículos sin stock. Se calcula una vez y se aplica a ambas ramas.
-  let idsConStock: number[] | null = null
-  if (conStock) {
-    const { data: stockIds } = await supabase
-      .from('articulo_stock')
-      .select('articulo_id')
-      .eq('sucursal_id', activeSucursalId)
-      .gt('stock_actual', 0)
-    idsConStock = [...new Set((stockIds ?? []).map((s: { articulo_id: number }) => s.articulo_id))]
-    if (idsConStock.length === 0) return NextResponse.json([])
-  }
-
+  // `articulo_stock.sucursal_id` / `.stock_actual` solo existen en el select cuando
+  // se pidió con_stock, así que los filtros de stock se agregan solo en ese caso.
+  // PostgREST deduplica el artículo padre: una fila por artículo, con todas sus
+  // filas de stock de la sucursal activa embebidas.
   if (q?.trim()) {
     const term = q.trim()
-    const SELECT_Q = `id, codigo, nombre, tipo_articulo, precio_venta, stock_actual, activo, imagen_url,
-      categorias(id, nombre), subcategorias(id, nombre), marcas(id, nombre), proveedores(id, nombre),
-      articulo_variantes(${VARIANTES_SELECT})`
-
-    // 1. Exacto en codigo o codigo_barras
-    let byCodeQ = supabase
-      .from('articulos')
-      .select(SELECT_Q)
-      .or(`codigo.ilike.${term},codigo_barras.ilike.${term}`)
-      .order('nombre')
-      .limit(50)
-    if (soloActivos) byCodeQ = byCodeQ.eq('activo', true)
-    if (idsConStock)  byCodeQ = byCodeQ.in('id', idsConStock)
-    if (filtroProveedorId) byCodeQ = byCodeQ.eq('proveedor_id', filtroProveedorId)
-    if (filtroMarcaId)     byCodeQ = byCodeQ.eq('marca_id', filtroMarcaId)
-    if (filtroCategoriaId) byCodeQ = byCodeQ.eq('categoria_id', filtroCategoriaId)
-
-    const { data: byCode, error: errCode } = await byCodeQ
-    if (errCode) return NextResponse.json({ error: errCode.message }, { status: 500 })
-
-    if ((byCode ?? []).length > 0) {
-      enriched = (byCode ?? []) as EnrichedRow[]
-    } else {
-      // 2. Parcial en codigo o nombre
-      let byPartialQ = supabase
-        .from('articulos')
-        .select(SELECT_Q)
-        .or(`codigo.ilike.%${term}%,nombre.ilike.%${term}%`)
-        .order('nombre')
-        .limit(50)
-      if (soloActivos) byPartialQ = byPartialQ.eq('activo', true)
-      if (idsConStock)  byPartialQ = byPartialQ.in('id', idsConStock)
-      if (filtroProveedorId) byPartialQ = byPartialQ.eq('proveedor_id', filtroProveedorId)
-      if (filtroMarcaId)     byPartialQ = byPartialQ.eq('marca_id', filtroMarcaId)
-      if (filtroCategoriaId) byPartialQ = byPartialQ.eq('categoria_id', filtroCategoriaId)
-
-      const { data: byPartial, error: errPartial } = await byPartialQ
-      if (errPartial) return NextResponse.json({ error: errPartial.message }, { status: 500 })
-      enriched = (byPartial ?? []) as EnrichedRow[]
-    }
-  } else {
+    // Exacto y parcial en una sola pasada: el exacto es un subconjunto del
+    // parcial, así que la consulta anterior gastaba una vuelta de más.
+    // Ojo: dentro del or() no se puede filtrar por una tabla embebida
+    // (`articulo_variantes.sku` da PGRST100), por eso el SKU no se busca acá.
     let query = supabase
       .from('articulos')
-      .select(`id, codigo, nombre, tipo_articulo, precio_venta, stock_actual, activo,
-        categorias(id, nombre), subcategorias(id, nombre), marcas(id, nombre), proveedores(id, nombre),
-        articulo_variantes(${VARIANTES_SELECT})`)
+      .select(select)
+      .or(`codigo.ilike.${term},codigo_barras.ilike.${term},`
+        + `codigo.ilike.%${term}%,nombre.ilike.%${term}%`)
       .order('nombre')
+      .limit(50)
 
     if (soloActivos) query = query.eq('activo', true)
-    if (idsConStock)  query = query.in('id', idsConStock)
+    if (conStock) query = query.eq('articulo_stock.sucursal_id', activeSucursalId).gt('articulo_stock.stock_actual', 0)
     if (filtroProveedorId) query = query.eq('proveedor_id', filtroProveedorId)
     if (filtroMarcaId)     query = query.eq('marca_id', filtroMarcaId)
     if (filtroCategoriaId) query = query.eq('categoria_id', filtroCategoriaId)
 
     const { data, error } = await query
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    enriched = (data ?? []) as EnrichedRow[]
+    enriched = (data ?? []) as unknown as EnrichedRow[]
+  } else {
+    let query = supabase
+      .from('articulos')
+      .select(select)
+      .order('nombre')
+
+    if (soloActivos) query = query.eq('activo', true)
+    if (conStock) query = query.eq('articulo_stock.sucursal_id', activeSucursalId).gt('articulo_stock.stock_actual', 0)
+    if (filtroProveedorId) query = query.eq('proveedor_id', filtroProveedorId)
+    if (filtroMarcaId)     query = query.eq('marca_id', filtroMarcaId)
+    if (filtroCategoriaId) query = query.eq('categoria_id', filtroCategoriaId)
+
+    const { data, error } = await query
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    enriched = (data ?? []) as unknown as EnrichedRow[]
   }
 
   // enrichStock y enrichPrecios son independientes — ambos leen de `enriched` sin depender el uno del otro

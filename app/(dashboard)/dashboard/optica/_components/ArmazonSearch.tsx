@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { Package } from 'lucide-react'
+import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
 
 export interface StockSucursal {
@@ -80,8 +81,16 @@ export default function ArmazonSearch({
       // El backend vuelve a validar al guardar, esto es solo para no ofrecer
       // armazones que no se pueden usar.
       const res = await fetch(`/api/dashboard/articulos?con_stock=true&q=${encodeURIComponent(q)}`)
+      // Sin este chequeo una falla del backend se veía como "no hay resultados":
+      // el array vacío es indistinguible de una búsqueda que no encontró nada.
+      if (!res.ok) {
+        const body = await res.json().catch(() => null)
+        toast.error(body?.error ?? `No se pudo buscar (error ${res.status})`)
+        setResults([])
+        return
+      }
       const data = await res.json()
-      setResults(Array.isArray(data) ? data.slice(0, 10) : [])
+      setResults(Array.isArray(data) ? data : [])
     }, 250)
   }, [q])
 
@@ -126,9 +135,15 @@ export default function ArmazonSearch({
           onBlur={() => setTimeout(() => { setOpen(false); setExpandingId(null) }, 200)}
         />
       </div>
-      {open && results.length > 0 && (
+      {open && q.trim() && (
         <div className="absolute z-30 top-full mt-1 w-72 bg-white rounded-md border shadow-lg max-h-60 overflow-auto">
-          {results.map(a => (
+          {results.length === 0 ? (
+            // La búsqueda filtra por stock de la sucursal activa, así que "nada"
+            // casi siempre es "está en otra sucursal" o "no hay stock", no un error.
+            <p className="px-3 py-2 text-xs text-gray-500">
+              Sin resultados con stock en la sucursal activa.
+            </p>
+          ) : results.map(a => (
             <div key={a.id}>
               <button
                 type="button"

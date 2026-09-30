@@ -249,6 +249,18 @@ ambas.
 artículos y variantes es el agregado de todas las sucursales, así que la UI no podía mostrar el
 stock real disponible. Ahora expone `stock_sucursal_actual` y `stock_sucursales`.
 
+**5. La búsqueda de artículos con stock no devolvía nada.** `con_stock` se armaba trayendo los
+`articulo_id` con stock de la sucursal activa y filtrando en la app con `in ()`. Con ~5.000
+artículos la lista de ids pasaba los 20 KB de URL: PostgREST respondía 400 y el dropdown de
+armazones de la OT salía vacío, sin error. Ahora el filtro es un embed
+`articulo_stock!inner(sucursal_id, variante_id, stock_actual)` con
+`articulo_stock.sucursal_id=eq.<sucursal>` y `articulo_stock.stock_actual=gt.0`, que deja la URL
+en ~750 caracteres. De paso la búsqueda por texto se unificó en una sola consulta (el exacto en
+código es un subconjunto del parcial) y el listado expone `stock_sucursal_actual`.
+
+> Regla: **nunca filtrar por una lista de ids traída a la app.** Se agrega un id por artículo con
+> stock y la URL crece sin techo. Si el filtro es sobre `articulo_stock`, va como embed.
+
 ---
 
 ## Bugs conocidos (documentados, no arreglados)
